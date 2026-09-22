@@ -114,9 +114,10 @@ export default function Services() {
               <br />
               <span className="text-gradient">the table.</span>
             </h2>
-            <p className="text-base leading-loose max-w-lg" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}>
+            {/*<p className="text-base leading-loose max-w-lg" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}>
               Edit later
             </p>
+            */}
           </div>
 
           {/* Pricing display */}
