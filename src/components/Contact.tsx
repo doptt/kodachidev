@@ -82,7 +82,7 @@ export default function Contact() {
               fontFamily: 'Inter, sans-serif',
               fontWeight: 300,
             }}>
-              Tell me what you're looking for, i'll handle the rest.
+              Tell me what you're looking for, I'll handle the rest.
             </p>
             <p className="text-sm leading-loose mb-12" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}>
               Typical Response Time: 24 hours
