@@ -1,0 +1,273 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+@theme inline {
+  --color-bg-base: #07060D;
+  --color-bg-secondary: #0D0B16;
+  --color-bg-elevated: #151121;
+  --color-accent: #9B6DFF;
+  --color-accent-electric: #7547FF;
+  --color-accent-soft: #C6A9FF;
+  --color-text-primary: #F5F2FF;
+  --color-text-secondary: #A29BB5;
+  --color-border-subtle: rgba(155, 109, 255, 0.15);
+  --font-display: 'Sora', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 109, 255, 0.3) transparent;
+}
+
+body {
+  margin: 0;
+  background-color: #07060D;
+  color: #F5F2FF;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(155, 109, 255, 0.3);
+  border-radius: 3px;
+}
+
+/* Glass system */
+.glass {
+  background: rgba(21, 17, 33, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(155, 109, 255, 0.12);
+}
+
+.glass-light {
+  background: rgba(155, 109, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(155, 109, 255, 0.1);
+}
+
+.glass-strong {
+  background: rgba(13, 11, 22, 0.8);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(155, 109, 255, 0.18);
+}
+
+/* Subtle grain texture */
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0.4;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-12px) rotate(1deg); }
+  66% { transform: translateY(6px) rotate(-0.5deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(20px, -15px) rotate(2deg); }
+  50% { transform: translate(-10px, 20px) rotate(-1deg); }
+  75% { transform: translate(-20px, -8px) rotate(1.5deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes drift-slow {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, 20px) scale(1.08); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes nebula-pulse {
+  0%, 100% { opacity: 0.5; filter: blur(60px); }
+  50% { opacity: 0.8; filter: blur(45px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); pointer-events: none; }
+  to { opacity: 1; transform: translateY(0); pointer-events: auto; }
+}
+
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(155, 109, 255, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(155, 109, 255, 0); }
+}
+
+/* Starfield: two-node star (outer = position + slow drift via translate,
+   inner = glow/twinkle via opacity+scale) so drift and twinkle never fight
+   over the same `transform` property. */
+@keyframes star-twinkle {
+  0%, 100% { opacity: var(--star-base, 0.3); transform: scale(var(--star-scale-base, 1)); }
+  50% { opacity: var(--star-peak, 0.95); transform: scale(var(--star-scale-peak, 1.15)); }
+}
+
+@keyframes star-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(5px, -6px); }
+}
+
+.star-core {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+}
+
+/* Diffraction-spike flare for the brighter "hero" stars — a soft cross of
+   light like a camera/eye actually resolves on a bright point source, so
+   it reads as a real light source instead of a flat dot. */
+.star-spike::before,
+.star-spike::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: linear-gradient(90deg, transparent, var(--spike-color, rgba(245, 242, 255, 0.5)) 50%, transparent);
+  pointer-events: none;
+}
+.star-spike::before {
+  width: var(--spike-len, 18px);
+  height: 1px;
+  transform: translate(-50%, -50%);
+}
+.star-spike::after {
+  width: 1px;
+  height: var(--spike-len, 18px);
+  transform: translate(-50%, -50%);
+}
+
+/* Comet: translate happens in the parent/document coordinate space (a
+   straight diagonal line), then rotate + optional mirror tilt the artwork
+   itself in place — order matters here or the streak arcs instead of
+   flying straight. */
+@keyframes comet-fly {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(var(--comet-angle, 16deg)) scaleX(var(--comet-mirror, 1));
+  }
+  3% { opacity: 1; }
+  7% { opacity: 0.9; }
+  11% {
+    opacity: 0;
+    transform: translate(var(--comet-dx, 55vw), var(--comet-dy, 28vh)) rotate(var(--comet-angle, 16deg)) scaleX(var(--comet-mirror, 1));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--comet-dx, 55vw), var(--comet-dy, 28vh)) rotate(var(--comet-angle, 16deg)) scaleX(var(--comet-mirror, 1));
+  }
+}
+
+.animate-star-twinkle { animation-name: star-twinkle; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+.animate-star-drift { animation-name: star-drift; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+.animate-comet { animation-name: comet-fly; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); animation-iteration-count: infinite; }
+
+.animate-float { animation: float 8s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
+.animate-drift { animation: drift 20s ease-in-out infinite; }
+.animate-drift-slow { animation: drift-slow 28s ease-in-out infinite; }
+.animate-nebula { animation: nebula-pulse 6s ease-in-out infinite; }
+.animate-fade-up { animation: fade-up 0.8s ease-out forwards; }
+.animate-status { animation: status-pulse 2s ease-in-out infinite; }
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-700 { animation-delay: 0.7s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-pulse-glow,
+  .animate-drift,
+  .animate-drift-slow,
+  .animate-nebula,
+  .animate-star-twinkle,
+  .animate-star-drift,
+  .animate-comet {
+    animation: none;
+  }
+}
+
+/* Typography utilities */
+.font-display { font-family: 'Sora', sans-serif; }
+.font-mono-label { font-family: 'JetBrains Mono', monospace; }
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #C6A9FF 0%, #9B6DFF 50%, #7547FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-subtle {
+  background: linear-gradient(135deg, #F5F2FF 0%, #C6A9FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Shimmer button effect */
+.btn-shimmer {
+  background: linear-gradient(
+    90deg,
+    #9B6DFF 0%,
+    #7547FF 30%,
+    #C6A9FF 50%,
+    #7547FF 70%,
+    #9B6DFF 100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Section divider */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(155, 109, 255, 0.2), transparent);
+}
+
+/* Focus styles */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: rgba(155, 109, 255, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(155, 109, 255, 0.1);
+}
