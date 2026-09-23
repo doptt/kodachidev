@@ -27,7 +27,7 @@ const services = [
   },
   {
     num: '03',
-    title: 'Business & Portfolios',
+    title: 'Businesses & Portfolios',
     desc: 'Whether you\'re running a business, showcasing your work, or building your brand, I create professional websites with reliable backend, automated emails, and secure user experiences.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">

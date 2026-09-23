@@ -6,7 +6,7 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "baseUrl": "kodachi.dev",
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
