@@ -50,7 +50,7 @@ const services = [
   },
   {
     num: '05',
-    title: 'Payment Systems and Databases',
+    title: 'Payments and Online Booking',
     desc: 'I use Stripe or Square to setup online payments for your business. Orders stored and organized neatly in a secure database for easy access, and order confirmations sent automatically',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -135,7 +135,7 @@ export default function Services() {
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
               }}>
-                3-4 weeks
+                1-4 weeks
               </div>
               <div className="w-8 h-px mb-4" style={{ background: 'rgba(155,109,255,0.35)' }} />
               <a href="#contact" className="inline-flex items-center gap-2 text-sm font-display font-semibold transition-all duration-200"
