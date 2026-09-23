@@ -60,7 +60,7 @@ export default function About() {
             color: '#F5F2FF',
           }}>
             Thoughtful design.{' '}
-            <span className="text-gradient">\nSolid engineering.</span>
+            <span className="text-gradient"> Solid engineering.</span>
           </h2>
         </Reveal>
 
