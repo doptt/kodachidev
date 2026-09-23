@@ -32,7 +32,7 @@ const traits = [
   {
     label: 'Compliance',
     detail: 'If you\'re selling a product or service, collecting user data, or anything that requires legal compliance, I assure your site is up to code with the latest regulations.',
-    glyph: '⌘',
+    glyph: '⚖',
   },
 ]
 
