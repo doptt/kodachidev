@@ -164,7 +164,7 @@ export default function Hero() {
             opacity: 0,
           }}
         >
-          High-quality online business{' '}
+          Modern websites built to grow your business{' '}
           <span className="text-gradient">and web services.</span>
         </h1>
 
@@ -178,8 +178,7 @@ export default function Hero() {
             opacity: 0,
           }}
         >
-          I build modern, secure websites that help individuals and small businesses establish
-          their online presence.
+          I build fast, responsive websites that turn visitors into customers.
         </p>
 
        <div className="flex flex-col sm:flex-row items-center gap-3 mt-8 animate-fade-up delay-300" style={{ opacity: 0 }}>
