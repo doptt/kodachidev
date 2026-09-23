@@ -66,13 +66,17 @@ function makeStars(depth: Depth, count: number, offset: number): Star[] {
   })
 }
 
-function StarNode({ s }: { s: Star }) {
+// Each parallax layer is 200% of the viewport tall and holds two identical
+// copies of its stars (top half + bottom half). The layer scrolls, and when
+// it has moved one full screen it wraps back — copy A lands exactly where
+// copy B was, so the motion is seamless and never runs out.
+function StarNode({ s, copy }: { s: Star; copy: 0 | 1 }) {
   return (
     <div
       className="absolute animate-star-drift"
       style={{
         left: `${s.left}%`,
-        top: `${s.top}%`,
+        top: `${copy * 50 + s.top / 2}%`,
         animationDuration: `${s.driftDuration}s`,
         animationDelay: `${s.driftDelay}s`,
       }}
@@ -179,7 +183,24 @@ function Comet({ c }: { c: CometSpec }) {
   )
 }
 
+function StarLayer({ stars, layerRef }: { stars: Star[]; layerRef: React.RefObject<HTMLDivElement | null> }) {
+  return (
+    <div
+      ref={layerRef}
+      className="absolute inset-x-0 top-0"
+      style={{
+        height: '200%',
+        transform: 'translate3d(0, calc(var(--parallax-offset, 0px) - 50%), 0)',
+        willChange: 'transform',
+      }}
+    >
+      {([0, 1] as const).flatMap((copy) => stars.map((s) => <StarNode key={`${s.key}-${copy}`} s={s} copy={copy} />))}
+    </div>
+  )
+}
+
 export default function Starfield() {
+  const rootRef = useRef<HTMLDivElement>(null)
   const farRef = useRef<HTMLDivElement>(null)
   const midRef = useRef<HTMLDivElement>(null)
   const nearRef = useRef<HTMLDivElement>(null)
@@ -197,25 +218,26 @@ export default function Starfield() {
     []
   )
 
-  // Subtle scroll-linked parallax across the three depth layers — driven
-  // straight through refs (no React state), so 80+ star nodes never
-  // re-render on scroll. This is what keeps the sky from reading as a
-  // flat image pasted on top of the page: distances actually shift
-  // relative to each other as you move through the site.
+  // Scroll-linked parallax across the three depth layers — driven straight
+  // through refs (no React state), so the star nodes never re-render on
+  // scroll. The offset wraps every screen-height (see StarNode) instead of
+  // being clamped, which is what used to freeze the sky halfway down.
   useEffect(() => {
-    const layers: Array<{ ref: React.RefObject<HTMLDivElement | null>; factor: number; max: number }> = [
-      { ref: farRef, factor: 0.015, max: 40 },
-      { ref: midRef, factor: 0.035, max: 75 },
-      { ref: nearRef, factor: 0.065, max: 115 },
+    const layers: Array<{ ref: React.RefObject<HTMLDivElement | null>; factor: number }> = [
+      { ref: farRef, factor: 0.015 },
+      { ref: midRef, factor: 0.035 },
+      { ref: nearRef, factor: 0.065 },
     ]
 
     let ticking = false
     const update = () => {
-      const y = window.scrollY
+      // Clamp iOS rubber-band overscroll so the layer never exposes a gap.
+      const y = Math.max(0, window.scrollY)
+      const h = rootRef.current?.clientHeight || window.innerHeight
       for (const layer of layers) {
         const el = layer.ref.current
         if (!el) continue
-        const offset = Math.min(y * layer.factor, layer.max)
+        const offset = (y * layer.factor) % h
         el.style.setProperty('--parallax-offset', `${offset}px`)
       }
       ticking = false
@@ -229,29 +251,25 @@ export default function Starfield() {
 
     update()
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    window.addEventListener('resize', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
   }, [])
 
   return (
-    <div className="fixed inset-0 pointer-events-none" aria-hidden style={{ zIndex: 0 }}>
-      <div ref={farRef} className="absolute inset-0" style={{ transform: 'translateY(var(--parallax-offset, 0px))' }}>
-        {farStars.map((s) => (
-          <StarNode key={s.key} s={s} />
-        ))}
-      </div>
-      <div ref={midRef} className="absolute inset-0" style={{ transform: 'translateY(var(--parallax-offset, 0px))' }}>
-        {midStars.map((s) => (
-          <StarNode key={s.key} s={s} />
-        ))}
+    <div ref={rootRef} className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden style={{ zIndex: 0 }}>
+      <StarLayer stars={farStars} layerRef={farRef} />
+      <StarLayer stars={midStars} layerRef={midRef} />
+      {/* Comets fly their own screen-relative paths, so they sit outside the
+          wrapping parallax layers */}
+      <div className="absolute inset-0">
         {comets.map((c) => (
           <Comet key={c.id} c={c} />
         ))}
       </div>
-      <div ref={nearRef} className="absolute inset-0" style={{ transform: 'translateY(var(--parallax-offset, 0px))' }}>
-        {nearStars.map((s) => (
-          <StarNode key={s.key} s={s} />
-        ))}
-      </div>
+      <StarLayer stars={nearStars} layerRef={nearRef} />
     </div>
   )
 }

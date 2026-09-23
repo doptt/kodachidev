@@ -1,4 +1,4 @@
-import { useReveal } from '../hooks/useReveal'
+import Reveal from './Reveal'
 
 const stack = [
   { label: 'React', cat: 'Framework' },
@@ -36,19 +36,9 @@ const traits = [
   },
 ]
 
-function reveal(visible: boolean, delay = 0): React.CSSProperties {
-  return {
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateY(0)' : 'translateY(28px)',
-    transition: `opacity 0.75s ease ${delay}ms, transform 0.75s ease ${delay}ms`,
-  }
-}
-
 export default function About() {
-  const { ref, visible } = useReveal(0.1)
-
   return (
-    <section id="about" ref={ref as React.RefObject<HTMLElement>} className="relative py-36 overflow-hidden">
+    <section id="about" className="relative py-36 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" aria-hidden>
         <div style={{
           position: 'absolute', inset: 0,
@@ -59,7 +49,7 @@ export default function About() {
 
       <div className="relative max-w-6xl mx-auto px-6">
         {/* Section label */}
-        <div style={reveal(visible, 0)} className="mb-20">
+        <Reveal className="mb-20">
           <span className="font-mono-label text-xs tracking-widest uppercase mb-4 block" style={{ color: '#9B6DFF', letterSpacing: '0.16em' }}>
             About
           </span>
@@ -72,12 +62,12 @@ export default function About() {
             Small beginnings.{' '}
             <span className="text-gradient">Big ideas.</span>
           </h2>
-        </div>
+        </Reveal>
 
         {/* Two column main content */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-16 mb-20">
           {/* Intro text */}
-          <div style={reveal(visible, 80)}>
+          <Reveal delay={80}>
             <p className="mb-5" style={{
               fontSize: 'clamp(1rem, 1.8vw, 1.15rem)',
               lineHeight: 1.8,
@@ -95,16 +85,15 @@ export default function About() {
               My portfolio is growing and I'm constantly improving my work. If you're looking
               for a clean, reliable page with security being a priority. We'll work well together.
             </p>
-          </div>
+          </Reveal>
 
           {/* Trait cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {traits.map((t, i) => (
+              <Reveal key={t.label} delay={120 + (i % 2) * 70} className="h-full">
               <div
-                key={t.label}
-                className="rounded-2xl p-5 transition-all duration-250 cursor-default"
+                className="h-full rounded-2xl p-5 transition-all duration-250 cursor-default"
                 style={{
-                  ...reveal(visible, 120 + i * 60),
                   background: 'rgba(21,17,33,0.5)',
                   border: '1px solid rgba(155,109,255,0.1)',
                 }}
@@ -129,12 +118,13 @@ export default function About() {
                   {t.detail}
                 </p>
               </div>
+              </Reveal>
             ))}
           </div>
         </div>
 
         {/* Tech stack — horizontal flow */}
-        <div style={reveal(visible, 380)}>
+        <Reveal delay={120}>
           <div className="rounded-2xl p-8 sm:p-10 relative overflow-hidden" style={{
             background: 'rgba(13,11,22,0.7)',
             border: '1px solid rgba(155,109,255,0.12)',
@@ -162,15 +152,12 @@ export default function About() {
 
             <div className="flex flex-wrap gap-3">
               {stack.map((t, i) => (
+                <Reveal key={t.label} variant="scale" duration={500} delay={200 + i * 40}>
                 <div
-                  key={t.label}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-200 cursor-default"
                   style={{
                     background: 'rgba(155,109,255,0.06)',
                     border: '1px solid rgba(155,109,255,0.12)',
-                    opacity: visible ? 1 : 0,
-                    transform: visible ? 'scale(1)' : 'scale(0.9)',
-                    transition: `opacity 0.5s ease ${380 + i * 40}ms, transform 0.5s ease ${380 + i * 40}ms`,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'rgba(155,109,255,0.14)'
@@ -190,10 +177,11 @@ export default function About() {
                     {t.cat.toUpperCase()}
                   </span>
                 </div>
+                </Reveal>
               ))}
             </div>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   )

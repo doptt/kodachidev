@@ -1,19 +1,8 @@
 import { useState } from 'react'
-import { useReveal } from '../hooks/useReveal'
-
-const budgetOptions = ['Under $300', '$300 – $500', '$500 – $800', '$800+', 'Not sure yet']
-
-function reveal(visible: boolean, delay = 0): React.CSSProperties {
-  return {
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateY(0)' : 'translateY(28px)',
-    transition: `opacity 0.75s ease ${delay}ms, transform 0.75s ease ${delay}ms`,
-  }
-}
+import Reveal from './Reveal'
 
 export default function Contact() {
-  const { ref, visible } = useReveal(0.08)
-  const [form, setForm] = useState({ name: '', email: '', details: '', budget: '' })
+  const [form, setForm] = useState({ name: '', email: '', details: '' })
   const [sent, setSent] = useState(false)
 
   const input = (override?: React.CSSProperties): React.CSSProperties => ({
@@ -31,17 +20,17 @@ export default function Contact() {
     ...override,
   })
 
-  const onFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const onFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     e.target.style.borderColor = 'rgba(155,109,255,0.45)'
     e.target.style.boxShadow = '0 0 0 4px rgba(155,109,255,0.07)'
   }
-  const onBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const onBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     e.target.style.borderColor = 'rgba(155,109,255,0.15)'
     e.target.style.boxShadow = 'none'
   }
 
   return (
-    <section id="contact" ref={ref as React.RefObject<HTMLElement>} className="relative py-36 overflow-hidden">
+    <section id="contact" className="relative py-36 overflow-hidden">
       {/* Atmosphere */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden>
         <div style={{
@@ -55,7 +44,7 @@ export default function Contact() {
 
       <div className="relative max-w-6xl mx-auto px-6">
         {/* Wide header */}
-        <div style={reveal(visible, 0)} className="mb-16">
+        <Reveal className="mb-16">
           <span className="font-mono-label text-xs tracking-widest uppercase mb-4 block" style={{ color: '#9B6DFF', letterSpacing: '0.16em' }}>
             Contact
           </span>
@@ -69,12 +58,12 @@ export default function Contact() {
             <br />
             <span className="text-gradient">Let's bring it to life.</span>
           </h2>
-        </div>
+        </Reveal>
 
         {/* Two-column: copy + form */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-16 items-start">
           {/* Left: copy + socials */}
-          <div style={reveal(visible, 80)}>
+          <Reveal delay={80}>
             <p className="mb-8" style={{
               fontSize: '1.05rem',
               lineHeight: 1.8,
@@ -168,10 +157,10 @@ export default function Contact() {
                 </a>
               ))}
             </div>
-          </div>
+          </Reveal>
 
           {/* Right: form */}
-          <div style={reveal(visible, 160)}>
+          <Reveal delay={160}>
             <div className="rounded-3xl p-0.5" style={{
               background: 'linear-gradient(140deg, rgba(155,109,255,0.18) 0%, rgba(117,71,255,0.06) 50%, rgba(155,109,255,0.14) 100%)',
             }}>
@@ -240,23 +229,6 @@ export default function Contact() {
                       />
                     </div>
 
-                    <div>
-                      <label className="font-mono-label text-xs uppercase block mb-2" style={{ color: '#A29BB5', letterSpacing: '0.1em', fontSize: '10px' }}>
-                        Budget range <span style={{ opacity: 0.5 }}>(optional)</span>
-                      </label>
-                      <select
-                        value={form.budget}
-                        onChange={(e) => setForm({ ...form, budget: e.target.value })}
-                        style={input({ appearance: 'none', cursor: 'pointer' } as React.CSSProperties)}
-                        onFocus={onFocus} onBlur={onBlur}
-                      >
-                        <option value="" style={{ background: '#0D0B16' }}>Select a range...</option>
-                        {budgetOptions.map((o) => (
-                          <option key={o} value={o} style={{ background: '#0D0B16' }}>{o}</option>
-                        ))}
-                      </select>
-                    </div>
-
                     <button
                       type="submit"
                       className="w-full py-4 rounded-2xl font-display font-semibold text-sm transition-all duration-300"
@@ -284,7 +256,7 @@ export default function Contact() {
                 )}
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

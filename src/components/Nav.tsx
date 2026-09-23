@@ -8,8 +8,10 @@ const links = [
   { label: 'Contact', href: '#contact' },
 ]
 
-export default function Nav({ scrolled }: { scrolled: boolean }) {
+export default function Nav({ scrolled, onHome = true }: { scrolled: boolean; onHome?: boolean }) {
   const [open, setOpen] = useState(false)
+  // On other pages (e.g. /terms) section links need to point back to the home page
+  const prefix = onHome ? '' : '/'
 
   return (
     <>
@@ -32,7 +34,7 @@ export default function Nav({ scrolled }: { scrolled: boolean }) {
           }}
         >
           {/* Wordmark */}
-          <a href="#home" className="flex items-center gap-2 group">
+          <a href={onHome ? '#home' : '/'} className="flex items-center gap-2 group">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-display"
               style={{
@@ -56,7 +58,7 @@ export default function Nav({ scrolled }: { scrolled: boolean }) {
             {links.map((l) => (
               <li key={l.label}>
                 <a
-                  href={l.href}
+                  href={prefix + l.href}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200"
                   style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}
                   onMouseEnter={(e) => {
@@ -79,7 +81,7 @@ export default function Nav({ scrolled }: { scrolled: boolean }) {
           {/* CTA + hamburger */}
           <div className="flex items-center gap-3">
             <a
-              href="#contact"
+              href="/terms"
               className="hidden sm:block px-4 py-2 rounded-xl text-sm font-semibold font-display transition-all duration-200"
               style={{
                 background: 'linear-gradient(135deg, #9B6DFF, #7547FF)',
@@ -149,7 +151,7 @@ export default function Nav({ scrolled }: { scrolled: boolean }) {
           {links.map((l) => (
             <a
               key={l.label}
-              href={l.href}
+              href={prefix + l.href}
               onClick={() => setOpen(false)}
               className="text-2xl font-display font-semibold py-3 px-8 rounded-2xl transition-colors duration-200"
               style={{ color: '#F5F2FF', letterSpacing: '-0.02em' }}
@@ -160,7 +162,17 @@ export default function Nav({ scrolled }: { scrolled: boolean }) {
             </a>
           ))}
           <a
-            href="#contact"
+            href="/terms"
+            onClick={() => setOpen(false)}
+            className="font-mono-label text-xs uppercase py-2 px-6 transition-colors duration-200"
+            style={{ color: '#A29BB5', letterSpacing: '0.12em' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#9B6DFF')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#A29BB5')}
+          >
+            Terms & Conditions
+          </a>
+          <a
+            href={prefix + '#contact'}
             onClick={() => setOpen(false)}
             className="mt-4 px-8 py-3 rounded-2xl text-base font-display font-semibold"
             style={{

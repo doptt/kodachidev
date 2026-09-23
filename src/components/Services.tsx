@@ -1,4 +1,4 @@
-import { useReveal } from '../hooks/useReveal'
+import Reveal from './Reveal'
 
 const services = [
   {
@@ -73,19 +73,9 @@ const services = [
   },
 ]
 
-function reveal(visible: boolean, delay = 0): React.CSSProperties {
-  return {
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateY(0)' : 'translateY(28px)',
-    transition: `opacity 0.7s ease ${delay}ms, transform 0.7s ease ${delay}ms`,
-  }
-}
-
 export default function Services() {
-  const { ref, visible } = useReveal(0.08)
-
   return (
-    <section id="services" ref={ref as React.RefObject<HTMLElement>} className="relative py-36 overflow-hidden">
+    <section id="services" className="relative py-36 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" aria-hidden>
         <div style={{
           position: 'absolute', width: '900px', height: '600px',
@@ -100,7 +90,7 @@ export default function Services() {
       <div className="relative max-w-6xl mx-auto px-6">
         {/* Header + pricing — side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-12 mb-20 items-end">
-          <div style={reveal(visible, 0)}>
+          <Reveal duration={700}>
             <span className="font-mono-label text-xs tracking-widest uppercase mb-4 block" style={{ color: '#9B6DFF', letterSpacing: '0.16em' }}>
               Services
             </span>
@@ -118,10 +108,10 @@ export default function Services() {
               Edit later
             </p>
             */}
-          </div>
+          </Reveal>
 
           {/* Pricing display */}
-          <div style={reveal(visible, 120)}>
+          <Reveal delay={120} duration={700}>
             <div className="rounded-2xl p-7 relative overflow-hidden" style={{
               background: 'rgba(13,11,22,0.75)',
               border: '1px solid rgba(155,109,255,0.15)',
@@ -159,16 +149,16 @@ export default function Services() {
                 </svg>
               </a>
             </div>
-          </div>
+          </Reveal>
         </div>
 
         {/* Services grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {services.map((s, i) => (
+            <Reveal key={s.num} delay={80 + (i % 3) * 80} duration={700} className="h-full">
             <div
-              key={s.num}
-              style={{ ...reveal(visible, 80 + i * 70), background: 'rgba(21,17,33,0.45)', border: '1px solid rgba(155,109,255,0.1)' }}
-              className="group rounded-2xl p-6 transition-all duration-300 cursor-default"
+              style={{ background: 'rgba(21,17,33,0.45)', border: '1px solid rgba(155,109,255,0.1)' }}
+              className="group h-full rounded-2xl p-6 transition-all duration-300 cursor-default"
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'rgba(21,17,33,0.85)'
                 e.currentTarget.style.borderColor = 'rgba(155,109,255,0.25)'
@@ -204,12 +194,12 @@ export default function Services() {
                 {s.desc}
               </p>
             </div>
+            </Reveal>
           ))}
         </div>
 
         {/* Bottom CTA strip */}
-        <div className="mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 pt-10" style={{
-          ...reveal(visible, 550),
+        <Reveal duration={700} className="mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 pt-10" style={{
           borderTop: '1px solid rgba(155,109,255,0.08)',
         }}>
           <p className="text-sm" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}>
@@ -225,7 +215,7 @@ export default function Services() {
               <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </a>
-        </div>
+        </Reveal>
       </div>
     </section>
   )
