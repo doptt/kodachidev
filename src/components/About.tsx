@@ -75,7 +75,7 @@ export default function About() {
               fontFamily: 'Inter, sans-serif',
               fontWeight: 300,
             }}>
-              Hi, my name is Noah and I'm an independent web developer who enjoys building modern, functional,
+              Hi, my name is Noah. I'm an independent web developer who enjoys building modern, functional,
               and engaging websites.
             </p>
             <p className="mb-5 text-sm leading-loose" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}>
