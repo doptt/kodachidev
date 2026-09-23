@@ -22,7 +22,7 @@ const traits = [
   {
     label: 'Detail‑oriented',
     detail: 'The small details make or break your sites impression, I assure everything is just right before deployment.',
-    glyph: '◈',
+    glyph: '⚲',
   },
   {
     label: 'Communicative',
