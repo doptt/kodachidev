@@ -239,8 +239,8 @@ export default function Hero() {
             className="font-mono-label text-xs"
             style={{ color: '#A29BB5', letterSpacing: '0.04em' }}
           >
-            Typical projects:{' '}
-            <span style={{ color: '#C6A9FF' }}>$300–$800</span>
+            Projects starting at:{' '}
+            <span style={{ color: '#C6A9FF' }}>$125</span>
           </span>
         </div>
       </div>
