@@ -4,7 +4,7 @@ const services = [
   {
     num: '01',
     title: 'Design & Development',
-    desc: 'Custom websites built to last — I take pride in building a clean-looking, stable product. Thorough security & bug audits are done before pushing out.',
+    desc: 'I build clean, reliable websites tailored to your needs, with careful attention to performance, stability, and usability.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <rect x="2" y="3" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.4" />
@@ -28,7 +28,7 @@ const services = [
   {
     num: '03',
     title: 'Business & Portfolios',
-    desc: 'Online / In-person businesses. Automatic emails, secure checkout flow, dependable backend you can trust.',
+    desc: 'Whether you\'re running a business, showcasing your work, or building your brand, I create professional websites with reliable backend, automated emails, and secure user experiences.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <path d="M3 18V9l8-5 8 5v9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -39,7 +39,7 @@ const services = [
   {
     num: '04',
     title: 'Built with security in mind',
-    desc: 'I use modern frameworks, libraries, and security practices to help keep your website fast, reliable, and protected. Hosting handled through platforms like Vercel or Cloudflare, with security measures designed to reduce common threats.',
+    desc: 'I use modern frameworks, libraries, and security practices to help keep your website fast, reliable, and protected. Hosting handled through platforms like Vercel or Cloudflare, with measures taken to reduce common threats.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <path d="M4 11a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
