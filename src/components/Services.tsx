@@ -4,7 +4,7 @@ const services = [
   {
     num: '01',
     title: 'Design & Development',
-    desc: 'Custom websites built to last — I take pride in building a visually appealing, stable product. Thorough security & bug audits are done before pushing out.',
+    desc: 'Custom websites built to last — I take pride in building a clean-looking, stable product. Thorough security & bug audits are done before pushing out.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <rect x="2" y="3" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.4" />
@@ -16,7 +16,7 @@ const services = [
   {
     num: '02',
     title: 'Responsive Layouts',
-    desc: 'Adjusts accordingly to screen size — maintaining usability, functionality, and visual appeal.',
+    desc: 'Adjusts accordingly to screen size — maintaining functionality, usability, and visual appeal.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <rect x="2" y="4" width="12" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
@@ -39,7 +39,7 @@ const services = [
   {
     num: '04',
     title: 'Security built to protect you',
-    desc: 'I use modern frameworks and libraries to ensure your website is secure and reliable. Sites are hosted on Vercel or Cloudflare, equipped with security measures such as rate limiters, protection against API abuse, and more.',
+    desc: 'I use modern frameworks and libraries to ensure your website is fast and reliable. Sites are hosted on Vercel or Cloudflare, and equipped with security measures to throw off bad actors.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <path d="M4 11a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -63,7 +63,7 @@ const services = [
   {
     num: '06',
     title: 'Launch & Deploy',
-    desc: 'I handle hosting, domains, and deployment, so you can go live without the headache. (monthly hosting costs may apply)',
+    desc: 'I handle hosting, domains, and deployment, so you can go live without the headache. (monthly maintenance costs may apply)',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <path d="M11 15V5M7 9l4-4 4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />

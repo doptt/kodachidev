@@ -59,8 +59,8 @@ export default function About() {
             lineHeight: 1.05,
             color: '#F5F2FF',
           }}>
-            Small beginnings.{' '}
-            <span className="text-gradient">Big ideas.</span>
+            Thoughtful design.{' '}
+            <span className="text-gradient">Solid engineering.</span>
           </h2>
         </Reveal>
 
