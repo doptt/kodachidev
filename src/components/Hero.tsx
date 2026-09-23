@@ -164,8 +164,8 @@ export default function Hero() {
             opacity: 0,
           }}
         >
-          Modern websites built to grow your business{' '}
-          <span className="text-gradient">and web services.</span>
+          Modern websites built to{' '}
+          <span className="text-gradient">grow your business.</span>
         </h1>
 
         {/* Supporting text */}
