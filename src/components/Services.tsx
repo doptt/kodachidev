@@ -16,7 +16,7 @@ const services = [
   {
     num: '02',
     title: 'Responsive Layouts',
-    desc: 'Looks great on every screen.\nYour website adapts seamlessly across desktops, tablets, and mobile devices while maintaining its functionality, usability, and visual quality.',
+    desc: 'Looks great on every screen — Your website adapts seamlessly across desktops, tablets, and mobile devices while maintaining functionality and visual quality.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <rect x="2" y="4" width="12" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
@@ -27,7 +27,7 @@ const services = [
   },
   {
     num: '03',
-    title: 'Business & Portfolio Sites',
+    title: 'Business & Portfolios',
     desc: 'Online / In-person businesses. Automatic emails, secure checkout flow, dependable backend you can trust.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -38,8 +38,8 @@ const services = [
   },
   {
     num: '04',
-    title: 'Security built to protect you',
-    desc: 'I use modern frameworks and libraries to ensure your website is fast and reliable. Sites are hosted on Vercel or Cloudflare, and equipped with security measures to throw off bad actors.',
+    title: 'Built with security in mind',
+    desc: 'I use modern frameworks, libraries, and security practices to help keep your website fast, reliable, and protected. Hosting handled through platforms like Vercel or Cloudflare, with security measures designed to reduce common threats.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <path d="M4 11a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -51,7 +51,7 @@ const services = [
   {
     num: '05',
     title: 'Payments and Online Booking',
-    desc: 'I use Stripe or Square to setup online payments for your business. Orders stored and organized neatly in a secure database for easy access, and order confirmations sent automatically',
+    desc: 'Payments for your business setup with Stripe, Square, or another third-party provider. Orders stored and organized neatly in a secure database for easy access, and order confirmations sent automatically',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <rect x="3" y="5" width="16" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
@@ -62,8 +62,8 @@ const services = [
   },
   {
     num: '06',
-    title: 'Launch & Deploy',
-    desc: 'I handle hosting, domains, and deployment, so you can go live without the headache. (monthly maintenance costs may apply)',
+    title: 'Launch & Deployment',
+    desc: 'I handle the technical side of getting your website online — including hosting, domains, configuration, and deployment. (Monthly hosting and maintenance costs may apply)',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <path d="M11 15V5M7 9l4-4 4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
