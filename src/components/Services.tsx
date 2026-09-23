@@ -16,7 +16,7 @@ const services = [
   {
     num: '02',
     title: 'Responsive Layouts',
-    desc: 'Adjusts accordingly to screen size — maintaining functionality, usability, and visual appeal.',
+    desc: 'Looks great on every screen.\nYour website adapts seamlessly across desktops, tablets, and mobile devices while maintaining its functionality, usability, and visual quality.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
         <rect x="2" y="4" width="12" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.4" />

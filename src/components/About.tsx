@@ -83,7 +83,7 @@ export default function About() {
             </p>
             <p className="text-sm leading-loose" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif', opacity: 0.75 }}>
               My portfolio is growing and I'm constantly improving my work. If you're looking
-              for a clean, reliable page, We'll work well together.
+              for a clean, reliable page, we'll work well together.
             </p>
           </Reveal>
 
