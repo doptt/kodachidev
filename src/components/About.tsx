@@ -17,7 +17,7 @@ const traits = [
   {
     label: 'Versatile',
     detail: 'I adapt to your project needs. I work with payment processors, databases, emailing, and other typical business needs. Just let me know.',
-    glyph: '⊹',
+    glyph: '❖',
   },
   {
     label: 'Detail‑oriented',
@@ -27,7 +27,7 @@ const traits = [
   {
     label: 'Communicative',
     detail: 'I reply quickly and clearly. I keep you updated on progress and will be frequently asking questions to assure your vision is being met.',
-    glyph: '⟁',
+    glyph: '✉',
   },
   {
     label: 'Compliance',
