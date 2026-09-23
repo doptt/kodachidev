@@ -15,17 +15,17 @@ const stack = [
 
 const traits = [
   {
-    label: 'Versatile',
+    label: 'Flexible',
     detail: 'I adapt to your project needs. I work with payment processors, databases, emailing, and other typical business needs. Just let me know.',
     glyph: '❖\uFE0E',
   },
   {
-    label: 'Detail‑oriented',
+    label: 'Every detail matters',
     detail: 'The small details make or break your sites impression, I assure everything is just right before deployment.',
     glyph: '⚲\uFE0E',
   },
   {
-    label: 'Communicative',
+    label: 'Clear communication',
     detail: 'I reply quickly and clearly. I keep you updated on progress and will be frequently asking questions to assure your vision is being met.',
     glyph: '✉\uFE0E',
   },
@@ -60,7 +60,7 @@ export default function About() {
             color: '#F5F2FF',
           }}>
             Thoughtful design.{' '}
-            <span className="text-gradient"> Solid engineering.</span>
+            <span className="text-gradient">Solid engineering.</span>
           </h2>
         </Reveal>
 
