@@ -17,22 +17,22 @@ const traits = [
   {
     label: 'Versatile',
     detail: 'I adapt to your project needs. I work with payment processors, databases, emailing, and other typical business needs. Just let me know.',
-    glyph: '❖',
+    glyph: '❖\uFE0E',
   },
   {
     label: 'Detail‑oriented',
     detail: 'The small details make or break your sites impression, I assure everything is just right before deployment.',
-    glyph: '⚲',
+    glyph: '⚲\uFE0E',
   },
   {
     label: 'Communicative',
     detail: 'I reply quickly and clearly. I keep you updated on progress and will be frequently asking questions to assure your vision is being met.',
-    glyph: '✉',
+    glyph: '✉\uFE0E',
   },
   {
     label: 'Compliance',
     detail: 'If you\'re selling a product or service, collecting user data, or anything that requires legal compliance, I assure your site is up to code with the latest regulations.',
-    glyph: '⚖',
+    glyph: '⚖\uFE0E',
   },
 ]
 
@@ -79,11 +79,11 @@ export default function About() {
               and engaging websites.
             </p>
             <p className="mb-5 text-sm leading-loose" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}>
-              I focus on creating thoughtful digital experiences and ready-to-go business websites for small businesses, personal brands, etc. Deep security audits and bug testing are done before the site goes live, so you can rest easy knowing your page is safe with secure backend.
+              I focus on creating thoughtful digital experiences and ready-to-go business websites for small businesses, personal brands, etc. Deep security audits and bug testing are done before the site goes live, so you can rest easy knowing your page is safe with great backend.
             </p>
             <p className="text-sm leading-loose" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif', opacity: 0.75 }}>
               My portfolio is growing and I'm constantly improving my work. If you're looking
-              for a clean, reliable page with security being a priority. We'll work well together.
+              for a clean, reliable page, We'll work well together.
             </p>
           </Reveal>
 
