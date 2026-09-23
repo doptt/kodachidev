@@ -75,8 +75,8 @@ export default function About() {
               fontFamily: 'Inter, sans-serif',
               fontWeight: 300,
             }}>
-              I'm an independent web developer who enjoys building modern, functional,
-              and visually engaging websites.
+              Hi, my name is Noah and I'm an independent web developer who enjoys building modern, functional,
+              and engaging websites.
             </p>
             <p className="mb-5 text-sm leading-loose" style={{ color: '#A29BB5', fontFamily: 'Inter, sans-serif' }}>
               I focus on creating thoughtful digital experiences and ready-to-go business websites for small businesses, personal brands, etc. Deep security audits and bug testing are done before the site goes live, so you can rest easy knowing your page is safe with secure backend.
