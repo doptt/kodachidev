@@ -1,40 +1,47 @@
-import { useRef, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-function prefersReducedMotion() {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-}
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-/**
- * Observes a single element and flips `visible` once it scrolls into view.
+/*
+ * Flips `visible` to true once the element's top edge is about 10% above the
+ * bottom of the screen, then stops watching.
  *
- * threshold 0 + a negative bottom rootMargin means "reveal as soon as the
- * element's top edge is ~10% above the bottom of the viewport". That works
- * for elements of any height — a percentage threshold can never be reached
- * by an element taller than the screen, which is what used to leave things
- * stuck invisible.
+ * The root margin does two jobs:
+ *   - The -10% bottom means things reveal a little after they peek in, not
+ *     the instant a single pixel shows.
+ *   - The huge top margin counts anything *above* the screen as seen. That
+ *     covers jumps (End key, anchor links, fast flicks) that skip right past
+ *     an element; without it, that content would stay invisible until you
+ *     scrolled back up to it.
+ *
+ * threshold 0 (rather than e.g. 0.1) matters for tall elements: a block
+ * taller than the screen can never be 10% visible on a short phone.
  */
-export function useReveal<T extends HTMLElement = HTMLDivElement>(rootMargin = '0px 0px -10% 0px') {
+export function useReveal<T extends HTMLElement = HTMLDivElement>(rootMargin = '100000px 0px -10% 0px') {
   const ref = useRef<T>(null)
   const [visible, setVisible] = useState(prefersReducedMotion)
 
   useEffect(() => {
     const el = ref.current
     if (!el || visible) return
+
     if (typeof IntersectionObserver === 'undefined') {
       setVisible(true)
       return
     }
-    const obs = new IntersectionObserver(
+
+    const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
+        if (entries.some((entry) => entry.isIntersecting)) {
           setVisible(true)
-          obs.disconnect()
+          observer.disconnect()
         }
       },
-      { threshold: 0, rootMargin }
+      { threshold: 0, rootMargin },
     )
-    obs.observe(el)
-    return () => obs.disconnect()
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [rootMargin, visible])
 
   return { ref, visible }

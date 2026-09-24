@@ -1,15 +1,15 @@
-import Layout from './components/Layout'
-import Hero from './components/Hero'
-import Work from './components/Work'
-import Services from './components/Services'
-import About from './components/About'
-import Contact from './components/Contact'
+import Layout from './components/layout/Layout'
+import Hero from './components/sections/Hero'
+import Reviews from './components/sections/Reviews'
+import Services from './components/sections/Services'
+import About from './components/sections/About'
+import Contact from './components/sections/Contact'
 
 export default function App() {
   return (
     <Layout>
       <Hero />
-      <Work />
+      <Reviews />
       <Services />
       <About />
       <Contact />

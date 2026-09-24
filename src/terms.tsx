@@ -1,10 +1,11 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+// Entry point for /terms (terms/index.html)
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import Terms from './pages/Terms'
 import './index.css'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
     <Terms />
-  </React.StrictMode>,
+  </StrictMode>,
 )

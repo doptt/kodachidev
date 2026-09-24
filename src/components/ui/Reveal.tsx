@@ -1,23 +1,25 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { useReveal } from '../hooks/useReveal'
+import { useReveal } from '../../hooks/useReveal'
 
 type RevealProps = {
   children: ReactNode
-  /** ms to wait after the element enters the viewport */
+  /** ms to wait after the element scrolls into view */
   delay?: number
-  /** 'up' slides in from below, 'scale' grows in slightly */
+  /** "up" slides in from below, "scale" grows in slightly */
   variant?: 'up' | 'scale'
+  /** px to slide when variant is "up" */
   distance?: number
   duration?: number
   className?: string
   style?: CSSProperties
 }
 
-/**
- * Scroll-reveal wrapper. Every wrapped element watches itself, so content
- * further down a section animates when *it* reaches the screen rather than
- * when the top of its section does. The reveal lives on this wrapper, so it
- * never fights with hover transforms/transitions on the child.
+/*
+ * Fades its children in the first time they scroll into view.
+ *
+ * Each Reveal watches itself, so a card halfway down a section animates when
+ * you actually reach it. The animation sits on this wrapper rather than the
+ * child, which leaves the child free to use its own hover transforms.
  */
 export default function Reveal({
   children,

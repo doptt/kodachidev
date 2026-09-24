@@ -1,92 +1,241 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+/* ==========================================================================
+   kodachi.dev — global styles
+
+   Tailwind handles layout and spacing. This file holds the design tokens,
+   a small set of reusable component classes, and every keyframe animation
+   used on the site.
+   ========================================================================== */
+
 @import 'tailwindcss';
 
-@theme inline {
-  --color-bg-base: #07060D;
-  --color-bg-secondary: #0D0B16;
-  --color-bg-elevated: #151121;
-  --color-accent: #9B6DFF;
-  --color-accent-electric: #7547FF;
-  --color-accent-soft: #C6A9FF;
-  --color-text-primary: #F5F2FF;
-  --color-text-secondary: #A29BB5;
-  --color-border-subtle: rgba(155, 109, 255, 0.15);
-  --font-display: 'Sora', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+/* --------------------------------------------------------------------------
+   Design tokens
+   Each color here turns into Tailwind utilities, so `--color-muted` gives
+   `text-muted`, `bg-muted`, `border-muted/20`, and so on.
+   -------------------------------------------------------------------------- */
+@theme {
+  --color-night: #07060d;   /* page background */
+  --color-deep: #0d0b16;    /* panels */
+  --color-surface: #151121; /* raised cards */
+  --color-accent: #9b6dff;
+  --color-violet: #7547ff;
+  --color-lavender: #c6a9ff;
+  --color-ink: #f5f2ff;     /* primary text */
+  --color-muted: #a29bb5;   /* secondary text */
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
 html {
   scroll-behavior: smooth;
   scrollbar-width: thin;
-  scrollbar-color: rgba(155, 109, 255, 0.3) transparent;
+  scrollbar-color: rgb(155 109 255 / 0.3) transparent;
 }
 
 body {
   margin: 0;
-  background-color: #07060D;
-  color: #F5F2FF;
-  font-family: 'Inter', sans-serif;
+  background-color: var(--color-night);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(155, 109, 255, 0.3);
+  background: rgb(155 109 255 / 0.3);
   border-radius: 3px;
 }
 
-/* Glass system */
-.glass {
-  background: rgba(21, 17, 33, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(155, 109, 255, 0.12);
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
 }
 
-.glass-light {
-  background: rgba(155, 109, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(155, 109, 255, 0.1);
+/* --------------------------------------------------------------------------
+   Components
+   Anything with a hover state or a glow lives here so the JSX can stay
+   readable.
+   -------------------------------------------------------------------------- */
+@layer components {
+  /* Small mono label above each section title */
+  .eyebrow {
+    display: block;
+    margin-bottom: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(2.4rem, 5vw, 3.8rem);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    color: var(--color-ink);
+  }
+
+  /* Brand gradient fill, used on the NW logo mark */
+  .bg-brand {
+    background: linear-gradient(135deg, var(--color-accent), var(--color-violet));
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #c6a9ff 0%, #9b6dff 50%, #7547ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Buttons: sizing comes from utilities at the call site */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-ink);
+    background: linear-gradient(135deg, var(--color-accent), var(--color-violet));
+    box-shadow: 0 0 26px rgb(117 71 255 / 0.36);
+    transition: box-shadow 0.3s ease, transform 0.3s ease, opacity 0.2s ease;
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 40px rgb(117 71 255 / 0.55);
+    transform: translateY(-2px);
+  }
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-lavender);
+    background: rgb(155 109 255 / 0.08);
+    border: 1px solid rgb(155 109 255 / 0.2);
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  }
+  .btn-ghost:hover {
+    color: var(--color-ink);
+    background: rgb(155 109 255 / 0.14);
+    border-color: rgb(155 109 255 / 0.35);
+  }
+
+  /* Service + trait cards */
+  .card {
+    background: rgb(21 17 33 / 0.45);
+    border: 1px solid rgb(155 109 255 / 0.1);
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  .card:hover {
+    background: rgb(21 17 33 / 0.85);
+    border-color: rgb(155 109 255 / 0.25);
+    box-shadow: 0 0 40px rgb(117 71 255 / 0.08), 0 8px 32px rgb(0 0 0 / 0.3);
+    transform: translateY(-3px);
+  }
+
+  /* Frosted panel used for the pricing box, stack box, form and terms */
+  .panel {
+    background: rgb(13 11 22 / 0.8);
+    border: 1px solid rgb(155 109 255 / 0.14);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+
+  /* Tech stack pills */
+  .chip {
+    background: rgb(155 109 255 / 0.06);
+    border: 1px solid rgb(155 109 255 / 0.12);
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  }
+  .chip:hover {
+    background: rgb(155 109 255 / 0.14);
+    border-color: rgb(155 109 255 / 0.28);
+    transform: scale(1.03);
+  }
+
+  /* Square icon holder, lights up when its parent `.group` is hovered */
+  .icon-tile {
+    background: rgb(155 109 255 / 0.07);
+    border: 1px solid rgb(155 109 255 / 0.12);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+  .group:hover .icon-tile,
+  .group:focus-visible .icon-tile {
+    background: rgb(155 109 255 / 0.15);
+    border-color: rgb(155 109 255 / 0.28);
+  }
+
+  /* Form inputs (and the custom select trigger) */
+  .field {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--color-ink);
+    background: rgb(7 6 13 / 0.65);
+    border: 1px solid rgb(155 109 255 / 0.15);
+    border-radius: 14px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .field::placeholder { color: rgb(162 155 181 / 0.7); }
+  .field:focus,
+  .field[aria-expanded='true'] {
+    border-color: rgb(155 109 255 / 0.45);
+    box-shadow: 0 0 0 4px rgb(155 109 255 / 0.07);
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(155 109 255 / 0.2), transparent);
+  }
+
+  /* Faint film grain over the whole page */
+  .grain::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0.4;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  }
 }
 
-.glass-strong {
-  background: rgba(13, 11, 22, 0.8);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(155, 109, 255, 0.18);
-}
-
-/* Subtle grain texture */
-.grain::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 100;
-  opacity: 0.4;
-}
-
-/* Animations */
+/* --------------------------------------------------------------------------
+   Hero ambience
+   -------------------------------------------------------------------------- */
 @keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  0%, 100% { transform: translateY(0) rotate(0deg); }
   33% { transform: translateY(-12px) rotate(1deg); }
   66% { transform: translateY(6px) rotate(-0.5deg); }
 }
@@ -97,17 +246,15 @@ body {
 }
 
 @keyframes drift {
-  0% { transform: translate(0, 0) rotate(0deg); }
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
   25% { transform: translate(20px, -15px) rotate(2deg); }
   50% { transform: translate(-10px, 20px) rotate(-1deg); }
   75% { transform: translate(-20px, -8px) rotate(1.5deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 @keyframes drift-slow {
-  0% { transform: translate(0, 0) scale(1); }
+  0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(-30px, 20px) scale(1.08); }
-  100% { transform: translate(0, 0) scale(1); }
 }
 
 @keyframes nebula-pulse {
@@ -115,26 +262,45 @@ body {
   50% { opacity: 0.8; filter: blur(45px); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(24px); pointer-events: none; }
-  to { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes status-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(155, 109, 255, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(155, 109, 255, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgb(155 109 255 / 0.4); }
+  50% { box-shadow: 0 0 0 6px rgb(155 109 255 / 0); }
 }
 
-/* Starfield: two-node star (outer = position + slow drift via translate,
-   inner = glow/twinkle via opacity+scale) so drift and twinkle never fight
-   over the same `transform` property. */
+@keyframes scroll-hint {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(200%); }
+}
+
+.animate-float { animation: float 8s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
+.animate-drift { animation: drift 20s ease-in-out infinite; }
+.animate-drift-slow { animation: drift-slow 28s ease-in-out infinite; }
+.animate-nebula { animation: nebula-pulse 6s ease-in-out infinite; }
+.animate-status { animation: status-pulse 2s ease-in-out infinite; }
+.animate-scroll-hint { animation: scroll-hint 2s ease-in-out infinite; }
+
+/* Hero entrance. `both` keeps elements hidden until their delay kicks in. */
+.animate-fade-up { animation: fade-up 0.8s ease-out both; }
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-700 { animation-delay: 0.7s; }
+
+/* --------------------------------------------------------------------------
+   Starfield
+   Each star is two nodes: the outer one drifts (translate), the inner one
+   twinkles (opacity + scale). Splitting them stops the two animations from
+   fighting over `transform`.
+   -------------------------------------------------------------------------- */
 @keyframes star-twinkle {
-  0%, 100% { opacity: var(--star-base, 0.3); transform: scale(var(--star-scale-base, 1)); }
+  0%, 100% { opacity: var(--star-base, 0.3); transform: scale(1); }
   50% { opacity: var(--star-peak, 0.95); transform: scale(var(--star-scale-peak, 1.15)); }
 }
 
@@ -150,71 +316,44 @@ body {
   border-radius: 50%;
 }
 
-/* Diffraction-spike flare for the brighter "hero" stars — a soft cross of
-   light like a camera/eye actually resolves on a bright point source, so
-   it reads as a real light source instead of a flat dot. */
+/* Cross-shaped flare on the brightest stars */
 .star-spike::before,
 .star-spike::after {
   content: '';
   position: absolute;
   top: 50%;
   left: 50%;
-  background: linear-gradient(90deg, transparent, var(--spike-color, rgba(245, 242, 255, 0.5)) 50%, transparent);
+  transform: translate(-50%, -50%);
   pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--spike-color) 50%, transparent);
 }
-.star-spike::before {
-  width: var(--spike-len, 18px);
-  height: 1px;
-  transform: translate(-50%, -50%);
-}
-.star-spike::after {
-  width: 1px;
-  height: var(--spike-len, 18px);
-  transform: translate(-50%, -50%);
-}
+.star-spike::before { width: var(--spike-len); height: 1px; }
+.star-spike::after { width: 1px; height: var(--spike-len); }
 
-/* Comet: translate happens in the parent/document coordinate space (a
-   straight diagonal line), then rotate + optional mirror tilt the artwork
-   itself in place — order matters here or the streak arcs instead of
-   flying straight. */
+/* Comets move along a straight line, then rotate/mirror in place. The
+   order inside `transform` matters, otherwise the path curves. */
 @keyframes comet-fly {
   0% {
     opacity: 0;
-    transform: translate(0, 0) rotate(var(--comet-angle, 16deg)) scaleX(var(--comet-mirror, 1));
+    transform: translate(0, 0) rotate(var(--comet-angle)) scaleX(var(--comet-mirror));
   }
   3% { opacity: 1; }
   7% { opacity: 0.9; }
-  11% {
+  11%, 100% {
     opacity: 0;
-    transform: translate(var(--comet-dx, 55vw), var(--comet-dy, 28vh)) rotate(var(--comet-angle, 16deg)) scaleX(var(--comet-mirror, 1));
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--comet-dx, 55vw), var(--comet-dy, 28vh)) rotate(var(--comet-angle, 16deg)) scaleX(var(--comet-mirror, 1));
+    transform: translate(var(--comet-dx), var(--comet-dy)) rotate(var(--comet-angle)) scaleX(var(--comet-mirror));
   }
 }
 
-.animate-star-twinkle { animation-name: star-twinkle; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
-.animate-star-drift { animation-name: star-drift; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
-.animate-comet { animation-name: comet-fly; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); animation-iteration-count: infinite; }
+.animate-star-twinkle { animation: star-twinkle ease-in-out infinite; }
+.animate-star-drift { animation: star-drift ease-in-out infinite; }
+.animate-comet { animation: comet-fly cubic-bezier(0.16, 1, 0.3, 1) infinite; }
 
-.animate-float { animation: float 8s ease-in-out infinite; }
-.animate-pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
-.animate-drift { animation: drift 20s ease-in-out infinite; }
-.animate-drift-slow { animation: drift-slow 28s ease-in-out infinite; }
-.animate-nebula { animation: nebula-pulse 6s ease-in-out infinite; }
-.animate-fade-up { animation: fade-up 0.8s ease-out forwards; }
-.animate-status { animation: status-pulse 2s ease-in-out infinite; }
-
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
-.delay-400 { animation-delay: 0.4s; }
-.delay-500 { animation-delay: 0.5s; }
-.delay-700 { animation-delay: 0.7s; }
-
-/* Reviews marquee: the track holds two identical laps and slides left by
-   exactly one lap (-50%), so the loop is seamless. */
+/* --------------------------------------------------------------------------
+   Reviews marquee
+   The track holds two identical copies of the cards and slides left by
+   exactly one copy (-50%), which makes the loop seamless.
+   -------------------------------------------------------------------------- */
 @keyframes marquee {
   from { transform: translate3d(0, 0, 0); }
   to { transform: translate3d(-50%, 0, 0); }
@@ -223,87 +362,77 @@ body {
 .marquee {
   overflow: hidden;
   padding: 12px 0;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
 }
-.animate-marquee { animation: marquee var(--marquee-duration, 45s) linear infinite; }
-.marquee:hover .animate-marquee,
-.marquee:focus-within .animate-marquee { animation-play-state: paused; }
+.marquee-track { animation: marquee var(--marquee-duration, 45s) linear infinite; }
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track { animation-play-state: paused; }
 
 .review-card {
-  background: linear-gradient(160deg, rgba(21, 17, 33, 0.92) 0%, rgba(13, 11, 22, 0.92) 100%);
-  border: 1px solid rgba(155, 109, 255, 0.12);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(160deg, rgb(21 17 33 / 0.92), rgb(13 11 22 / 0.92));
+  border: 1px solid rgb(155 109 255 / 0.12);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.25);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 .review-card:hover {
-  border-color: rgba(155, 109, 255, 0.3);
-  box-shadow: 0 0 40px rgba(117, 71, 255, 0.12), 0 12px 36px rgba(0, 0, 0, 0.35);
+  border-color: rgb(155 109 255 / 0.3);
+  box-shadow: 0 0 40px rgb(117 71 255 / 0.12), 0 12px 36px rgb(0 0 0 / 0.35);
   transform: translateY(-4px);
 }
-.review-star { filter: drop-shadow(0 0 4px rgba(155, 109, 255, 0.55)); }
+.review-star { filter: drop-shadow(0 0 4px rgb(155 109 255 / 0.55)); }
 .review-placeholder {
+  display: block;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(155, 109, 255, 0.1), rgba(155, 109, 255, 0.05));
+  background: linear-gradient(90deg, rgb(155 109 255 / 0.1), rgb(155 109 255 / 0.05));
 }
 
+/* --------------------------------------------------------------------------
+   Budget dropdown
+   The list scales down from the trigger, then each option slides in with
+   a short stagger (set per option via --i).
+   -------------------------------------------------------------------------- */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes option-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.dropdown-menu {
+  transform-origin: top center;
+  animation: dropdown-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dropdown-option {
+  animation: option-in 0.24s ease-out both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion: keep the page usable, drop anything decorative.
+   -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-  .animate-marquee { animation: none; }
-  .marquee { overflow-x: auto; }
+  html { scroll-behavior: auto; }
+
   .animate-float,
   .animate-pulse-glow,
   .animate-drift,
   .animate-drift-slow,
   .animate-nebula,
+  .animate-status,
+  .animate-scroll-hint,
   .animate-star-twinkle,
   .animate-star-drift,
-  .animate-comet {
+  .animate-comet,
+  .marquee-track,
+  .dropdown-menu,
+  .dropdown-option {
     animation: none;
   }
-}
 
-/* Typography utilities */
-.font-display { font-family: 'Sora', sans-serif; }
-.font-mono-label { font-family: 'JetBrains Mono', monospace; }
-
-/* Gradient text */
-.text-gradient {
-  background: linear-gradient(135deg, #C6A9FF 0%, #9B6DFF 50%, #7547FF 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.text-gradient-subtle {
-  background: linear-gradient(135deg, #F5F2FF 0%, #C6A9FF 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Shimmer button effect */
-.btn-shimmer {
-  background: linear-gradient(
-    90deg,
-    #9B6DFF 0%,
-    #7547FF 30%,
-    #C6A9FF 50%,
-    #7547FF 70%,
-    #9B6DFF 100%
-  );
-  background-size: 200% auto;
-  animation: shimmer 3s linear infinite;
-}
-
-/* Section divider */
-.section-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(155, 109, 255, 0.2), transparent);
-}
-
-/* Focus styles */
-input:focus, textarea:focus, select:focus {
-  outline: none;
-  border-color: rgba(155, 109, 255, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(155, 109, 255, 0.1);
+  .animate-fade-up { animation-duration: 0.01ms; }
+  .marquee { overflow-x: auto; }
 }

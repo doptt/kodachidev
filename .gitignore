@@ -1,0 +1,25 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Secrets. Only the example file is committed.
+.env
+.env.*
+!.env.example
+
+# Vercel CLI
+.vercel/
+
+# Logs and editor/OS clutter
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local notes, not part of the repo
+AGENTS.md
+CLAUDE.md
+docs/design-brief.md
+docs/reference/
