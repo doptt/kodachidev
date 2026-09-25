@@ -1,10 +1,21 @@
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Reveal from '../ui/Reveal'
 
-const SERVICES = [
+type Service = {
+  num: string
+  title: string
+  desc: string
+  icon: ReactNode
+}
+
+// How many lines of each description show before it fades out
+const COLLAPSED_LINES = 3
+
+const SERVICES: Service[] = [
   {
     num: '01',
     title: 'Design & Development',
-    desc: 'I build clean, reliable websites tailored to your needs, with careful attention to performance, stability, and usability.',
+    desc: 'I\'m a perfectionist when it comes to designing a website, the small details is what matters to me. I enjoy making it look as aesthetically pleasing as possible while also keeping navigation simple.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <rect x="2" y="3" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.4" />
@@ -28,7 +39,7 @@ const SERVICES = [
   {
     num: '03',
     title: 'Businesses & Portfolios',
-    desc: 'Whether you\'re running a business, showcasing your work, or building your brand, I create professional websites with solid backend, automated emails, and secure user experiences.',
+    desc: 'Whether you\'re running a business, showcasing your work, or building your brand, I create professional websites with solid backend and secure user experiences.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <path d="M3 18V9l8-5 8 5v9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -38,8 +49,8 @@ const SERVICES = [
   },
   {
     num: '04',
-    title: 'Built with security in mind',
-    desc: 'I use modern frameworks, and libraries to help keep your website fast and reliable. Hosting handled through platforms like Vercel or Cloudflare, with security measures such as rate limiting and CSRF protection to reduce common threats.',
+    title: 'Security and Reliability',
+    desc: 'I use modern frameworks, and libraries to help keep your website fast and reliable. Security measures such as rate limiting and CSRF protection are put in place to reduce common threats.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <path d="M4 11a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -51,7 +62,7 @@ const SERVICES = [
   {
     num: '05',
     title: 'Payments and Online Booking',
-    desc: 'Payments for your business setup with Stripe, Square, or another third-party provider. Orders stored and organized neatly in a secure database for easy access, and confirmations sent automatically',
+    desc: 'Payments are setup with Stripe, Square, or another third-party provider. Orders stored and organized neatly in a secure database for easy access, and confirmations sent automatically.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <rect x="3" y="5" width="16" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
@@ -63,7 +74,7 @@ const SERVICES = [
   {
     num: '06',
     title: 'Launch & Deployment',
-    desc: 'I handle the technical side of getting your website online — including hosting, domains, configuration, and deployment. (Monthly hosting and maintenance costs may apply)',
+    desc: 'I handle the technical side of getting your website online — including hosting, domains, configuration, and deployment. 24/7 uptime with DDoS mitigation and more.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <path d="M11 15V5M7 9l4-4 4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -78,6 +89,122 @@ function ArrowIcon() {
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
       <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  )
+}
+
+function ChevronIcon({ flipped }: { flipped: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden
+      className={`transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${flipped ? 'rotate-180' : ''}`}
+    >
+      <path d="M3 4.5L6 7.5l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/*
+ * A service card whose description fades out after a few lines. Clicking
+ * anywhere on the card eases it open to the full text.
+ *
+ * The height animates between two measured pixel values, so the motion ends
+ * exactly where the text does rather than overshooting like a max-height
+ * trick would. Descriptions short enough to fit get no toggle, but the
+ * toggle's space is kept so cards in a row still line up.
+ */
+function ServiceCard({ service }: { service: Service }) {
+  const textId = useId()
+  const textRef = useRef<HTMLParagraphElement>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [heights, setHeights] = useState({ collapsed: 0, full: 0 })
+
+  // Measure before paint so the card never flashes at full height, then keep
+  // measuring as the width changes (window resize, fonts finishing loading).
+  useLayoutEffect(() => {
+    const text = textRef.current
+    if (!text) return
+
+    const measure = () => {
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight)
+      setHeights({ collapsed: lineHeight * COLLAPSED_LINES, full: text.offsetHeight })
+    }
+
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(text)
+    return () => observer.disconnect()
+  }, [])
+
+  const expandable = heights.full > heights.collapsed + 1
+  const open = expanded || !expandable
+
+  // One handler for the whole card. The "Read more" button inside doesn't
+  // need its own: keyboard and screen reader presses bubble up to here too.
+  const toggle = () => {
+    if (!expandable) return
+    // Don't toggle if the click was really the end of selecting some text
+    if (window.getSelection()?.toString()) return
+    setExpanded((value) => !value)
+  }
+
+  return (
+    <div
+      onClick={toggle}
+      data-expanded={expanded}
+      className={`card rounded-2xl p-6 ${expandable ? 'cursor-pointer' : 'cursor-default'}`}
+    >
+      <div className="mb-5 flex items-start justify-between">
+        <span className="font-mono text-xs tracking-[0.06em] text-accent/40">{service.num}</span>
+        <div className="text-accent">{service.icon}</div>
+      </div>
+
+      <h3 className="mb-3 font-display text-base leading-[1.3] font-semibold tracking-[-0.02em]">{service.title}</h3>
+
+      <div
+        className="service-text overflow-hidden"
+        data-faded={!open}
+        style={{ height: expandable ? (expanded ? heights.full : heights.collapsed) : undefined }}
+      >
+        <p
+          id={textId}
+          ref={textRef}
+          className={`text-sm leading-[1.7] transition-colors duration-500 ${expanded ? 'text-ink/80' : 'text-muted'}`}
+        >
+          {service.desc}
+        </p>
+      </div>
+
+      {/* `invisible` also takes it out of the tab order and screen readers */}
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={textId}
+        className={`mt-4 inline-flex cursor-pointer items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-black transition-colors duration-200 hover:text-lavender ${
+          expandable ? '' : 'invisible'
+        }`}
+      >
+        {/* Both labels share one grid cell and crossfade into each other */}
+        <span className="grid">
+          <span
+            aria-hidden={expanded}
+            className={`col-start-1 row-start-1 transition-all duration-300 ${expanded ? '-translate-y-1 opacity-0' : 'opacity-100'}`}
+          >
+            Read more
+          </span>
+          <span
+            aria-hidden={!expanded}
+            className={`col-start-1 row-start-1 transition-all duration-300 ${expanded ? 'opacity-100' : 'translate-y-1 opacity-0'}`}
+          >
+            Show less
+          </span>
+        </span>
+        <ChevronIcon flipped={expanded} />
+      </button>
+    </div>
   )
 }
 
@@ -137,18 +264,12 @@ export default function Services() {
           </Reveal>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* items-start lets an opened card grow on its own without stretching its neighbours */}
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {SERVICES.map((service, i) => (
             // Stagger by column so each row animates left to right
-            <Reveal key={service.num} delay={80 + (i % 3) * 80} duration={700} className="h-full">
-              <div className="card h-full cursor-default rounded-2xl p-6">
-                <div className="mb-5 flex items-start justify-between">
-                  <span className="font-mono text-xs tracking-[0.06em] text-accent/40">{service.num}</span>
-                  <div className="text-accent">{service.icon}</div>
-                </div>
-                <h3 className="mb-3 font-display text-base leading-[1.3] font-semibold tracking-[-0.02em]">{service.title}</h3>
-                <p className="text-sm leading-[1.7] text-muted">{service.desc}</p>
-              </div>
+            <Reveal key={service.num} delay={80 + (i % 3) * 80} duration={700}>
+              <ServiceCard service={service} />
             </Reveal>
           ))}
         </div>

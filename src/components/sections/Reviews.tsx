@@ -119,7 +119,7 @@ export default function Reviews() {
       <div className="relative mx-auto max-w-6xl px-6">
         <Reveal distance={32} className="mb-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <span className="eyebrow">Reviews</span>
+            <span className="eyebrow">Testimonials</span>
             <h2 className="section-title">
               Adding soon
               <br />

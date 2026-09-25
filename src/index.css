@@ -151,6 +151,12 @@ body {
     box-shadow: 0 0 40px rgb(117 71 255 / 0.08), 0 8px 32px rgb(0 0 0 / 0.3);
     transform: translateY(-3px);
   }
+  /* An opened service card keeps a soft glow so it reads as "active" */
+  .card[data-expanded='true'] {
+    background: rgb(21 17 33 / 0.85);
+    border-color: rgb(155 109 255 / 0.32);
+    box-shadow: 0 0 48px rgb(117 71 255 / 0.12), 0 8px 32px rgb(0 0 0 / 0.3);
+  }
 
   /* Frosted panel used for the pricing box, stack box, form and terms */
   .panel {
@@ -412,6 +418,28 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Expandable service text
+   Collapsed text fades out through a mask. The fade length is a registered
+   custom property so it can animate: the fade melts away as the card opens
+   and comes back as it closes, instead of popping on and off.
+   -------------------------------------------------------------------------- */
+@property --fade {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.service-text {
+  --fade: 0px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent);
+  transition:
+    height 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    --fade 0.45s ease;
+}
+.service-text[data-faded='true'] { --fade: 1.7em; }
+
+/* --------------------------------------------------------------------------
    Reduced motion: keep the page usable, drop anything decorative.
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
@@ -432,6 +460,8 @@ body {
   .dropdown-option {
     animation: none;
   }
+
+  .service-text { transition: none; }
 
   .animate-fade-up { animation-duration: 0.01ms; }
   .marquee { overflow-x: auto; }

@@ -53,7 +53,7 @@ export default function About() {
 
       <div className="relative mx-auto max-w-6xl px-6">
         <Reveal className="mb-20">
-          <span className="eyebrow">About</span>
+          <span className="eyebrow">About Me</span>
           <h2 className="section-title">
             Thoughtful design. <span className="text-gradient">Solid engineering.</span>
           </h2>
@@ -62,10 +62,10 @@ export default function About() {
         <div className="mb-20 grid grid-cols-1 gap-16 lg:grid-cols-2">
           <Reveal delay={80}>
             <p className="mb-5 text-[clamp(1rem,1.8vw,1.15rem)] leading-[1.8] font-light text-lavender">
-              Hi, my name is Noah. I'm an independent web developer who enjoys building engaging websites and working with software.
+              Hi, my name is Noah. I'm a fullstack web developer who enjoys building engaging websites, working with software, and fixing stuff
             </p>
             <p className="mb-5 text-sm leading-loose text-muted">
-              I build thoughtful, ready-to-launch websites for small businesses, personal brands, and growing ideas. 
+              I build thoughtful, ready-to-launch websites for small businesses and personal brands.
               From the interface to the backend, I care about making every part of the site reliable, secure, and easy to use. 
               Before launch, I test thoroughly for bugs and security issues so your site is ready for the real world.
             </p>
