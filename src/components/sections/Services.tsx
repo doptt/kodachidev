@@ -28,7 +28,7 @@ const SERVICES = [
   {
     num: '03',
     title: 'Businesses & Portfolios',
-    desc: 'Whether you\'re running a business, showcasing your work, or building your brand, I create professional websites with reliable backend, automated emails, and secure user experiences.',
+    desc: 'Whether you\'re running a business, showcasing your work, or building your brand, I create professional websites with solid backend, automated emails, and secure user experiences.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <path d="M3 18V9l8-5 8 5v9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -39,7 +39,7 @@ const SERVICES = [
   {
     num: '04',
     title: 'Built with security in mind',
-    desc: 'I use modern frameworks, libraries, and security practices to help keep your website fast, reliable, and protected. Hosting handled through platforms like Vercel or Cloudflare, with measures taken to reduce common threats.',
+    desc: 'I use modern frameworks, and libraries to help keep your website fast and reliable. Hosting handled through platforms like Vercel or Cloudflare, with security measures such as rate limiting and CSRF protection to reduce common threats.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <path d="M4 11a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -51,7 +51,7 @@ const SERVICES = [
   {
     num: '05',
     title: 'Payments and Online Booking',
-    desc: 'Payments for your business setup with Stripe, Square, or another third-party provider. Orders stored and organized neatly in a secure database for easy access, and order confirmations sent automatically',
+    desc: 'Payments for your business setup with Stripe, Square, or another third-party provider. Orders stored and organized neatly in a secure database for easy access, and confirmations sent automatically',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <rect x="3" y="5" width="16" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4" />

@@ -16,27 +16,27 @@ const STACK = [
 // \uFE0E forces the text version of each symbol so phones don't swap in emoji
 const TRAITS = [
   {
-    label: 'Flexible',
+    label: 'Built around you',
     glyph: '❖\uFE0E',
     detail:
-      'I adapt to your project needs. I work with payment processors, databases, emailing, and other typical business needs. Just let me know.',
+      'Every project is different. I shape the design, features, and technology around your goals instead of forcing your business into a template.',
   },
   {
     label: 'Every detail matters',
     glyph: '⚲\uFE0E',
-    detail: 'The small details make or break your sites impression, I assure everything is just right before deployment.',
+    detail: 'Clean code, reliable infrastructure, and thoughtful implementation to give your site a solid foundation. I\'m a ',
   },
   {
     label: 'Clear communication',
     glyph: '✉\uFE0E',
     detail:
-      'I reply quickly and clearly. I keep you updated on progress and will be frequently asking questions to assure your vision is being met.',
+      'No guessing how things are going. I keep communication straightforward, share progress regularly, and will frequently ask questions to make sure your vision is being met.',
   },
   {
-    label: 'Compliance',
+    label: 'Privacy & Compliance',
     glyph: '⚖\uFE0E',
     detail:
-      "If you're selling a product or service, collecting user data, or anything that requires legal compliance, I assure your site is up to code with the latest regulations.",
+      "I look beyond the website itself. I review how your business collects and handles customer information, identify the policies and disclosures your site needs, and ensure the technical pieces are properly implemented before launch.",
   },
 ]
 
@@ -62,13 +62,12 @@ export default function About() {
         <div className="mb-20 grid grid-cols-1 gap-16 lg:grid-cols-2">
           <Reveal delay={80}>
             <p className="mb-5 text-[clamp(1rem,1.8vw,1.15rem)] leading-[1.8] font-light text-lavender">
-              Hi, my name is Noah. I'm an independent web developer who enjoys building modern, functional, and engaging
-              websites.
+              Hi, my name is Noah. I'm an independent web developer who enjoys building engaging websites and working with software.
             </p>
             <p className="mb-5 text-sm leading-loose text-muted">
-              I focus on creating thoughtful digital experiences and ready-to-go business websites for small businesses,
-              personal brands, etc. Deep security audits and bug testing are done before the site goes live, so you can
-              rest easy knowing your page is safe with great backend.
+              I build thoughtful, ready-to-launch websites for small businesses, personal brands, and growing ideas. 
+              From the interface to the backend, I care about making every part of the site reliable, secure, and easy to use. 
+              Before launch, I test thoroughly for bugs and security issues so your site is ready for the real world.
             </p>
             <p className="text-sm leading-loose text-muted/75">
               My portfolio is growing and I'm constantly improving my work. If you're looking for a clean, reliable page,
