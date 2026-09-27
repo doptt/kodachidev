@@ -50,7 +50,7 @@ const SERVICES: Service[] = [
   {
     num: '04',
     title: 'Security and Reliability',
-    desc: 'I use modern frameworks, and libraries to help keep your website fast and reliable. Security measures such as rate limiting and CSRF protection are put in place to reduce common threats.',
+    desc: 'I use modern frameworks and libraries to help keep your website fast and reliable. Security measures such as rate limiting and CSRF protection are put in place to reduce common threats.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <path d="M4 11a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />

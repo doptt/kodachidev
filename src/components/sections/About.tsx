@@ -65,13 +65,13 @@ export default function About() {
               Hi, my name is Noah. I'm a fullstack web developer who enjoys building engaging websites, working with software, and fixing stuff
             </p>
             <p className="mb-5 text-sm leading-loose text-muted">
-              I build thoughtful, ready-to-launch websites for small businesses and personal brands.
-              From the interface to the backend, I care about making every part of the site reliable, secure, and easy to use. 
-              Before launch, I test thoroughly for bugs and security issues so your site is ready for the real world.
+              I’ve always been the kind of person who can’t leave something alone if I don’t understand how it works. 
+              That curiosity is what pulled me into tech — from experimenting with operating systems and software to building websites and debugging code.
+              I love taking an idea, figuring out how to make it work, and turning it into something people can actually use. 
+              I’m always learning, experimenting with new tools, and finding something new to get way too invested in.
             </p>
             <p className="text-sm leading-loose text-muted/75">
-              My portfolio is growing and I'm constantly improving my work. If you're looking for a clean, reliable page,
-              we'll work well together.
+              My portfolio is growing and I'm constantly improving my work. Feel free to contact me if you'd like to chat.
             </p>
           </Reveal>
 
