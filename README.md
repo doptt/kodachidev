@@ -8,7 +8,8 @@ It's a small React site with no backend of its own, apart from one serverless fu
 
 - **Home page** with a hero, reviews, services, an about section and a contact form
 - **Terms & Conditions** at [/terms](https://kodachi.dev/terms)
-- A **starfield background** with three depth layers that drift as you scroll, plus a few comets
+- A **scroll-driven 3D hero**: one cloud of ~20k particles that forms a ringed planet behind the headline, then re-forms into a layered website, a laptop and phone, and finally a warp tunnel the camera dives into. It's plain WebGL with no 3D library, and the whole scene is generated in code
+- A **canvas sky** behind every page: three depths of twinkling stars with scroll and cursor parallax, a faint nebula band, and meteors and comets on curved paths. The stars streak into hyperspace during the hero's warp dive
 - **Scroll reveals** on the content, done with a small `IntersectionObserver` hook instead of an animation library
 - A **reviews carousel** that loops forever and pauses when you hover over it
 - A **contact form** that emails me through [Resend](https://resend.com), with a custom animated budget dropdown
@@ -68,6 +69,7 @@ src/
     ui/                 Reusable pieces: Reveal, Select
   hooks/useReveal.ts    Scroll-into-view detection for Reveal
   lib/contact.ts        Budget options, field limits, and the form request
+  lib/space/            Hero particle shapes + WebGL renderer, and the canvas sky
   pages/Terms.tsx       The /terms page
   index.css             Design tokens, component classes and all animations
   main.tsx              Entry for the home page

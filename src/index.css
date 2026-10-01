@@ -238,34 +238,97 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Hero ambience
+   Hero
+   The particle scene itself is WebGL (see lib/space). These are the DOM
+   layers around it: the bloom that follows the shape, the soft dark scrims
+   that keep text readable over bright particles, and the chapter rail.
    -------------------------------------------------------------------------- */
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  33% { transform: translateY(-12px) rotate(1deg); }
-  66% { transform: translateY(6px) rotate(-0.5deg); }
+.hero-orb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.05); }
+.hero-glow {
+  background: radial-gradient(
+    circle,
+    rgb(155 109 255 / 0.32) 0%,
+    rgb(117 71 255 / 0.14) 32%,
+    rgb(117 71 255 / 0.04) 55%,
+    transparent 70%
+  );
 }
 
-@keyframes drift {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(20px, -15px) rotate(2deg); }
-  50% { transform: translate(-10px, 20px) rotate(-1deg); }
-  75% { transform: translate(-20px, -8px) rotate(1.5deg); }
+/* Shaded body under the planet's particles, lit from the upper left like
+   the particles are. Hides the stars behind it so the planet looks solid. */
+.hero-planet {
+  background: radial-gradient(circle at 34% 28%, rgb(58 40 116) 0%, rgb(26 18 52) 36%, rgb(10 8 20) 66%, rgb(7 6 13) 100%);
+  box-shadow: inset -6px -8px 18px rgb(0 0 0 / 0.45), 0 0 6px rgb(155 109 255 / 0.25);
 }
 
-@keyframes drift-slow {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-30px, 20px) scale(1.08); }
+.hero-scrim::before,
+.hero-chapter::before {
+  content: '';
+  position: absolute;
+  inset: -3rem -4rem;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgb(7 6 13 / 0.62), rgb(7 6 13 / 0.3) 60%, transparent);
 }
 
-@keyframes nebula-pulse {
-  0%, 100% { opacity: 0.5; filter: blur(60px); }
-  50% { opacity: 0.8; filter: blur(45px); }
+/* On phones the chapter text sits at the bottom over a solid fade instead */
+@media (max-width: 767px) {
+  .hero-chapter::before {
+    inset: 0;
+    background: linear-gradient(to top, var(--color-night) 35%, rgb(7 6 13 / 0.75) 65%, transparent);
+  }
+}
+
+.hero-rail button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  cursor: pointer;
+}
+
+.hero-rail-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity 0.3s ease, transform 0.3s ease, color 0.3s ease;
+}
+
+.hero-rail-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(155 109 255 / 0.3);
+  box-shadow: 0 0 0 0 rgb(155 109 255 / 0);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.hero-rail button:hover .hero-rail-label,
+.hero-rail button:focus-visible .hero-rail-label,
+.hero-rail [data-active] .hero-rail-label {
+  opacity: 1;
+  transform: none;
+}
+.hero-rail [data-active] .hero-rail-label { color: var(--color-lavender); }
+.hero-rail [data-active] .hero-rail-dot {
+  background: var(--color-lavender);
+  box-shadow: 0 0 12px 2px rgb(155 109 255 / 0.55);
+  transform: scale(1.25);
 }
 
 @keyframes fade-up {
@@ -283,11 +346,6 @@ body {
   100% { transform: translateY(200%); }
 }
 
-.animate-float { animation: float 8s ease-in-out infinite; }
-.animate-pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
-.animate-drift { animation: drift 20s ease-in-out infinite; }
-.animate-drift-slow { animation: drift-slow 28s ease-in-out infinite; }
-.animate-nebula { animation: nebula-pulse 6s ease-in-out infinite; }
 .animate-status { animation: status-pulse 2s ease-in-out infinite; }
 .animate-scroll-hint { animation: scroll-hint 2s ease-in-out infinite; }
 
@@ -298,62 +356,6 @@ body {
 .delay-300 { animation-delay: 0.3s; }
 .delay-400 { animation-delay: 0.4s; }
 .delay-700 { animation-delay: 0.7s; }
-
-/* --------------------------------------------------------------------------
-   Starfield
-   Each star is two nodes: the outer one drifts (translate), the inner one
-   twinkles (opacity + scale). Splitting them stops the two animations from
-   fighting over `transform`.
-   -------------------------------------------------------------------------- */
-@keyframes star-twinkle {
-  0%, 100% { opacity: var(--star-base, 0.3); transform: scale(1); }
-  50% { opacity: var(--star-peak, 0.95); transform: scale(var(--star-scale-peak, 1.15)); }
-}
-
-@keyframes star-drift {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(5px, -6px); }
-}
-
-.star-core {
-  position: absolute;
-  top: 0;
-  left: 0;
-  border-radius: 50%;
-}
-
-/* Cross-shaped flare on the brightest stars */
-.star-spike::before,
-.star-spike::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--spike-color) 50%, transparent);
-}
-.star-spike::before { width: var(--spike-len); height: 1px; }
-.star-spike::after { width: 1px; height: var(--spike-len); }
-
-/* Comets move along a straight line, then rotate/mirror in place. The
-   order inside `transform` matters, otherwise the path curves. */
-@keyframes comet-fly {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) rotate(var(--comet-angle)) scaleX(var(--comet-mirror));
-  }
-  3% { opacity: 1; }
-  7% { opacity: 0.9; }
-  11%, 100% {
-    opacity: 0;
-    transform: translate(var(--comet-dx), var(--comet-dy)) rotate(var(--comet-angle)) scaleX(var(--comet-mirror));
-  }
-}
-
-.animate-star-twinkle { animation: star-twinkle ease-in-out infinite; }
-.animate-star-drift { animation: star-drift ease-in-out infinite; }
-.animate-comet { animation: comet-fly cubic-bezier(0.16, 1, 0.3, 1) infinite; }
 
 /* --------------------------------------------------------------------------
    Reviews marquee
@@ -445,23 +447,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 
-  .animate-float,
-  .animate-pulse-glow,
-  .animate-drift,
-  .animate-drift-slow,
-  .animate-nebula,
   .animate-status,
   .animate-scroll-hint,
-  .animate-star-twinkle,
-  .animate-star-drift,
-  .animate-comet,
   .marquee-track,
   .dropdown-menu,
   .dropdown-option {
     animation: none;
   }
 
-  .service-text { transition: none; }
+  .service-text,
+  .hero-rail-label,
+  .hero-rail-dot { transition: none; }
 
   .animate-fade-up { animation-duration: 0.01ms; }
   .marquee { overflow-x: auto; }
