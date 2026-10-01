@@ -21,7 +21,9 @@ export default function Layout({ children, onHome = true }: LayoutProps) {
   }, [])
 
   return (
-    <div id="top" className="grain relative min-h-screen overflow-x-hidden bg-night">
+    // overflow-x-clip (not hidden): "hidden" would turn this div into a
+    // scroll container and break the hero's sticky stage
+    <div id="top" className="grain relative min-h-screen overflow-x-clip bg-night">
       {/* Soft violet light washing in from the top and edges */}
       <div
         className="pointer-events-none fixed inset-0 z-0"
