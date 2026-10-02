@@ -270,14 +270,6 @@ body {
   pointer-events: none;
   background: radial-gradient(closest-side, rgb(7 6 13 / 0.62), rgb(7 6 13 / 0.3) 60%, transparent);
 }
-/* The intro's lower edge sits over the black hole's glow, so it reaches
-   further down and stays darker there */
-.hero-scrim::before {
-  inset: -3rem -5rem -4.5rem;
-  background:
-    radial-gradient(closest-side, rgb(7 6 13 / 0.62), rgb(7 6 13 / 0.3) 60%, transparent),
-    radial-gradient(46% 20% at 50% 78%, rgb(7 6 13 / 0.6), transparent);
-}
 
 /* On phones the chapter text sits at the bottom over a solid fade instead */
 @media (max-width: 767px) {
