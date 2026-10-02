@@ -29,26 +29,30 @@ export default function Nav({ scrolled, onHome = true }: NavProps) {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
-        <nav
-          aria-label="Main"
-          className={`flex w-full max-w-5xl items-center justify-between rounded-2xl border border-accent/12 px-5 py-3 backdrop-blur-xl transition-all duration-300 ${
-            scrolled ? 'bg-deep/90 shadow-[0_8px_32px_rgb(0_0_0/0.4)]' : 'bg-deep/55'
-          }`}
-        >
-          <a href={onHome ? '#home' : '/'} className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand font-display text-xs font-bold tracking-wider">
+      {/* The frosted bar only wraps the section links. The logo and the
+          Terms button float on their own at either side; explicit columns
+          keep them in place when the links collapse into the hamburger. */}
+      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4">
+        <nav aria-label="Main" className="mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 lg:gap-4">
+          <a href={onHome ? '#home' : '/'} className="col-start-1 row-start-1 flex items-center gap-2 justify-self-start">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand font-display text-xs font-bold tracking-wider shadow-[0_0_20px_rgb(117_71_255/0.35)]">
               NW
             </span>
-            <span className="hidden font-display text-sm font-semibold tracking-tight sm:block">kodachi.dev</span>
+            <span className="hidden font-display text-sm font-semibold tracking-tight [text-shadow:0_1px_12px_rgb(7_6_13/0.9)] sm:block">
+              kodachi.dev
+            </span>
           </a>
 
-          <ul className="hidden items-center gap-1 md:flex">
+          <ul
+            className={`col-start-2 row-start-1 hidden items-center gap-1 rounded-2xl border border-accent/12 p-1.5 backdrop-blur-xl transition-all duration-300 md:flex ${
+              scrolled ? 'bg-deep/90 shadow-[0_8px_32px_rgb(0_0_0/0.4)]' : 'bg-deep/55'
+            }`}
+          >
             {LINKS.map((link) => (
               <li key={link.label}>
                 <a
                   href={href(link.hash)}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors duration-200 hover:bg-accent/8 hover:text-ink"
+                  className="block rounded-xl px-3 py-1.5 text-sm font-medium lg:px-3.5 text-muted transition-colors duration-200 hover:bg-accent/8 hover:text-ink"
                 >
                   {link.label}
                 </a>
@@ -56,15 +60,19 @@ export default function Nav({ scrolled, onHome = true }: NavProps) {
             ))}
           </ul>
 
-          <div className="flex items-center gap-3">
-            <a href="/terms" className="btn-primary hidden rounded-xl px-4 py-2 text-sm sm:inline-flex">
+          <div className="col-start-3 row-start-1 flex items-center gap-3 justify-self-end">
+            <a href="/terms" className="btn-primary hidden rounded-xl px-4 py-2 text-sm whitespace-nowrap sm:inline-flex">
               Terms & Conditions
             </a>
 
-            {/* Hamburger. The outer bars slide to the middle and cross into an X. */}
+            {/* Hamburger, in its own small frosted tile so it stays visible
+                over content. The outer bars slide to the middle and cross
+                into an X. */}
             <button
               type="button"
-              className="flex h-9 w-9 flex-col items-center justify-center gap-1.5 rounded-lg md:hidden"
+              className={`flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-xl border border-accent/12 backdrop-blur-xl transition-colors duration-300 md:hidden ${
+                scrolled ? 'bg-deep/90' : 'bg-deep/55'
+              }`}
               onClick={() => setOpen(!open)}
               aria-label={open ? 'Close menu' : 'Open menu'}
               aria-expanded={open}
