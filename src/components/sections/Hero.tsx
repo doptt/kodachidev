@@ -43,7 +43,7 @@ type Pose = {
 }
 
 const POSES: Pose[] = [
-  { p: 0.0, m: 0, yaw: 0, pitch: 0.02, roll: 0, cam: 7, x: 0, y: -1.16, scale: 1.3, fade: 1, glow: 0.45, glowSize: 2.6, hole: 1, compact: [0, -0.76, 0.85] },
+  { p: 0.0, m: 0, yaw: 0, pitch: 0.02, roll: 0, cam: 7, x: 0, y: -0.83, scale: 1.3, fade: 1, glow: 0.45, glowSize: 2.6, hole: 1, compact: [0, -0.76, 0.85] },
   { p: 0.11, m: 0, yaw: 0.06, pitch: 0.03, roll: 0, cam: 7, x: 0.4, y: -0.02, scale: 0.95, fade: 1, glow: 0.4, glowSize: 2.8, hole: 1, compact: [0, 0.2, 0.75] },
   { p: 0.24, m: 0, yaw: -0.08, pitch: 0.06, roll: 0, cam: 6.6, x: 0.4, y: -0.02, scale: 0.95, fade: 1, glow: 0.4, glowSize: 2.8, hole: 1, compact: [0, 0.2, 0.75] },
   { p: 0.34, m: 1, yaw: -0.75, pitch: 0.22, roll: 0, cam: 7.4, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, compact: [0, 0.3, 0.68] },
