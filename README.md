@@ -8,7 +8,7 @@ It's a small React site with no backend of its own, apart from one serverless fu
 
 - **Home page** with a hero, reviews, services, an about section and a contact form
 - **Terms & Conditions** at [/terms](https://kodachi.dev/terms)
-- A **scroll-driven 3D hero**: one cloud of ~20k particles that forms a ringed planet behind the headline, then re-forms into a layered website, a laptop and phone, and finally a warp tunnel the camera dives into. It's plain WebGL with no 3D library, and the whole scene is generated in code
+- A **scroll-driven 3D hero**: a ray-traced black hole rises behind the headline, with real gravitational lensing bending its disk into an arch, and cursor ripples that roll through its rings. As you scroll, ~20k particles tear off the disk and re-form into Orion in 3D, then a laptop and phone, and finally a warp tunnel the camera dives into. It's plain WebGL with no 3D library, and the whole scene is generated in code
 - A **canvas sky** behind every page: three depths of twinkling stars with scroll and cursor parallax, a faint nebula band, and meteors and comets on curved paths. The stars streak into hyperspace during the hero's warp dive
 - **Scroll reveals** on the content, done with a small `IntersectionObserver` hook instead of an animation library
 - A **reviews carousel** that loops forever and pauses when you hover over it
