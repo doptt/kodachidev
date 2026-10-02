@@ -1,5 +1,3 @@
-/* Small WebGL helpers shared by the hero passes. */
-
 export function program(gl: WebGLRenderingContext, vertex: string, fragment: string, attributes: readonly string[]) {
   const compile = (type: number, source: string) => {
     const shader = gl.createShader(type)
@@ -13,7 +11,7 @@ export function program(gl: WebGLRenderingContext, vertex: string, fragment: str
   if (!p) throw new Error('createProgram failed')
   gl.attachShader(p, compile(gl.VERTEX_SHADER, vertex))
   gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fragment))
-  // Fixed attribute slots, so passes can share them without surprises
+  // attributes get fixed slots in the order they're listed
   attributes.forEach((name, i) => gl.bindAttribLocation(p, i, name))
   gl.linkProgram(p)
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) ?? 'link failed')
@@ -24,7 +22,7 @@ export function uniforms<T extends string>(gl: WebGLRenderingContext, p: WebGLPr
   return Object.fromEntries(names.map((n) => [n, gl.getUniformLocation(p, n)])) as Record<T, WebGLUniformLocation | null>
 }
 
-/** A colour texture you can render into */
+/** A texture to render into */
 export type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number }
 
 export function target(gl: WebGLRenderingContext, w: number, h: number, old?: Target | null): Target {

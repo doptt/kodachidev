@@ -13,8 +13,7 @@ type Review = {
   rating: number
 }
 
-// Fill these in as reviews come in. Empty fields show as soft placeholder
-// bars so the cards still look intentional in the meantime.
+// Empty fields show as placeholder bars until the real reviews are in
 const REVIEWS: Review[] = [
   { name: '', role: '', text: '', project: '', rating: 5 },
   { name: '', role: '', text: '', project: '', rating: 5 },
@@ -48,7 +47,6 @@ function ReviewCard({ review: r }: { review: Review }) {
 
   return (
     <article className="review-card flex w-[290px] shrink-0 flex-col rounded-2xl p-6 sm:w-[340px]">
-      {/* Who wrote it */}
       <div className="flex items-center gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-accent/20 font-display text-sm font-semibold ${
@@ -106,7 +104,7 @@ export default function Reviews() {
   const lap = Array.from({ length: repeats }, () => REVIEWS).flat()
 
   return (
-    // id stays "work" so the existing nav + hero links keep working
+    // id is "work" because the nav and hero link here
     <section id="work" className="relative overflow-hidden py-36">
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <div
@@ -127,7 +125,7 @@ export default function Reviews() {
             </h2>
           </div>
           <p className="max-w-xs pb-1 text-sm leading-relaxed text-muted">
-            Quality over quantity — My priority is shipping out a good final product, not fast completion.
+            Quality over quantity. My priority is shipping a good final product, not a fast one.
           </p>
         </Reveal>
       </div>

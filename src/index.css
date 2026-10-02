@@ -1,18 +1,6 @@
-/* ==========================================================================
-   kodachi.dev — global styles
-
-   Tailwind handles layout and spacing. This file holds the design tokens,
-   a small set of reusable component classes, and every keyframe animation
-   used on the site.
-   ========================================================================== */
-
 @import 'tailwindcss';
 
-/* --------------------------------------------------------------------------
-   Design tokens
-   Each color here turns into Tailwind utilities, so `--color-muted` gives
-   `text-muted`, `bg-muted`, `border-muted/20`, and so on.
-   -------------------------------------------------------------------------- */
+/* Colours and fonts. Each --color-x becomes text-x, bg-x, border-x/20 etc. */
 @theme {
   --color-night: #07060d;   /* page background */
   --color-deep: #0d0b16;    /* panels */
@@ -28,9 +16,7 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-/* --------------------------------------------------------------------------
-   Base
-   -------------------------------------------------------------------------- */
+/* Base */
 html {
   scroll-behavior: smooth;
   scrollbar-width: thin;
@@ -59,11 +45,7 @@ body {
   outline-offset: 3px;
 }
 
-/* --------------------------------------------------------------------------
-   Components
-   Anything with a hover state or a glow lives here so the JSX can stay
-   readable.
-   -------------------------------------------------------------------------- */
+/* Shared component classes */
 @layer components {
   /* Small mono label above each section title */
   .eyebrow {
@@ -237,12 +219,7 @@ body {
   }
 }
 
-/* --------------------------------------------------------------------------
-   Hero
-   The black hole and particles are WebGL (see lib/space). These are the DOM
-   layers around them: the bloom that follows the shape, the soft dark scrims
-   that keep text readable over bright particles, and the chapter rail.
-   -------------------------------------------------------------------------- */
+/* Hero. The 3D scene itself is WebGL, see src/lib/space. */
 .hero-glow {
   position: absolute;
   top: 0;
@@ -339,7 +316,7 @@ body {
 .animate-status { animation: status-pulse 2s ease-in-out infinite; }
 .animate-scroll-hint { animation: scroll-hint 2s ease-in-out infinite; }
 
-/* Hero entrance. `both` keeps elements hidden until their delay kicks in. */
+/* Hero entrance. `both` keeps things hidden until their delay starts. */
 .animate-fade-up { animation: fade-up 0.8s ease-out both; }
 .delay-100 { animation-delay: 0.1s; }
 .delay-200 { animation-delay: 0.2s; }
@@ -347,11 +324,7 @@ body {
 .delay-400 { animation-delay: 0.4s; }
 .delay-700 { animation-delay: 0.7s; }
 
-/* --------------------------------------------------------------------------
-   Reviews marquee
-   The track holds two identical copies of the cards and slides left by
-   exactly one copy (-50%), which makes the loop seamless.
-   -------------------------------------------------------------------------- */
+/* Reviews marquee. The track holds two copies and slides by one (-50%) to loop. */
 @keyframes marquee {
   from { transform: translate3d(0, 0, 0); }
   to { transform: translate3d(-50%, 0, 0); }
@@ -385,11 +358,7 @@ body {
   background: linear-gradient(90deg, rgb(155 109 255 / 0.1), rgb(155 109 255 / 0.05));
 }
 
-/* --------------------------------------------------------------------------
-   Budget dropdown
-   The list scales down from the trigger, then each option slides in with
-   a short stagger (set per option via --i).
-   -------------------------------------------------------------------------- */
+/* Budget dropdown */
 @keyframes dropdown-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -409,12 +378,7 @@ body {
   animation-delay: calc(var(--i, 0) * 30ms);
 }
 
-/* --------------------------------------------------------------------------
-   Expandable service text
-   Collapsed text fades out through a mask. The fade length is a registered
-   custom property so it can animate: the fade melts away as the card opens
-   and comes back as it closes, instead of popping on and off.
-   -------------------------------------------------------------------------- */
+/* Service card text. --fade is registered so the mask can animate open and shut. */
 @property --fade {
   syntax: '<length>';
   inherits: false;
@@ -431,9 +395,7 @@ body {
 }
 .service-text[data-faded='true'] { --fade: 1.7em; }
 
-/* --------------------------------------------------------------------------
-   Reduced motion: keep the page usable, drop anything decorative.
-   -------------------------------------------------------------------------- */
+/* Reduced motion: keep everything usable, drop the decoration */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 

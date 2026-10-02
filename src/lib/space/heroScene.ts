@@ -1,74 +1,48 @@
-import { BlackHolePass } from './blackHole'
+import { BlackHolePass, RIPPLE_GLSL } from './blackHole'
 import { DISK, diskCamera, focalFor } from './camera'
 import type { Formations } from './formations'
 import { program, uniforms } from './gl'
 
-/*
- * Draws the hero: the ray-traced black hole first, then ~20k particles on
- * top with additive blending (a soft halo pass under a crisp pass).
- *
- * The particles do all their shape work in the vertex shader: blending
- * between formations, orbits, cursor ripples, and gravitational lensing
- * around the black hole (a thin-lens approximation, so particles behind the
- * hole bend into the same arch the ray tracer draws, plus a fainter second
- * image underneath). The CPU only sends uniforms each frame.
- */
+// Renders the hero: the ray traced black hole, then the particles on top
+// with additive blending. All the particle motion happens in the vertex
+// shader, so each frame is just a handful of uniforms.
 
 export type SceneFrame = {
   time: number
   dt: number
-  /** 0..3, which formation we're on (fractions blend between them) */
+  /** 0 = disk, 1 = Orion, 2 = tunnel, fractions blend between them */
   morph: number
-  /** 0..1, particles flying in on first load */
+  /** 0-1, particles flying in on page load */
   intro: number
   yaw: number
   pitch: number
   roll: number
-  /** Camera distance from the origin */
   cam: number
-  /** Screen offset in clip space (-1..1) */
+  /** Screen offset in clip space */
   x: number
   y: number
   scale: number
-  /** Tunnel travel; keeps increasing while the tunnel flows */
+  /** How far the tunnel has scrolled past the camera */
   flow: number
-  /** Cursor in clip space plus how strongly it pushes nearby points */
   mouseX: number
   mouseY: number
   mouseForce: number
   fade: number
-  /** 0..1, how present the black hole is */
+  /** 0-1, how visible the black hole is */
   hole: number
-  /** Cursor ripples: x, z (disk space), start time, strength. 8 of them. */
+  /** x, z, start time and strength for each ripple, see RIPPLES */
   ripples: Float32Array
 }
 
-const n = (v: number) => v.toFixed(4)
-
-const RIPPLE_GLSL = /* glsl */ `
-uniform vec4 uRip[8];
-float ripple(vec2 q) {
-  float w = 0.0;
-  for (int i = 0; i < 8; i++) {
-    vec4 R = uRip[i];
-    float age = uTime - R.z;
-    if (R.w > 0.0 && age > 0.0 && age < 7.0) {
-      float x = length(q - R.xy) - age * 3.4;
-      w += sin(x * 2.4) * exp(-x * x / (2.0 + age * 2.5)) * exp(-age * 0.55) * R.w;
-    }
-  }
-  return w;
-}
-`
+const glsl = (v: number) => v.toFixed(4)
 
 const VERTEX = /* glsl */ `
 precision highp float;
 
-attribute vec3 aA;
-attribute vec3 aB;
-attribute vec3 aC;
-attribute vec3 aD;
-attribute vec4 aGlow;
+attribute vec3 aDisk;
+attribute vec3 aOrion;
+attribute vec3 aTunnel;
+attribute vec3 aGlow;
 attribute vec4 aSeed;
 
 uniform float uTime;
@@ -95,13 +69,13 @@ varying float vHalo;
 varying float vStar;
 
 const float PI = 3.14159265;
-const float RS = ${n(DISK.rs)};
-const float INNER = ${n(DISK.inner)};
-const float OUTER = ${n(DISK.outer)};
-const float TILT = ${n(DISK.tilt)};
-const float DROLL = ${n(DISK.roll)};
-const float SPIN = ${n(DISK.spin)};
-const float ORBIT = ${n(DISK.orbit)};
+const float RS = ${glsl(DISK.rs)};
+const float INNER = ${glsl(DISK.inner)};
+const float OUTER = ${glsl(DISK.outer)};
+const float TILT = ${glsl(DISK.tilt)};
+const float DISK_ROLL = ${glsl(DISK.roll)};
+const float SPIN = ${glsl(DISK.spin)};
+const float ORBIT = ${glsl(DISK.orbit)};
 
 ${RIPPLE_GLSL}
 
@@ -109,12 +83,12 @@ vec3 rotX(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(p.x
 vec3 rotY(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z); }
 vec3 rotZ(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(c * p.x - s * p.y, s * p.x + c * p.y, p.z); }
 vec3 view(vec3 p) { return rotZ(rotX(rotY(p, uRot.x), uRot.y), uRot.z); }
-vec3 toModel(vec3 q) { return rotZ(rotX(q, TILT), DROLL); }
+vec3 diskToModel(vec3 q) { return rotZ(rotX(q, TILT), DISK_ROLL); }
 
-// How far this particle is through morph step i. Each particle leaves at
-// its own moment, so shapes dissolve gradually instead of all at once.
-float progress(float i) {
-  float x = clamp((uMorph - i) * 1.7 - aSeed.x * 0.7, 0.0, 1.0);
+// Each particle leaves at a slightly different moment, so shapes dissolve
+// rather than all moving at once
+float progress(float step) {
+  float x = clamp((uMorph - step) * 1.7 - aSeed.x * 0.7, 0.0, 1.0);
   return x * x * (3.0 - 2.0 * x);
 }
 
@@ -130,56 +104,50 @@ void main() {
   float t = uTime;
   vHalo = uHalo;
 
-  // A: accretion disk. Keplerian orbits; ripples lift the gas as they pass.
-  vec3 q = aA;
-  float orbitR = max(length(q.xz), 0.001);
-  q = rotY(q, -SPIN * ORBIT * pow(max(orbitR, INNER), -1.5) * t);
-  float w = orbitR < OUTER * 1.4 ? ripple(q.xz) : 0.0;
-  q.y += w * 0.55;
-  vec3 a = toModel(q * RS);
-  // Doppler beaming, matching the ray-traced gas
-  vec3 orbitDir = view(toModel(SPIN * vec3(-q.z, 0.0, q.x) / orbitR));
-  float beta = sqrt(0.5 / max(orbitR, INNER));
-  float gA = aGlow.x * (1.0 + max(w, 0.0) * 0.9) * pow(sqrt(1.0 - beta * beta) / (1.0 - beta * orbitDir.z), 2.5);
+  // Disk: Keplerian orbits, lifted by the cursor ripples
+  vec3 q = aDisk;
+  float radius = max(length(q.xz), 0.001);
+  q = rotY(q, -SPIN * ORBIT * pow(max(radius, INNER), -1.5) * t);
+  float wave = radius < OUTER * 1.4 ? ripple(q.xz) : 0.0;
+  q.y += wave * 0.55;
+  vec3 disk = diskToModel(q * RS);
 
-  // B: Orion, swaying gently
-  vec3 b = rotY(aB, sin(t * 0.2) * 0.12);
-  b.y += sin(t * 0.5) * 0.02;
+  // Doppler beaming: the side orbiting toward the camera is brighter
+  vec3 orbit = view(diskToModel(SPIN * vec3(-q.z, 0.0, q.x) / radius));
+  float beta = sqrt(0.5 / max(radius, INNER));
+  float doppler = sqrt(1.0 - beta * beta) / (1.0 - beta * orbit.z);
+  float diskGlow = aGlow.x * (1.0 + max(wave, 0.0) * 0.9) * pow(doppler, 2.5);
 
-  // C: devices
-  vec3 c = rotY(aC, sin(t * 0.18 + 1.0) * 0.08);
-  c.y += sin(t * 0.5) * 0.03;
+  vec3 orion = rotY(aOrion, sin(t * 0.2) * 0.12);
+  orion.y += sin(t * 0.5) * 0.02;
 
-  // D: tunnel. Depth loops forever; radius narrows toward a bright throat.
-  float u = fract(aD.y + uFlow);
-  float z = mix(-15.0, 5.0, u);
-  float r = (0.16 + 2.7 * exp((z - 5.0) / 3.6)) * (1.0 + aD.z);
-  float ang = aD.x + z * 0.32 + t * 0.12;
-  vec3 d = vec3(cos(ang) * r, sin(ang) * r, z);
-  float gD = aGlow.w * smoothstep(0.0, 0.12, u) * (1.0 - smoothstep(0.92, 1.0, u));
+  // Tunnel: depth wraps around forever and the radius narrows into a throat
+  float depth = fract(aTunnel.y + uFlow);
+  float z = mix(-15.0, 5.0, depth);
+  float r = (0.16 + 2.7 * exp((z - 5.0) / 3.6)) * (1.0 + aTunnel.z);
+  float angle = aTunnel.x + z * 0.32 + t * 0.12;
+  vec3 tunnel = vec3(cos(angle) * r, sin(angle) * r, z);
+  float tunnelGlow = aGlow.z * smoothstep(0.0, 0.12, depth) * (1.0 - smoothstep(0.92, 1.0, depth));
 
   float k1 = progress(0.0);
   float k2 = progress(1.0);
-  float k3 = progress(2.0);
-  vec3 p = mix(mix(mix(a, b, k1), c, k2), d, k3);
-  float g = mix(mix(mix(gA, aGlow.y, k1), aGlow.z, k2), gD, k3);
+  vec3 p = mix(mix(disk, orion, k1), tunnel, k2);
+  float g = mix(mix(diskGlow, aGlow.y, k1), tunnelGlow, k2);
 
-  // Random direction per particle, used for the in-flight billow and intro
+  // A random direction per particle, for the in-between swirl and the intro
   float th = aSeed.w * 18.85 + aSeed.x * 11.0;
   float cz = fract(aSeed.w * 7.31 + aSeed.z * 3.7) * 2.0 - 1.0;
-  float sz = sqrt(1.0 - cz * cz);
-  vec3 dir = vec3(sz * cos(th), cz, sz * sin(th));
+  vec3 dir = vec3(sqrt(1.0 - cz * cz) * cos(th), cz, sqrt(1.0 - cz * cz) * sin(th));
 
-  float flight = sin(k1 * PI) + sin(k2 * PI) + sin(k3 * PI);
+  float flight = sin(k1 * PI) + sin(k2 * PI);
   p += dir * flight * (0.3 + 0.7 * aSeed.w);
   p = rotY(p, flight * (aSeed.z - 0.35) * 1.5);
   g *= 1.0 + flight * 0.5;
 
-  // First load: everything spirals in from far away
-  float ki = clamp(uIntro * 1.6 - aSeed.x * 0.6, 0.0, 1.0);
-  ki = 1.0 - pow(1.0 - ki, 3.0);
-  p = mix(rotY(dir * (8.0 + 6.0 * aSeed.z), 2.4), rotY(p, (1.0 - ki) * 1.6), ki);
-  g *= mix(0.15, 1.0, ki);
+  float arrive = clamp(uIntro * 1.6 - aSeed.x * 0.6, 0.0, 1.0);
+  arrive = 1.0 - pow(1.0 - arrive, 3.0);
+  p = mix(rotY(dir * (8.0 + 6.0 * aSeed.z), 2.4), rotY(p, (1.0 - arrive) * 1.6), arrive);
+  g *= mix(0.15, 1.0, arrive);
 
   p = view(p * uScale);
 
@@ -190,31 +158,30 @@ void main() {
   }
   vec2 sky = p.xy / dist;
 
-  // Gravitational lensing around the hole at the origin. Points behind it
-  // are seen at the thin-lens image positions: the main image is pushed
-  // outward (the arch), the second one lands on the opposite side.
+  // Gravitational lensing (thin lens) around the hole at the origin. Points
+  // behind it get pushed outward into the arch, and a dimmer second image
+  // lands on the opposite side.
   float lensed = 1.0;
   if (uLens > 0.001) {
-    float rsW = RS * uScale;
+    float rsWorld = RS * uScale;
     float behind = -p.z;
     if (behind > 0.0) {
-      float beta2 = length(sky) + 1e-6;
-      float e2 = 2.0 * rsW * behind / (uCam * dist);
-      float root = sqrt(beta2 * beta2 + 4.0 * e2);
-      float uu = beta2 / sqrt(e2);
-      float mu = (uu * uu + 2.0) / (2.0 * uu * sqrt(uu * uu + 4.0));
-      float img = uImage > 0.5 ? 0.5 * (beta2 - root) : 0.5 * (beta2 + root);
-      mu = uImage > 0.5 ? mu - 0.5 : mu + 0.5;
-      sky = mix(sky, sky / beta2 * img, uLens);
-      lensed = mix(1.0, clamp(mu, 0.0, 2.5), uLens);
-      // Images that land inside the shadow are gone
-      float shadow = 2.6 * rsW / uCam;
-      lensed *= 1.0 - uLens * (1.0 - smoothstep(shadow * 0.95, shadow * 1.05, abs(img)));
+      float b = length(sky) + 1e-6;
+      float einstein2 = 2.0 * rsWorld * behind / (uCam * dist);
+      float root = sqrt(b * b + 4.0 * einstein2);
+      float u = b / sqrt(einstein2);
+      float magnify = (u * u + 2.0) / (2.0 * u * sqrt(u * u + 4.0));
+      float image = uImage > 0.5 ? 0.5 * (b - root) : 0.5 * (b + root);
+      magnify = uImage > 0.5 ? magnify - 0.5 : magnify + 0.5;
+      sky = mix(sky, sky / b * image, uLens);
+      lensed = mix(1.0, clamp(magnify, 0.0, 2.5), uLens);
+
+      float shadow = 2.6 * rsWorld / uCam;
+      lensed *= 1.0 - uLens * (1.0 - smoothstep(shadow * 0.95, shadow * 1.05, abs(image)));
     } else if (uImage > 0.5) {
       lensed = 0.0;
     }
-    // Anything that strays across the horizon is swallowed
-    lensed *= 1.0 - uLens * (1.0 - smoothstep(1.0, 1.8, length(p) / rsW));
+    lensed *= 1.0 - uLens * (1.0 - smoothstep(1.0, 1.8, length(p) / rsWorld));
   } else if (uImage > 0.5) {
     lensed = 0.0;
   }
@@ -227,14 +194,13 @@ void main() {
   ndc.x /= uAspect;
   ndc += uOffset;
 
-  // The cursor acts like a small gravity well, nudging points aside
-  vec2 dm = (ndc - uMouse.xy) * vec2(uAspect, 1.0);
-  float lm = length(dm) + 0.0001;
-  ndc += (dm / lm) * vec2(1.0 / uAspect, 1.0) * uMouse.z * 0.04 * exp(-lm * lm * 24.0);
+  // The cursor nudges nearby points aside
+  vec2 toMouse = (ndc - uMouse.xy) * vec2(uAspect, 1.0);
+  float mouseDist = length(toMouse) + 0.0001;
+  ndc += (toMouse / mouseDist) * vec2(1.0 / uAspect, 1.0) * uMouse.z * 0.04 * exp(-mouseDist * mouseDist * 24.0);
 
   gl_Position = vec4(ndc, 0.0, 1.0);
 
-  // Constellation stars (glow over 3) are drawn big, with spikes
   float star = smoothstep(2.95, 3.2, g) * (1.0 - uHalo);
   vStar = star;
 
@@ -242,6 +208,7 @@ void main() {
   size *= 1.0 + star * (7.5 + (g - 3.2) * 5.0) / aSeed.y;
   float alpha = g * uFade * lensed * (1.0 - 0.55 * smoothstep(6.0, 26.0, dist)) * smoothstep(0.06, 1.4, dist);
   alpha *= mix(1.0, 0.32, star);
+  // Fade sub-pixel points instead of letting them flicker
   if (size < 1.25) {
     alpha *= size / 1.25;
     size = 1.25;
@@ -255,7 +222,7 @@ void main() {
   vec3 col = mix(violet, lavender, aSeed.z);
   col = mix(col, ice, step(0.9, aSeed.w) * 0.75);
   col = mix(col, vec3(1.0, 0.97, 1.0), clamp((g - 1.1) * 0.6, 0.0, 0.75));
-  col = mix(col, vec3(1.0, 0.96, 1.0), pow(1.0 - u, 5.0) * k3 * 0.7);
+  col = mix(col, vec3(1.0, 0.96, 1.0), pow(1.0 - depth, 5.0) * k2 * 0.7);
   vColor = col;
 }
 `
@@ -272,25 +239,29 @@ void main() {
   vec2 c = gl_PointCoord - 0.5;
   float d = dot(c, c) * 4.0;
   if (d > 1.0) discard;
+
   float soft = (1.0 - d) * (1.0 - d);
-  float dot1 = soft * 0.6 + exp(-d * 16.0) * 0.75;
-  // Flared star: tight core, soft halo and four thin diffraction spikes
+  float disc = soft * 0.6 + exp(-d * 16.0) * 0.75;
+
+  // Stars get a tight core, a halo and four diffraction spikes
   vec2 ac = abs(c);
   float spikes = exp(-ac.y * 130.0) * (1.0 - ac.x * 2.0) + exp(-ac.x * 130.0) * (1.0 - ac.y * 2.0);
   float flare = exp(-d * 70.0) * 1.6 + exp(-d * 10.0) * 0.3 + spikes * 0.7;
-  float a = mix(mix(dot1, flare, vStar), soft, vHalo) * vAlpha;
+
+  float a = mix(mix(disc, flare, vStar), soft, vHalo) * vAlpha;
   gl_FragColor = vec4(vColor * a, a * 0.35);
 }
 `
 
 const ATTRIBUTES = [
-  ['aA', 3],
-  ['aB', 3],
-  ['aC', 3],
-  ['aD', 3],
-  ['aGlow', 4],
+  ['aDisk', 3],
+  ['aOrion', 3],
+  ['aTunnel', 3],
+  ['aGlow', 3],
   ['aSeed', 4],
 ] as const
+
+const STRIDE = ATTRIBUTES.reduce((sum, [, size]) => sum + size, 0)
 
 const UNIFORMS = [
   'uTime', 'uMorph', 'uIntro', 'uRot', 'uCam', 'uFocal', 'uAspect', 'uOffset', 'uScale',
@@ -309,7 +280,7 @@ export class HeroScene {
   private height = 1
   private dpr = 1
 
-  /** Returns null when WebGL isn't available, so the caller can fall back */
+  /** Returns null if WebGL isn't available */
   static create(canvas: HTMLCanvasElement, data: Formations) {
     const gl = canvas.getContext('webgl', {
       alpha: true,
@@ -323,7 +294,7 @@ export class HeroScene {
     try {
       return new HeroScene(gl, data)
     } catch (err) {
-      console.warn('[hero] WebGL setup failed', err)
+      console.warn('Hero scene failed to start', err)
       return null
     }
   }
@@ -334,26 +305,23 @@ export class HeroScene {
     this.program = program(gl, VERTEX, FRAGMENT, ATTRIBUTES.map(([name]) => name))
     this.u = uniforms(gl, this.program, UNIFORMS)
 
-    // The black hole is a bonus: if its shader won't build, keep the particles
+    // If the ray tracer won't compile on this GPU, carry on with just particles
     let hole: BlackHolePass | null = null
     try {
       hole = new BlackHolePass(gl)
     } catch (err) {
-      console.warn('[hero] black hole disabled', err)
+      console.warn('Black hole shader failed, showing particles only', err)
     }
     this.hole = hole
 
-    // Interleave everything into one buffer: 20 floats per particle
-    const stride = 20
-    const packed = new Float32Array(data.count * stride)
+    const sources = [data.disk, data.orion, data.tunnel, data.glow, data.seed]
+    const packed = new Float32Array(data.count * STRIDE)
     for (let i = 0; i < data.count; i++) {
-      const o = i * stride
-      packed.set(data.a.subarray(i * 3, i * 3 + 3), o)
-      packed.set(data.b.subarray(i * 3, i * 3 + 3), o + 3)
-      packed.set(data.c.subarray(i * 3, i * 3 + 3), o + 6)
-      packed.set(data.d.subarray(i * 3, i * 3 + 3), o + 9)
-      packed.set(data.glow.subarray(i * 4, i * 4 + 4), o + 12)
-      packed.set(data.seed.subarray(i * 4, i * 4 + 4), o + 16)
+      let offset = i * STRIDE
+      ATTRIBUTES.forEach(([, size], a) => {
+        packed.set(sources[a].subarray(i * size, (i + 1) * size), offset)
+        offset += size
+      })
     }
     this.buffer = gl.createBuffer()!
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer)
@@ -383,7 +351,7 @@ export class HeroScene {
     let offset = 0
     ATTRIBUTES.forEach(([, size], i) => {
       gl.enableVertexAttribArray(i)
-      gl.vertexAttribPointer(i, size, gl.FLOAT, false, 20 * 4, offset * 4)
+      gl.vertexAttribPointer(i, size, gl.FLOAT, false, STRIDE * 4, offset * 4)
       offset += size
     })
   }
@@ -437,9 +405,9 @@ export class HeroScene {
     gl.uniform1f(u.uLens, lens)
     gl.uniform4fv(u.uRip, f.ripples)
 
-    // Soft glow under a random third of the points (the buffer is shuffled,
-    // so the first third is a fair sample), then the points themselves, then
-    // the second lensed image while the hole is around
+    // A soft glow pass over a third of the points (the buffer is shuffled, so
+    // the first third is a random sample), the points themselves, and the
+    // second lensed image while the hole is visible.
     gl.uniform1f(u.uImage, 0)
     gl.uniform1f(u.uHalo, 1)
     gl.drawArrays(gl.POINTS, 0, Math.floor(this.count / 3))

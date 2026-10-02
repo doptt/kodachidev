@@ -4,11 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import type { IncomingMessage } from 'node:http'
 
-// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Make .env / .env.local available to api/contact.ts during `npm run dev`.
-  // This only touches the Node process; nothing here reaches the browser
-  // (Vite only exposes variables prefixed with VITE_).
+  // Load .env.local into the Node process so api/contact.ts can read it in dev.
+  // None of this reaches the browser, Vite only exposes VITE_ variables.
   const env = loadEnv(mode, process.cwd(), '')
   for (const [key, value] of Object.entries(env)) process.env[key] ??= value
 
@@ -16,7 +14,7 @@ export default defineConfig(({ mode }) => {
     base: '/',
     plugins: [cleanUrls(), devApi(), react(), tailwindcss()],
     build: {
-      // Two pages: index.html -> /, terms/index.html -> /terms
+      // index.html is /, terms/index.html is /terms
       rolldownOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
@@ -29,10 +27,7 @@ export default defineConfig(({ mode }) => {
   }
 })
 
-/*
- * Serve /terms (no trailing slash) as terms/index.html in dev and preview,
- * the same way Vercel does in production.
- */
+// Serve /terms without the trailing slash locally, like Vercel does
 function cleanUrls(): Plugin {
   const rewrite = (req: IncomingMessage, _res: unknown, next: () => void) => {
     if (req.url && /^\/terms(\?.*)?$/.test(req.url)) req.url = req.url.replace('/terms', '/terms/')
@@ -45,12 +40,8 @@ function cleanUrls(): Plugin {
   }
 }
 
-/*
- * Runs api/contact.ts inside the dev server, so the contact form works
- * locally without the Vercel CLI. It converts Node's request into a standard
- * Request, calls the same POST handler Vercel uses, and writes the Response
- * back. Dev only; production goes through Vercel Functions.
- */
+// Runs api/contact.ts inside the dev server so the form works locally
+// without the Vercel CLI. Production uses Vercel Functions instead.
 function devApi(): Plugin {
   return {
     name: 'dev-api',

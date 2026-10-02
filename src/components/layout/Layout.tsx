@@ -9,7 +9,7 @@ type LayoutProps = {
   onHome?: boolean
 }
 
-// Page shell shared by every page: background glow, stars, nav and footer.
+// Shared page shell: background, stars, nav and footer
 export default function Layout({ children, onHome = true }: LayoutProps) {
   const [scrolled, setScrolled] = useState(false)
 
@@ -21,10 +21,10 @@ export default function Layout({ children, onHome = true }: LayoutProps) {
   }, [])
 
   return (
-    // overflow-x-clip (not hidden): "hidden" would turn this div into a
-    // scroll container and break the hero's sticky stage
+    // overflow-x-clip rather than hidden, which would make this a scroll
+    // container and break the hero's sticky stage
     <div id="top" className="grain relative min-h-screen overflow-x-clip bg-night">
-      {/* Soft violet light washing in from the top and edges */}
+      {/* Background glow */}
       <div
         className="pointer-events-none fixed inset-0 z-0"
         aria-hidden

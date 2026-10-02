@@ -9,7 +9,7 @@ const EMPTY_FORM: ContactPayload = { name: '', email: '', details: '', budget: '
 
 const DISCORD_HANDLE = 'kodache'
 
-// Icon paths. Email and GitHub are 24×24 strokes, Discord is a filled 256×199 logo.
+// Email and GitHub are 24x24 stroke icons, Discord is a filled 256x199 logo
 const ICONS = {
   email: 'M3 8l7 5 7-5M3 8v8a1 1 0 001 1h12a1 1 0 001-1V8M3 8a1 1 0 011-1h12a1 1 0 011 1',
   github:
@@ -34,7 +34,7 @@ function DiscordIcon() {
   )
 }
 
-// One row in the "Email / GitHub / Discord" list on the left
+// A row in the list of ways to reach me
 function ContactRow({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return (
     <>
@@ -78,7 +78,7 @@ export default function Contact() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Clipboard can be blocked; the handle is visible on screen anyway
+      // Clipboard access can be blocked, and the handle is on screen anyway
     }
   }
 
@@ -105,7 +105,6 @@ export default function Contact() {
         </Reveal>
 
         <div className="grid grid-cols-1 items-start gap-16 lg:grid-cols-[1fr_1.4fr]">
-          {/* Left: intro + ways to reach me */}
           <Reveal delay={80}>
             <p className="mb-8 text-[1.05rem] leading-[1.8] font-light text-lavender">
               Tell me what you're looking for, I'll handle the rest.
@@ -140,7 +139,6 @@ export default function Contact() {
             </ul>
           </Reveal>
 
-          {/* Right: the form */}
           <Reveal delay={160}>
             <div className="rounded-3xl bg-[linear-gradient(140deg,rgb(155_109_255/0.18)_0%,rgb(117_71_255/0.06)_50%,rgb(155_109_255/0.14)_100%)] p-0.5">
               <div className="rounded-3xl bg-deep/90 p-8 backdrop-blur-2xl sm:p-10">
@@ -224,8 +222,7 @@ export default function Contact() {
                       disabled={sending}
                     />
 
-                    {/* Honeypot: off-screen and skipped by keyboard + screen readers.
-                        Real people never see it, bots tend to fill every field. */}
+                    {/* Honeypot. Off screen and out of the tab order, so only bots fill it in. */}
                     <div aria-hidden className="absolute -left-[10000px] h-px w-px overflow-hidden">
                       <label htmlFor="contact-website">Leave this empty</label>
                       <input

@@ -3,21 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-/*
- * Flips `visible` to true once the element's top edge is about 10% above the
- * bottom of the screen, then stops watching.
- *
- * The root margin does two jobs:
- *   - The -10% bottom means things reveal a little after they peek in, not
- *     the instant a single pixel shows.
- *   - The huge top margin counts anything *above* the screen as seen. That
- *     covers jumps (End key, anchor links, fast flicks) that skip right past
- *     an element; without it, that content would stay invisible until you
- *     scrolled back up to it.
- *
- * threshold 0 (rather than e.g. 0.1) matters for tall elements: a block
- * taller than the screen can never be 10% visible on a short phone.
- */
+// Sets `visible` once the element is about 10% into the screen, then stops
+// watching. The huge top margin counts anything already above the screen as
+// seen, so jumping past content (anchor links, the End key) can't leave it
+// hidden. Threshold 0 so elements taller than the screen still trigger.
 export function useReveal<T extends HTMLElement = HTMLDivElement>(rootMargin = '100000px 0px -10% 0px') {
   const ref = useRef<T>(null)
   const [visible, setVisible] = useState(prefersReducedMotion)

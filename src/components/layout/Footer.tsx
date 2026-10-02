@@ -11,7 +11,7 @@ export default function Footer({ onHome = true }: { onHome?: boolean }) {
           <span className="font-display text-sm font-semibold tracking-tight text-muted">kodachi.dev</span>
         </a>
 
-        <p className="font-mono text-xs tracking-wide text-muted/50">© {new Date().getFullYear()} · Built with care</p>
+        <p className="font-mono text-xs tracking-wide text-muted/50">© {new Date().getFullYear()} kodachi.dev</p>
 
         <div className="flex items-center gap-6">
           <a href="/terms" className={linkClass}>

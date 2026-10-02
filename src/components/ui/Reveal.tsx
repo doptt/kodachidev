@@ -14,13 +14,8 @@ type RevealProps = {
   style?: CSSProperties
 }
 
-/*
- * Fades its children in the first time they scroll into view.
- *
- * Each Reveal watches itself, so a card halfway down a section animates when
- * you actually reach it. The animation sits on this wrapper rather than the
- * child, which leaves the child free to use its own hover transforms.
- */
+// Fades its children in the first time they scroll into view. The animation
+// is on this wrapper so the child can keep its own hover transforms.
 export default function Reveal({
   children,
   delay = 0,

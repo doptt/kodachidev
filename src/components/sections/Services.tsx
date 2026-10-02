@@ -27,7 +27,7 @@ const SERVICES: Service[] = [
   {
     num: '02',
     title: 'Responsive Layouts',
-    desc: 'Looks great on every screen — Your page adapts seamlessly across desktops, tablets, and mobile devices while maintaining functionality and visual quality.',
+    desc: 'Looks great on every screen. Your page adapts to desktops, tablets, and phones without losing any functionality or visual quality.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <rect x="2" y="4" width="12" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
@@ -74,7 +74,7 @@ const SERVICES: Service[] = [
   {
     num: '06',
     title: 'Launch & Deployment',
-    desc: 'I handle the technical side of getting your website online — including hosting, domains, configuration, and deployment. 24/7 uptime with DDoS mitigation and more.',
+    desc: 'I handle the technical side of getting your website online, including hosting, domains, configuration, and deployment. 24/7 uptime with DDoS mitigation and more.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
         <path d="M11 15V5M7 9l4-4 4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -107,23 +107,17 @@ function ChevronIcon({ flipped }: { flipped: boolean }) {
   )
 }
 
-/*
- * A service card whose description fades out after a few lines. Clicking
- * anywhere on the card eases it open to the full text.
- *
- * The height animates between two measured pixel values, so the motion ends
- * exactly where the text does rather than overshooting like a max-height
- * trick would. Descriptions short enough to fit get no toggle, but the
- * toggle's space is kept so cards in a row still line up.
- */
+// A card whose description fades out after a few lines and opens on click.
+// The height animates between two measured values so it stops exactly where
+// the text ends. Short descriptions get no toggle, but keep its space so the
+// cards in a row still line up.
 function ServiceCard({ service }: { service: Service }) {
   const textId = useId()
   const textRef = useRef<HTMLParagraphElement>(null)
   const [expanded, setExpanded] = useState(false)
   const [heights, setHeights] = useState({ collapsed: 0, full: 0 })
 
-  // Measure before paint so the card never flashes at full height, then keep
-  // measuring as the width changes (window resize, fonts finishing loading).
+  // Measure before paint, then again whenever the width changes
   useLayoutEffect(() => {
     const text = textRef.current
     if (!text) return
@@ -142,11 +136,10 @@ function ServiceCard({ service }: { service: Service }) {
   const expandable = heights.full > heights.collapsed + 1
   const open = expanded || !expandable
 
-  // One handler for the whole card. The "Read more" button inside doesn't
-  // need its own: keyboard and screen reader presses bubble up to here too.
+  // The Read more button has no handler of its own, its clicks bubble up here
   const toggle = () => {
     if (!expandable) return
-    // Don't toggle if the click was really the end of selecting some text
+    // ignore the click at the end of a text selection
     if (window.getSelection()?.toString()) return
     setExpanded((value) => !value)
   }
@@ -221,7 +214,6 @@ export default function Services() {
       </div>
 
       <div className="relative mx-auto max-w-6xl px-6">
-        {/* Heading on the left, turnaround time on the right */}
         <div className="mb-20 grid grid-cols-1 items-end gap-12 lg:grid-cols-[1fr_340px]">
           <Reveal duration={700}>
             <span className="eyebrow">Services</span>
@@ -264,10 +256,10 @@ export default function Services() {
           </Reveal>
         </div>
 
-        {/* items-start lets an opened card grow on its own without stretching its neighbours */}
+        {/* items-start so an open card doesn't stretch the rest of its row */}
         <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {SERVICES.map((service, i) => (
-            // Stagger by column so each row animates left to right
+            // stagger by column so each row comes in left to right
             <Reveal key={service.num} delay={80 + (i % 3) * 80} duration={700}>
               <ServiceCard service={service} />
             </Reveal>
@@ -278,7 +270,7 @@ export default function Services() {
           duration={700}
           className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-accent/8 pt-10 sm:flex-row"
         >
-          <p className="text-sm text-muted">Not sure what you need? That's fine — let's figure it out together.</p>
+          <p className="text-sm text-muted">Not sure what you need? That's fine, we can figure it out together.</p>
           <a href="#contact" className="btn-primary rounded-xl px-6 py-3 text-sm whitespace-nowrap">
             Get a Free Quote
             <ArrowIcon />
