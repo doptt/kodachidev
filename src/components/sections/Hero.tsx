@@ -10,9 +10,10 @@ import { clamp01, lerp, prefersReducedMotion, sky, smooth } from '../../lib/spac
  * it, one particle cloud re-forms into a new shape for each chapter:
  *
  *   intro    a black hole, its lensed disk arching up behind the headline
- *   01       the disk tears away and re-forms as Orion, in 3D
- *   02       a website on a laptop and a phone
- *   03       everything pours into a warp tunnel and the camera dives in
+ *   01       the hole moves aside and holds, with text beside it
+ *   02       the disk tears away and re-forms as Orion, in 3D
+ *   03       a website on a laptop and a phone
+ *   04       everything pours into a warp tunnel and the camera dives in
  *
  * Scroll position is eased, then mapped through the POSES timeline below.
  * The loop writes straight to the DOM and the canvas, so React never
@@ -42,14 +43,15 @@ type Pose = {
 }
 
 const POSES: Pose[] = [
-  { p: 0.0, m: 0, yaw: 0, pitch: 0.02, roll: 0, cam: 7, x: 0, y: -1.06, scale: 1.3, fade: 1, glow: 0.45, glowSize: 2.6, hole: 1, compact: [0, -0.76, 0.85] },
-  { p: 0.11, m: 0, yaw: 0.06, pitch: 0.03, roll: 0, cam: 7, x: 0, y: -0.02, scale: 1.12, fade: 1, glow: 0.4, glowSize: 2.8, hole: 1, compact: [0, 0.1, 0.8] },
-  { p: 0.24, m: 1, yaw: -0.75, pitch: 0.22, roll: 0, cam: 7.4, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, compact: [0, 0.3, 0.68] },
-  { p: 0.41, m: 1, yaw: -0.05, pitch: 0.04, roll: 0, cam: 7.2, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, compact: [0, 0.3, 0.68] },
-  { p: 0.54, m: 2, yaw: 0.5, pitch: 0.24, roll: 0, cam: 7.4, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, hole: 0, compact: [0, 0.3, 0.68] },
-  { p: 0.7, m: 2, yaw: 0.14, pitch: 0.16, roll: 0, cam: 7.1, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, hole: 0, compact: [0, 0.3, 0.68] },
-  { p: 0.82, m: 3, yaw: 0.08, pitch: 0.05, roll: 0, cam: 12, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.7, glowSize: 1.2, hole: 0, compact: [0, 0.22, 0.8] },
-  { p: 0.9, m: 3, yaw: 0.08, pitch: 0.05, roll: 0.2, cam: 6.5, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.9, glowSize: 1.1, hole: 0, compact: [0, 0.22, 0.8] },
+  { p: 0.0, m: 0, yaw: 0, pitch: 0.02, roll: 0, cam: 7, x: 0, y: -1.16, scale: 1.3, fade: 1, glow: 0.45, glowSize: 2.6, hole: 1, compact: [0, -0.76, 0.85] },
+  { p: 0.11, m: 0, yaw: 0.06, pitch: 0.03, roll: 0, cam: 7, x: 0.4, y: -0.02, scale: 0.95, fade: 1, glow: 0.4, glowSize: 2.8, hole: 1, compact: [0, 0.2, 0.75] },
+  { p: 0.24, m: 0, yaw: -0.08, pitch: 0.06, roll: 0, cam: 6.6, x: 0.4, y: -0.02, scale: 0.95, fade: 1, glow: 0.4, glowSize: 2.8, hole: 1, compact: [0, 0.2, 0.75] },
+  { p: 0.34, m: 1, yaw: -0.75, pitch: 0.22, roll: 0, cam: 7.4, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.488, m: 1, yaw: -0.05, pitch: 0.04, roll: 0, cam: 7.2, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.601, m: 2, yaw: 0.5, pitch: 0.24, roll: 0, cam: 7.4, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.739, m: 2, yaw: 0.14, pitch: 0.16, roll: 0, cam: 7.1, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.844, m: 3, yaw: 0.08, pitch: 0.05, roll: 0, cam: 12, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.7, glowSize: 1.2, hole: 0, compact: [0, 0.22, 0.8] },
+  { p: 0.913, m: 3, yaw: 0.08, pitch: 0.05, roll: 0.2, cam: 6.5, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.9, glowSize: 1.1, hole: 0, compact: [0, 0.22, 0.8] },
   { p: 1.0, m: 3, yaw: 0, pitch: 0, roll: 0.7, cam: 0.6, x: 0, y: 0, scale: 1, fade: 0, glow: 0, glowSize: 1, hole: 0, compact: [0, 0, 1] },
 ]
 
@@ -67,12 +69,20 @@ type Chapter = {
 
 const CHAPTERS: Chapter[] = [
   {
+    label: 'Event horizon',
+    title: 'Pulled in by',
+    accent: 'great design.',
+    body: 'A website that draws visitors in and keeps them there: a clear message, a smooth experience, and every page built to turn interest into enquiries.',
+    side: 'left',
+    show: [0.09, 0.13, 0.22, 0.27],
+  },
+  {
     label: 'Design',
     title: 'Every detail,',
     accent: 'placed with intent.',
     body: 'Layouts shaped around your brand and your customers, polished down to the last pixel while navigation stays simple.',
     side: 'left',
-    show: [0.2, 0.26, 0.41, 0.46],
+    show: [0.305, 0.357, 0.488, 0.531],
   },
   {
     label: 'Every screen',
@@ -80,7 +90,7 @@ const CHAPTERS: Chapter[] = [
     accent: 'every screen.',
     body: 'From wide desktop monitors to the phone in your pocket, your site adapts without losing a thing.',
     side: 'right',
-    show: [0.5, 0.56, 0.69, 0.74],
+    show: [0.566, 0.618, 0.731, 0.774],
   },
   {
     label: 'Launch',
@@ -88,7 +98,7 @@ const CHAPTERS: Chapter[] = [
     accent: 'kept in orbit.',
     body: 'Hosting, domains and deployment handled for you, with security and uptime built in from day one.',
     side: 'center',
-    show: [0.8, 0.85, 0.95, 0.99],
+    show: [0.826, 0.87, 0.957, 0.991],
     cta: true,
   },
 ]
@@ -96,9 +106,10 @@ const CHAPTERS: Chapter[] = [
 // Progress rail: where each stop scrolls to, and where it becomes active
 const STOPS = [
   { label: 'Intro', at: 0, from: 0 },
-  { label: 'Design', at: 0.33, from: 0.17 },
-  { label: 'Every screen', at: 0.62, from: 0.47 },
-  { label: 'Launch', at: 0.9, from: 0.76 },
+  { label: 'Event horizon', at: 0.17, from: 0.07 },
+  { label: 'Design', at: 0.418, from: 0.279 },
+  { label: 'Every screen', at: 0.67, from: 0.54 },
+  { label: 'Launch', at: 0.913, from: 0.792 },
 ]
 
 // Phones: every chapter sits at the bottom, full width. Wider screens: each
@@ -283,7 +294,7 @@ export default function Hero() {
       const intro = reduced ? 1 : clamp01((now - introStart) / 2600)
 
       // The dive at the end speeds the tunnel up and streaks the sky
-      const warp = reduced ? 0 : smooth(clamp01((p - 0.86) / 0.08)) * (1 - smooth(clamp01((p - 0.96) / 0.04)) * 0.7)
+      const warp = reduced ? 0 : smooth(clamp01((p - 0.878) / 0.07)) * (1 - smooth(clamp01((p - 0.965) / 0.035)) * 0.7)
       sky.warp = warp
       if (!reduced) {
         time += dt
@@ -326,7 +337,7 @@ export default function Hero() {
         mouseX,
         mouseY,
         // The gravity well is for the particle shapes; the disk gets ripples
-        mouseForce: force * (1 - pose.hole) * (1 - smooth(clamp01((p - 0.8) / 0.08))),
+        mouseForce: force * (1 - pose.hole) * (1 - smooth(clamp01((p - 0.826) / 0.07))),
         fade: pose.fade,
         hole: pose.hole * intro,
         ripples,
@@ -392,7 +403,7 @@ export default function Hero() {
   }, [])
 
   return (
-    <section id="home" ref={sectionRef} className="relative h-[400vh]">
+    <section id="home" ref={sectionRef} className="relative h-[500vh]">
       <div ref={stageRef} className="sticky top-0 h-svh w-full overflow-hidden">
         <div ref={glowRef} className="hero-glow" style={{ opacity: 0 }} aria-hidden />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
@@ -422,10 +433,6 @@ export default function Hero() {
                 <ArrowIcon />
               </a>
             </div>
-
-            <p className="mt-6 animate-fade-up font-mono text-xs tracking-wide text-muted delay-400">
-              Projects starting at: <span className="text-lavender">$125</span>
-            </p>
           </div>
 
           {/* Scroll hint */}
