@@ -2,14 +2,8 @@ import { useEffect, useRef } from 'react'
 import { prefersReducedMotion } from '../../lib/space/sky'
 import { SkyRenderer } from '../../lib/space/skyRenderer'
 
-/*
- * Fixed background sky behind every page. The drawing lives in
- * SkyRenderer; this component sizes the canvas, feeds it scroll and cursor
- * input, and runs the animation loop.
- *
- * With reduced motion on, the sky is drawn once (and again on resize):
- * no twinkle, no parallax, no comets.
- */
+// Background sky behind every page. With reduced motion it's drawn once and
+// left still.
 export default function Starfield() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -20,8 +14,8 @@ export default function Starfield() {
     const sky = new SkyRenderer(canvas)
     const reduced = prefersReducedMotion()
 
-    // The canvas is sized to the *largest* viewport (lvh), so a phone's
-    // address bar sliding in and out doesn't resize it and reshuffle stars
+    // Sized to the largest viewport (lvh) so a phone's address bar showing
+    // and hiding doesn't resize it and reshuffle the stars
     let size = ''
     const resize = () => {
       const width = canvas.clientWidth || window.innerWidth
@@ -59,7 +53,7 @@ export default function Starfield() {
       last = now
       const ease = (rate: number) => 1 - Math.exp(-dt * rate)
 
-      const scroll = Math.max(0, window.scrollY) // ignore iOS overscroll bounce
+      const scroll = Math.max(0, window.scrollY) // ignore iOS overscroll
       if (dt > 0) velocity += ((scroll - lastScroll) / dt - velocity) * ease(8)
       lastScroll = scroll
       mx += (targetX - mx) * ease(2)

@@ -1,26 +1,34 @@
 import { DISK } from './camera'
 import { program, target, uniforms, type Target } from './gl'
 
-/*
- * The hero black hole, ray traced in a fragment shader.
- *
- * Every pixel fires a light ray from the camera and bends it around the
- * hole (Schwarzschild geodesics, integrated in small steps). Whenever the
- * bent ray crosses the disk plane it picks up that bit of disk. That's what
- * produces the look of the reference: the far side of the disk lifted into
- * an arch over the top, a thinner image of it wrapping underneath, a bright
- * photon ring, and a black shadow.
- *
- * The disk is purple gas streaked along its orbit, densest and most opaque
- * at the inner edge, thinning out to translucent at the rim. Doppler
- * beaming makes the side turning toward you brighter and paler. Cursor
- * ripples (up to 8 at once) travel outward through the rings.
- *
- * It renders into an offscreen texture at reduced resolution, plus a tiny
- * copy that gets blurred into bloom, then both are composited.
- */
+// The hero black hole, ray traced in a fragment shader. Each pixel's ray is
+// bent around the hole (Schwarzschild geodesics, stepped numerically) and
+// picks up colour wherever it crosses the disk plane. That gives the arch
+// over the top, the thin ring underneath and the photon ring for free.
+//
+// It renders at reduced resolution into a texture, plus a tiny copy that
+// gets blurred into bloom, and the two are composited onto the canvas.
 
 export const RIPPLES = 8
+
+// Shared with the particle shader so the gas and the particles ripple together.
+// Each ripple is (x, z, start time, strength) in disk space.
+export const RIPPLE_GLSL = /* glsl */ `
+uniform vec4 uRip[${RIPPLES}];
+
+float ripple(vec2 q) {
+  float w = 0.0;
+  for (int i = 0; i < ${RIPPLES}; i++) {
+    vec4 R = uRip[i];
+    float age = uTime - R.z;
+    if (R.w > 0.0 && age > 0.0 && age < 7.0) {
+      float x = length(q - R.xy) - age * 3.4;
+      w += sin(x * 2.4) * exp(-x * x / (2.0 + age * 2.5)) * exp(-age * 0.55) * R.w;
+    }
+  }
+  return w;
+}
+`
 
 const QUAD_VERTEX = /* glsl */ `
 attribute vec2 aPos;
@@ -47,8 +55,6 @@ uniform mat3 uCamRot;
 uniform vec3 uCamPos;
 uniform float uTime;
 uniform float uGain;
-uniform float uExposure;
-uniform vec4 uRip[${RIPPLES}];
 
 const float INNER = ${DISK.inner.toFixed(3)};
 const float OUTER = ${DISK.outer.toFixed(3)};
@@ -73,23 +79,11 @@ float noise(vec3 x) {
   );
 }
 
-// Waves from the cursor, travelling outward through the disk
-float ripple(vec2 q) {
-  float w = 0.0;
-  for (int i = 0; i < ${RIPPLES}; i++) {
-    vec4 R = uRip[i];
-    float age = uTime - R.z;
-    if (R.w > 0.0 && age > 0.0 && age < 7.0) {
-      float x = length(q - R.xy) - age * 3.4;
-      w += sin(x * 2.4) * exp(-x * x / (2.0 + age * 2.5)) * exp(-age * 0.55) * R.w;
-    }
-  }
-  return w;
-}
+${RIPPLE_GLSL}
 
-// Gas streaks, stretched along the orbit. Inner rings orbit faster than outer
-// ones, which would eventually wind any pattern into mush, so two copies of
-// it each shear for a limited time and cross-fade.
+// Streaky gas, stretched along the orbit. The inner disk orbits faster than
+// the outer disk, which would eventually wind any pattern into noise, so two
+// copies of it each shear for a while and cross-fade.
 float streaks(float r, float phi) {
   float omega = SPIN * ORBIT * pow(r, -1.5);
   float total = 0.0;
@@ -99,8 +93,7 @@ float streaks(float r, float phi) {
     float a = phi - omega * phase * 22.0;
     vec2 cs = vec2(cos(a), sin(a));
     vec3 o = vec3(float(k) * 17.0, 0.0, 0.0);
-    // Broad clumps, plus two layers of thin filaments: the ridges of
-    // stretched noise, which wander like the streaks in real gas
+    // broad clumps plus two layers of thin filaments (ridges of the noise)
     float broad = noise(vec3(r * 1.6, cs * 1.3) + o);
     float f1 = 1.0 - abs(noise(vec3(r * 5.0, cs * 2.2) + o + 3.1) * 2.0 - 1.0);
     float f2 = 1.0 - abs(noise(vec3(r * 13.0, cs * 3.4) + o + 7.7) * 2.0 - 1.0);
@@ -110,7 +103,7 @@ float streaks(float r, float phi) {
   return total;
 }
 
-// Emission (rgb) and opacity (a) where a ray crosses the disk
+// Colour and opacity of the disk where a ray crosses it
 vec4 disk(vec3 p, vec3 v) {
   float r = length(p.xz);
   if (r < INNER * 0.88 || r > OUTER) return vec4(0.0);
@@ -200,7 +193,7 @@ void main() {
   // Soft photon-ring glow hugging the edge of the shadow
   col += vec3(0.55, 0.45, 1.0) * 0.1 * exp(-pow((impact - 2.62) * 2.4, 2.0)) * T;
 
-  vec3 rgb = 1.0 - exp(-col * uExposure);
+  vec3 rgb = 1.0 - exp(-col);
   float alpha = max(captured, 1.0 - T);
   gl_FragColor = vec4(rgb, alpha) * uGain;
 }
@@ -230,7 +223,7 @@ void main() {
 }
 `
 
-const TRACE_UNIFORMS = ['uAspect', 'uFocal', 'uOffset', 'uCamRot', 'uCamPos', 'uTime', 'uGain', 'uExposure', 'uRip'] as const
+const TRACE_UNIFORMS = ['uAspect', 'uFocal', 'uOffset', 'uCamRot', 'uCamPos', 'uTime', 'uGain', 'uRip'] as const
 const COMPOSITE_UNIFORMS = ['uSharp', 'uSoft', 'uTexel', 'uBloom'] as const
 
 export type HoleFrame = {
@@ -255,7 +248,7 @@ export class BlackHolePass {
   private soft: Target | null = null
   private width = 1
   private height = 1
-  /** Fraction of the canvas resolution the ray tracer runs at; drops if frames run slow */
+  /** Fraction of the canvas resolution to trace at, lowered if frames are slow */
   private quality = 1
   private slowFrames = 0
 
@@ -273,7 +266,7 @@ export class BlackHolePass {
   resize(width: number, height: number, dpr: number) {
     this.width = width
     this.height = height
-    // Around 1.3 traced pixels per CSS pixel is plenty for soft, glowing gas
+    // ~1.3 traced pixels per CSS pixel is plenty for soft, glowing gas
     this.quality = Math.min(1, 1.3 / dpr)
     this.allocate()
   }
@@ -286,7 +279,7 @@ export class BlackHolePass {
     this.soft = target(gl, Math.max(1, Math.round(this.width / 10)), Math.max(1, Math.round(this.height / 10)), this.soft)
   }
 
-  /** Lower the resolution a notch when frames are consistently slow */
+  /** Drops the resolution a notch when frames keep running slow */
   adapt(dt: number) {
     this.slowFrames = dt > 1 / 40 ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 1)
     if (this.slowFrames > 45 && this.quality > 0.45) {
@@ -301,10 +294,11 @@ export class BlackHolePass {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
     gl.enableVertexAttribArray(0)
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
-    for (let i = 1; i < 6; i++) gl.disableVertexAttribArray(i)
+    // turn off the particle attributes so WebGL doesn't validate them here
+    for (let i = 1; i < 5; i++) gl.disableVertexAttribArray(i)
   }
 
-  /** Draws the hole onto the (already cleared) default framebuffer */
+  /** Draws onto the default framebuffer, which should already be cleared */
   render(f: HoleFrame) {
     const { gl, tu, cu, sharp, soft } = this
     if (!sharp || !soft || f.gain <= 0.002) return
@@ -319,7 +313,6 @@ export class BlackHolePass {
     gl.uniform3f(tu.uCamPos, f.camPos[0], f.camPos[1], f.camPos[2])
     gl.uniform1f(tu.uTime, f.time)
     gl.uniform1f(tu.uGain, f.gain)
-    gl.uniform1f(tu.uExposure, 1.0)
     gl.uniform4fv(tu.uRip, f.ripples)
 
     for (const t of [sharp, soft]) {

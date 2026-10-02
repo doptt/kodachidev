@@ -1,19 +1,14 @@
-/*
- * Tiny bits shared by the hero scene and the background sky.
- *
- * `sky` is a plain mutable object rather than React state: the hero writes
- * to it every animation frame and the starfield reads it every frame, so
- * routing it through React would re-render for nothing.
- */
+// Written by the hero and read by the starfield on every frame. A plain
+// object on purpose, since React state would re-render for nothing.
 export const sky = {
-  /** 0..1, how hard the background stars streak outward (hero warp dive) */
+  /** 0-1, how hard the background stars streak during the warp dive */
   warp: 0,
 }
 
 export const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-/** Small, fast, seeded PRNG so the scene looks the same on every visit */
+/** Seeded random numbers, so the scene looks the same on every visit */
 export function mulberry32(seed: number) {
   let a = seed >>> 0
   return () => {

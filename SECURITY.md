@@ -1,60 +1,58 @@
 # Security
 
-## Reporting a problem
+If you find a security problem with kodachi.dev, please email contact@kodachi.dev instead of opening a public issue.
 
-If you find a security issue with kodachi.dev, please email **contact@kodachi.dev** rather than opening a public issue. I'll reply within a couple of days.
+## How the site is set up
 
-## How the site is protected
+Almost everything is static files. The only thing that takes input is the contact form, which posts to a single serverless function (`api/contact.ts`). That function never fetches a URL a visitor gives it, and the only outbound request it makes is to Resend's API, so there's nothing to point at internal services (SSRF).
 
-Most of the site is static files, which leaves very little to attack. The one moving part is the contact form. Here is what's in place, and why.
+## Headers
 
-### Response headers
+`vercel.json` sets these on every response:
 
-Set in `vercel.json` for every page:
+- **Content-Security-Policy**: scripts only from the site itself, styles and fonts only from the site and Google Fonts, no inline styles or scripts, no plugins, no framing, and requests only back to the site.
+- **Strict-Transport-Security**: HTTPS only, for two years.
+- **X-Frame-Options: DENY** and `frame-ancestors 'none'`: the site can't be embedded, so no clickjacking.
+- **X-Content-Type-Options: nosniff**: browsers don't guess file types.
+- **Referrer-Policy**: other sites only ever see the domain.
+- **Permissions-Policy**: camera, microphone, location, payments and USB are off.
+- **Cross-Origin-Opener-Policy / Cross-Origin-Resource-Policy**: other sites can't reach into a window opened from here, or embed the site's files.
 
-- **Content-Security-Policy.** The browser only runs scripts served from kodachi.dev itself. Styles and fonts are also allowed from Google Fonts. The page can't be framed, can't load plugins, and can only send data back to its own domain. This is the main defence against injected scripts.
-- **Strict-Transport-Security.** Browsers always use HTTPS for the domain, for two years.
-- **X-Frame-Options: DENY** and `frame-ancestors 'none'`. Other sites can't embed this one, which prevents clickjacking.
-- **X-Content-Type-Options: nosniff.** Browsers won't guess file types.
-- **Referrer-Policy.** Other sites only see the domain, never full URLs.
-- **Permissions-Policy.** Camera, microphone, location, payments and USB are turned off for the site.
-- **Cross-Origin-Opener-Policy.** Pages opened from other sites can't reach back into this one.
+## The contact form
 
-### The contact form (`api/contact.ts`)
+Each request goes through these checks before anything is sent:
 
-Each request goes through these checks in order:
+1. **Same site only (CSRF).** The `Origin` header has to match the site, and requests that the browser marks as cross-site (`Sec-Fetch-Site`) are refused. Browsers won't let other pages fake either header.
+2. **JSON only.** The content type has to be exactly `application/json`, so a plain HTML form on another site can't post here.
+3. **Rate limit.** Five messages per IP every 10 minutes. This is kept in memory per serverless instance, so use the firewall rule below for a hard limit.
+4. **Size cap.** Bodies over 16 KB are cut off while they're being read, so a huge upload never sits in memory.
+5. **Validation.** Every field is type and length checked, the email has to be well formed and the budget has to be one of the listed options. Control characters and text direction overrides are removed, and the name is squashed onto one line before it goes in the subject, so it can't add email headers.
+6. **Honeypot.** A hidden field only bots fill in. They get a fake success and nothing is sent.
+7. **Escaping.** Everything is HTML-escaped before it goes into the email.
+8. **Generic errors.** Visitors get a friendly message, the details go to the Vercel logs.
 
-1. **Same-site only.** The `Origin` header has to match the domain the request was sent to, so other websites can't post to the endpoint from a visitor's browser.
-2. **JSON only, with a 16 KB cap.** Plain HTML form posts from other sites are rejected outright.
-3. **Rate limit.** Five messages per IP every 10 minutes. This limit lives in memory, so each serverless instance keeps its own count. See the next section for the version that can't be bypassed.
-4. **Validation.** Every field is checked for type and length. Emails have to be properly formed, and the budget has to be one of the listed options. Invisible control and text-direction characters are stripped, and the name is flattened to a single line before it's used in the subject.
-5. **Honeypot.** A hidden field that only bots fill in. When it's filled, the bot gets a fake "sent" and no email goes out.
-6. **Escaping.** All user input is HTML-escaped before it goes into the email, so nobody can inject markup into my inbox.
-7. **Quiet errors.** Visitors get a generic message when something fails. The details go to the Vercel logs.
+Messages only ever go to my inbox, with the visitor as reply-to, so the form can't be used to email anyone else.
 
-The site never sends email to whatever address a visitor types in. Messages only go to my own inbox, with the visitor set as "reply-to", so the form can't be used to send spam to other people.
+On the browser side React escapes all output, there's no `dangerouslySetInnerHTML`, and external links use `rel="noopener noreferrer"`.
 
-### Secrets
+## Secrets
 
-The Resend key only exists as an environment variable on the server. Nothing in `src/` reads environment variables, and Vite only exposes variables that start with `VITE_`, so the key can't end up in the browser bundle. `.env` files are ignored by git, and only `.env.example` (with placeholders) is committed.
+The Resend key only exists as a server environment variable. Nothing in `src/` reads environment variables, and Vite only exposes ones prefixed with `VITE_`, so the key can't end up in the browser bundle. `.env` files are git-ignored.
 
-### Dependencies
+## Dependencies
 
-The only runtime dependencies are React and React DOM. Resend is called with `fetch`, so there's no email SDK to trust. Everything installs from the public npm registry through a lockfile.
+The only runtime dependencies are React and React DOM, and Resend is called with plain `fetch`. Everything installs from npm through the lockfile.
 
-## Things to switch on in dashboards
+## Worth turning on in dashboards
 
-These can't live in the repo, but they're worth doing before launch:
-
-- **Vercel Firewall rate limit.** In the project, go to Firewall → Rules and add a rate limit on `/api/contact`, around 10 requests per minute per IP. Unlike the in-code limit, this one is enforced for every instance.
-- **Restricted Resend key.** Create the key with "Sending access" only, limited to the kodachi.dev domain. If it ever leaks, it can't read or delete anything.
-- **Verified sending domain.** Verifying kodachi.dev in Resend adds SPF and DKIM records, so the form's emails don't land in spam and nobody else can send as the domain through Resend.
+- **Vercel Firewall**: add a rate limit rule for `/api/contact` (about 10 requests a minute per IP). Unlike the in-code limit, it applies across all instances.
+- **Resend**: use a key with sending access only, restricted to kodachi.dev, and verify the domain so SPF and DKIM are set up.
 - **Two-factor auth** on GitHub, Vercel, Resend and the domain registrar.
 
-## Before each release
+## Before a release
 
-- [ ] `npm audit` is clean (or the findings don't affect this site)
-- [ ] `npm run typecheck` and `npm run build` both pass
+- [ ] `npm audit` is clean
+- [ ] `npm run typecheck` and `npm run build` pass
 - [ ] No keys or `.env` files in `git status`
-- [ ] Headers check out at [securityheaders.com](https://securityheaders.com)
+- [ ] Headers look right on [securityheaders.com](https://securityheaders.com)
 - [ ] A test message through the live form arrives

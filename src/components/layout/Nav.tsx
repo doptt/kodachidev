@@ -29,9 +29,7 @@ export default function Nav({ scrolled, onHome = true }: NavProps) {
 
   return (
     <>
-      {/* The frosted bar only wraps the section links. The logo and the
-          Terms button float on their own at either side; explicit columns
-          keep them in place when the links collapse into the hamburger. */}
+      {/* Only the links sit in the frosted bar, the logo and Terms button float either side */}
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4">
         <nav aria-label="Main" className="mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 lg:gap-4">
           <a href={onHome ? '#home' : '/'} className="col-start-1 row-start-1 flex items-center gap-2 justify-self-start">
@@ -65,9 +63,7 @@ export default function Nav({ scrolled, onHome = true }: NavProps) {
               Terms & Conditions
             </a>
 
-            {/* Hamburger, in its own small frosted tile so it stays visible
-                over content. The outer bars slide to the middle and cross
-                into an X. */}
+            {/* Hamburger. The outer bars slide in and cross into an X. */}
             <button
               type="button"
               className={`flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-xl border border-accent/12 backdrop-blur-xl transition-colors duration-300 md:hidden ${

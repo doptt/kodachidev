@@ -1,17 +1,8 @@
 import { mulberry32, sky } from './sky'
 
-/*
- * The fixed background sky, drawn on a 2D canvas:
- *
- *   - a faint nebula band, rendered once into a small offscreen canvas
- *   - three depths of stars that twinkle, parallax on scroll and mouse,
- *     smear slightly when you scroll fast, and streak outward when the
- *     hero dives into its warp tunnel (`sky.warp`)
- *   - meteors and comets on curved paths, at random intervals, shedding
- *     little sparks as they go
- *
- * Star glows are pre-rendered sprites, so each star is a single drawImage.
- */
+// The background sky on a 2D canvas: a faint nebula band, three layers of
+// twinkling stars with scroll and mouse parallax, and the odd meteor or
+// comet. Star glows are pre-rendered sprites, so each star is one drawImage.
 
 type Star = {
   x: number
@@ -61,7 +52,7 @@ function sprite(color: string, spikes: boolean) {
   c.width = c.height = s
   const g = c.getContext('2d')!
   if (spikes) {
-    // Thin diffraction cross for the brightest stars
+    // thin cross for the brightest stars
     for (const [w, h] of [[s, 1.6], [1.6, s]]) {
       const grad = w > h ? g.createLinearGradient(0, 0, s, 0) : g.createLinearGradient(0, 0, 0, s)
       grad.addColorStop(0, 'transparent')
@@ -117,8 +108,7 @@ export class SkyRenderer {
     const r = mulberry32(7)
     const { w, h } = this
     const stars: Star[] = []
-    // The milky-way band runs corner to corner; a third of the far stars
-    // crowd around it
+    // a third of the far stars crowd around a band running corner to corner
     const band = (x: number) => h * (0.92 - (0.78 * x) / w)
 
     LAYERS.forEach((layer, li) => {
@@ -145,7 +135,7 @@ export class SkyRenderer {
     this.stars = stars
   }
 
-  /** Soft clouds, drawn once at low resolution. Tiles seamlessly in y. */
+  /** Soft clouds, drawn once at low resolution. Tiles vertically. */
   private makeNebula() {
     const scale = 0.33
     const cw = Math.max(1, Math.round(this.w * scale))
@@ -168,7 +158,6 @@ export class SkyRenderer {
       }
     }
 
-    // Band
     for (let i = 0; i < 26; i++) {
       const t = i / 25
       const x = (t * 1.2 - 0.1) * cw
@@ -176,7 +165,6 @@ export class SkyRenderer {
       const tone = r() < 0.5 ? '117 71 255' : '86 96 230'
       blob(x, y, ch * (0.14 + r() * 0.16), tone, 0.022 + r() * 0.03)
     }
-    // A few larger clouds of colour
     blob(cw * 0.82, ch * 0.18, ch * 0.5, '198 169 255', 0.03)
     blob(cw * 0.1, ch * 0.62, ch * 0.55, '117 71 255', 0.045)
     blob(cw * 0.55, ch * 0.9, ch * 0.45, '170 90 255', 0.025)
@@ -190,7 +178,7 @@ export class SkyRenderer {
     let x0: number, y0: number, x1: number, y1: number, duration: number
 
     if (meteor) {
-      // Short, fast and steep, starting somewhere in the upper sky
+      // short, fast and steep, starting in the upper half
       x0 = w * (0.1 + rand() * 0.8)
       y0 = h * (rand() * 0.45)
       const angle = 0.35 + rand() * 0.5 // below the horizon, in radians
@@ -199,7 +187,7 @@ export class SkyRenderer {
       y1 = y0 + Math.sin(angle) * len
       duration = 0.7 + rand() * 0.6
     } else {
-      // Long, slow arc from one edge to the other
+      // long, slow arc from one edge to the other
       x0 = ltr ? -w * 0.08 : w * 1.08
       x1 = ltr ? w * 1.08 : -w * 0.08
       y0 = h * (0.05 + rand() * 0.4)
@@ -207,7 +195,7 @@ export class SkyRenderer {
       duration = 7 + rand() * 4
     }
 
-    // Bend the path a little so nothing moves on rails
+    // bend the path a little so it doesn't look like it's on rails
     const mx = (x0 + x1) / 2
     const my = (y0 + y1) / 2
     const len = Math.hypot(x1 - x0, y1 - y0)
@@ -244,7 +232,7 @@ export class SkyRenderer {
     const { ctx, w, h } = this
     if (animate) this.time += dt
     const t = this.time
-    // Eased, so streaks wind down smoothly when the hero stops driving them
+    // eased, so the streaks wind down instead of snapping off
     this.warp += ((animate ? sky.warp : 0) - this.warp) * (1 - Math.exp(-dt * 5))
     const warp = this.warp < 0.002 ? 0 : this.warp
 
@@ -275,7 +263,7 @@ export class SkyRenderer {
       const alpha = Math.max(0.05, Math.min(1, s.base * (1 + s.amp * twinkle)))
       const color = COLORS[s.color]
 
-      // Motion streaks: outward during the warp dive, vertical while scrolling fast
+      // streak outward during the warp dive, and vertically when scrolling fast
       const dx = x - cx
       const dy = y - cy
       const dist = Math.hypot(dx, dy) || 1
@@ -318,13 +306,12 @@ export class SkyRenderer {
     for (const f of this.flyers) {
       f.age += dt
       const raw = Math.min(1, f.age / f.duration)
-      // Meteors speed up as they burn in; comets glide
       const u = f.kind === 'meteor' ? raw * (0.55 + 0.45 * raw) : raw
       const [hx, hy] = this.at(f, u)
       const envelope = f.kind === 'meteor' ? Math.pow(Math.sin(Math.PI * raw), 0.7) : Math.min(1, raw / 0.06, (1 - raw) / 0.06)
       if (envelope <= 0) continue
 
-      // Tapered tail following the curve back
+      // tapered tail that follows the curve back
       const steps = 20
       const back = f.tail * (f.kind === 'meteor' ? Math.min(1, raw * 3) : 1)
       let [px, py] = [hx, hy]
@@ -342,7 +329,7 @@ export class SkyRenderer {
         py = ty
       }
 
-      // Comets also get a faint, straight blue ion tail
+      // comets also get a faint, straight blue ion tail
       const [bx, by] = this.at(f, Math.max(0, u - 0.01))
       const vx = hx - bx
       const vy = hy - by
@@ -364,7 +351,6 @@ export class SkyRenderer {
         ctx.stroke()
       }
 
-      // Sparks shed from the head
       f.sparkDebt += dt * (f.kind === 'meteor' ? 45 : 30)
       while (f.sparkDebt >= 1) {
         f.sparkDebt -= 1
@@ -381,7 +367,7 @@ export class SkyRenderer {
         })
       }
 
-      // Head: wide coma, then a bright core
+      // head: a wide soft glow with a bright core
       const coma = f.width * (f.kind === 'comet' ? 9 : 5)
       ctx.globalAlpha = envelope * 0.55
       ctx.drawImage(this.glows[4], hx - coma, hy - coma, coma * 2, coma * 2)

@@ -24,7 +24,7 @@ const TRAITS = [
   {
     label: 'Every detail matters',
     glyph: '⚲\uFE0E',
-    detail: 'Clean code, reliable infrastructure, and thoughtful implementation to give your site a solid foundation. I\'m a ',
+    detail: 'Clean code, reliable infrastructure, and thoughtful implementation to give your site a solid foundation.',
   },
   {
     label: 'Clear communication',
@@ -66,7 +66,7 @@ export default function About() {
             </p>
             <p className="mb-5 text-sm leading-loose text-muted">
               I’ve always been the kind of person who can’t leave something alone if I don’t understand how it works. 
-              That curiosity is what pulled me into tech — from experimenting with operating systems and software to building websites and debugging code.
+              That curiosity is what pulled me into tech, from experimenting with operating systems and software to building websites and debugging code.
               I love taking an idea, figuring out how to make it work, and turning it into something people can actually use. 
               I’m always learning, experimenting with new tools, and finding something new to get way too invested in.
             </p>

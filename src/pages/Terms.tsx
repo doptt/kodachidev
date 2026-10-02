@@ -1,7 +1,7 @@
 import Layout from '../components/layout/Layout'
 import Reveal from '../components/ui/Reveal'
 
-// Placeholder copy, edit freely. Each entry becomes a numbered section.
+// Each entry becomes a numbered section
 const LAST_UPDATED = 'September 23, 2026'
 
 const SECTIONS = [

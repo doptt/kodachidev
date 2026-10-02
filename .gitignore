@@ -17,9 +17,3 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
-
-# Local notes, not part of the repo
-AGENTS.md
-CLAUDE.md
-docs/design-brief.md
-docs/reference/

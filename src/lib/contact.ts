@@ -1,10 +1,5 @@
-/*
- * Everything the contact form needs that isn't UI: the budget choices, field
- * limits, and the request to /api/contact.
- *
- * The limits are mirrored on the server in api/contact.ts. The browser copy
- * is only there for nicer feedback; the server never trusts it.
- */
+// Budget choices, field limits and the request to /api/contact. The server
+// (api/contact.ts) has its own copy of these and doesn't trust the browser.
 
 export const BUDGET_OPTIONS = ['$125 – $250', '$250 – $500', '$500 – $750', '$750+', 'Not sure yet'] as const
 
@@ -19,7 +14,7 @@ export type ContactPayload = {
   email: string
   details: string
   budget: string
-  /** Honeypot. Hidden from people, so only bots fill it in. */
+  /** Honeypot field, hidden from people so only bots fill it in */
   website: string
 }
 

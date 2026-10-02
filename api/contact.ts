@@ -1,45 +1,35 @@
 /*
  * POST /api/contact
  *
- * Takes a submission from the contact form, checks it, and emails it to me
- * through Resend (https://resend.com). Vercel deploys every file in /api as
- * a serverless function, and in development vite.config.ts serves it too.
+ * Checks a contact form submission and emails it to me through Resend.
+ * Vercel runs this as a serverless function, and vite.config.ts serves it
+ * during development.
  *
  * Environment variables:
- *   RESEND_API_KEY      required. A "sending access" key is enough.
- *   CONTACT_FROM_EMAIL  required. Sender on a domain verified in Resend,
- *                       e.g. "kodachi.dev <noreply@kodachi.dev>"
- *   CONTACT_TO_EMAIL    optional. Inbox that receives messages
- *                       (defaults to contact@kodachi.dev)
- *   ALLOWED_ORIGINS     optional. Extra comma-separated origins allowed to
- *                       post here. The site's own origin always works.
+ *   RESEND_API_KEY      required, a key with sending access
+ *   CONTACT_FROM_EMAIL  required, e.g. "kodachi.dev <noreply@kodachi.dev>"
+ *   CONTACT_TO_EMAIL    where messages go, defaults to contact@kodachi.dev
+ *   ALLOWED_ORIGINS     extra comma-separated origins allowed to post here
  *
- * What it guards against, in order:
- *   1. Other websites posting to this endpoint (Origin check)
- *   2. Spam bursts from one address (rate limit)
- *   3. Oversized or malformed bodies (size cap, JSON + field validation)
- *   4. Bots (honeypot field, answered with a fake success)
- *   5. HTML injection in the email (everything is escaped)
+ * See SECURITY.md for what each check is for.
  */
 
-// Keep these in sync with src/lib/contact.ts
+// Keep in sync with src/lib/contact.ts
 const BUDGET_OPTIONS = ['$125 – $250', '$250 – $500', '$500 – $750', '$750+', 'Not sure yet']
 const LIMITS = { name: 100, email: 254, details: 5000 }
 
 const MAX_BODY_BYTES = 16 * 1024
-const RATE_LIMIT = { max: 5, windowMs: 10 * 60 * 1000 } // 5 messages per 10 minutes per IP
+const RATE_LIMIT = { max: 5, windowMs: 10 * 60 * 1000 }
 const RESEND_TIMEOUT_MS = 10_000
 
-// -----------------------------------------------------------------------------
-// Handler
-// -----------------------------------------------------------------------------
+const SEND_FAILED = "Your message couldn't be sent. Please try again, or email me directly."
 
 export async function POST(request: Request): Promise<Response> {
   if (!isSameSite(request)) {
     return reply(403, { error: 'Forbidden.' })
   }
 
-  if (!request.headers.get('content-type')?.includes('application/json')) {
+  if (mediaType(request) !== 'application/json') {
     return reply(415, { error: 'Expected a JSON body.' })
   }
 
@@ -47,8 +37,8 @@ export async function POST(request: Request): Promise<Response> {
     return reply(429, { error: 'Too many messages. Please wait a few minutes and try again.' }, { 'Retry-After': '600' })
   }
 
-  const raw = await request.text()
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
+  const raw = await readBody(request, MAX_BODY_BYTES)
+  if (raw === null) {
     return reply(413, { error: 'That message is too long.' })
   }
 
@@ -64,8 +54,7 @@ export async function POST(request: Request): Promise<Response> {
     return reply(400, { error: result.error })
   }
 
-  // Honeypot was filled in, so this is almost certainly a bot. Say "sent" so
-  // it moves on, but don't actually send anything.
+  // Only bots fill in the hidden field. Tell them it worked and send nothing.
   if (result.honeypot) {
     return reply(200, { ok: true })
   }
@@ -90,7 +79,7 @@ export async function POST(request: Request): Promise<Response> {
       body: JSON.stringify({
         from,
         to: [to],
-        reply_to: message.email, // hitting "Reply" goes straight to the visitor
+        reply_to: message.email,
         subject: `New inquiry from ${message.name}`,
         html: renderHtml(message),
         text: renderText(message),
@@ -99,21 +88,16 @@ export async function POST(request: Request): Promise<Response> {
     })
 
     if (!res.ok) {
-      // Log the details for me, keep the visitor's error generic
       console.error('[contact] Resend responded', res.status, await res.text().catch(() => ''))
-      return reply(502, { error: "Your message couldn't be sent. Please try again, or email me directly." })
+      return reply(502, { error: SEND_FAILED })
     }
   } catch (err) {
     console.error('[contact] Request to Resend failed', err)
-    return reply(502, { error: "Your message couldn't be sent. Please try again, or email me directly." })
+    return reply(502, { error: SEND_FAILED })
   }
 
   return reply(200, { ok: true })
 }
-
-// -----------------------------------------------------------------------------
-// Request checks
-// -----------------------------------------------------------------------------
 
 function reply(status: number, body: object, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
@@ -122,22 +106,20 @@ function reply(status: number, body: object, headers: Record<string, string> = {
   })
 }
 
-/*
- * Browsers always attach an Origin header to POST requests, so a real
- * submission from the site will have an Origin matching the host it was sent
- * to. Anything else (another website, or a script without an Origin) is
- * turned away. Scripts can fake the header, which is why this is only one
- * layer of several.
- */
+// Browsers send an Origin header with every POST and can't fake it, so this
+// stops other sites from submitting the form on a visitor's behalf.
 function isSameSite(request: Request) {
   const origin = request.headers.get('origin')
   if (!origin) return false
 
-  const extra = (process.env.ALLOWED_ORIGINS ?? '')
+  const allowed = (process.env.ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
-  if (extra.includes(origin)) return true
+  if (allowed.includes(origin)) return true
+
+  // Newer browsers also say outright when a request comes from another site
+  if (request.headers.get('sec-fetch-site') === 'cross-site') return false
 
   const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
   try {
@@ -147,61 +129,79 @@ function isSameSite(request: Request) {
   }
 }
 
-function clientIp(request: Request) {
-  // Vercel sets both of these itself, so visitors can't spoof them
-  return (
-    request.headers.get('x-real-ip') ??
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    'unknown'
-  )
+// "application/json; charset=utf-8" -> "application/json". Comparing the whole
+// type matters: a cross-site form can send "text/plain; application/json".
+function mediaType(request: Request) {
+  return (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
 }
 
-/*
- * Simple in-memory limiter. Good enough to stop someone mashing the button,
- * but each serverless instance has its own memory, so it isn't a hard
- * guarantee. For that, add a rate-limit rule for /api/contact in the Vercel
- * Firewall (see SECURITY.md).
- */
+// Reads the body but gives up as soon as it passes the limit, so a huge
+// upload never ends up in memory. Returns null if it's too big.
+async function readBody(request: Request, limit: number) {
+  if (Number(request.headers.get('content-length')) > limit) return null
+  if (!request.body) return ''
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > limit) {
+      await reader.cancel()
+      return null
+    }
+    chunks.push(value)
+  }
+
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(bytes)
+}
+
+// Vercel sets these itself, so visitors can't spoof them
+function clientIp(request: Request) {
+  return request.headers.get('x-real-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+}
+
+// In-memory, so each serverless instance counts separately. It stops someone
+// mashing the button; the Vercel firewall rule in SECURITY.md is the real limit.
 const hits = new Map<string, number[]>()
 
 function isRateLimited(ip: string) {
   const now = Date.now()
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < RATE_LIMIT.windowMs)
-
-  if (recent.length >= RATE_LIMIT.max) {
-    hits.set(ip, recent)
-    return true
-  }
-
-  recent.push(now)
+  const limited = recent.length >= RATE_LIMIT.max
+  if (!limited) recent.push(now)
   hits.set(ip, recent)
 
-  // Stop the map growing forever on a long-lived instance
   if (hits.size > 5000) {
     for (const [key, times] of hits) {
       if (times.every((t) => now - t >= RATE_LIMIT.windowMs)) hits.delete(key)
     }
   }
-  return false
+  return limited
 }
-
-// -----------------------------------------------------------------------------
-// Validation
-// -----------------------------------------------------------------------------
 
 type Message = { name: string; email: string; details: string; budget: string }
 
 type Validation = { ok: true; value: Message; honeypot: boolean } | { ok: false; error: string }
 
-// Control characters (except tab/newline) and bidi overrides, which can be
-// used to make text display differently from what it really says
-const INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g
+// Control characters (apart from tabs and newlines) and the bidi overrides
+// that can make text display differently from what it actually says
+const INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F‪-‮⁦-⁩]/g
 
-// WHATWG's email pattern, but requiring a dot in the domain
+// The WHATWG email pattern, but the domain needs a dot
 const EMAIL =
   /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/
 
 const singleLine = (value: string) => value.replace(INVISIBLE, '').replace(/\s+/g, ' ').trim()
+
 const multiLine = (value: string) =>
   value
     .replace(/\r\n?/g, '\n')
@@ -210,17 +210,17 @@ const multiLine = (value: string) =>
     .trim()
 
 function validate(input: unknown): Validation {
-  if (typeof input !== 'object' || input === null) {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
     return { ok: false, error: 'Invalid request.' }
   }
 
   const data = input as Record<string, unknown>
-  const text = (key: string) => (typeof data[key] === 'string' ? (data[key] as string) : '')
+  const field = (key: string) => (typeof data[key] === 'string' ? (data[key] as string) : '')
 
-  const name = singleLine(text('name'))
-  const email = singleLine(text('email')).toLowerCase()
-  const details = multiLine(text('details'))
-  const budget = singleLine(text('budget'))
+  const name = singleLine(field('name'))
+  const email = singleLine(field('email')).toLowerCase()
+  const details = multiLine(field('details'))
+  const budget = singleLine(field('budget'))
 
   if (!name) return { ok: false, error: 'Please enter your name.' }
   if (name.length > LIMITS.name) return { ok: false, error: 'That name is too long.' }
@@ -238,12 +238,8 @@ function validate(input: unknown): Validation {
     return { ok: false, error: 'Please pick a budget from the list.' }
   }
 
-  return { ok: true, value: { name, email, details, budget }, honeypot: text('website').trim() !== '' }
+  return { ok: true, value: { name, email, details, budget }, honeypot: field('website').trim() !== '' }
 }
-
-// -----------------------------------------------------------------------------
-// Email body
-// -----------------------------------------------------------------------------
 
 function escapeHtml(value: string) {
   return value

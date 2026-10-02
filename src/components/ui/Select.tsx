@@ -11,19 +11,10 @@ type SelectProps = {
   disabled?: boolean
 }
 
-/*
- * Custom dropdown that behaves like a native <select>, but can be animated
- * and styled to match the rest of the form.
- *
- * Follows the WAI-ARIA "select-only combobox" pattern: the trigger button
- * keeps focus the whole time and points at the highlighted option with
- * aria-activedescendant. Keyboard support:
- *   ↑ / ↓        move the highlight (opens the list if closed)
- *   Enter/Space  pick the highlighted option, or open the list
- *   Home / End   jump to the first / last option
- *   Escape / Tab close without picking
- *   Any letter   jump to the next option starting with it
- */
+// A styled dropdown that works like a native <select>, following the
+// WAI-ARIA select-only combobox pattern. Focus stays on the button, the
+// arrow keys and Home/End move the highlight, Enter or Space picks, Escape
+// closes and typing a letter jumps to the next match.
 export default function Select({ label, hint, options, value, onChange, placeholder = 'Select…', disabled }: SelectProps) {
   const id = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -118,7 +109,7 @@ export default function Select({ label, hint, options, value, onChange, placehol
         aria-controls={`${id}-listbox`}
         aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
         disabled={disabled}
-        // detail === 0 means the click came from the keyboard, which onKeyDown already handled
+        // detail is 0 for keyboard clicks, which onKeyDown already handles
         onClick={(e) => e.detail !== 0 && (open ? setOpen(false) : openList())}
         onKeyDown={onKeyDown}
         className="field flex cursor-pointer items-center justify-between text-left disabled:cursor-not-allowed disabled:opacity-60"
