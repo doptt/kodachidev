@@ -1,15 +1,22 @@
+import { BlackHolePass } from './blackHole'
+import { DISK, diskCamera, focalFor } from './camera'
 import type { Formations } from './formations'
+import { program, uniforms } from './gl'
 
 /*
- * Draws the hero particles with plain WebGL. No library: it's one buffer,
- * one shader pair and two draw calls (a soft halo pass under a crisp pass).
+ * Draws the hero: the ray-traced black hole first, then ~20k particles on
+ * top with additive blending (a soft halo pass under a crisp pass).
  *
- * All the shape work happens in the vertex shader. The CPU only sends a
- * handful of uniforms per frame, so it stays cheap even with ~16k points.
+ * The particles do all their shape work in the vertex shader: blending
+ * between formations, orbits, cursor ripples, and gravitational lensing
+ * around the black hole (a thin-lens approximation, so particles behind the
+ * hole bend into the same arch the ray tracer draws, plus a fainter second
+ * image underneath). The CPU only sends uniforms each frame.
  */
 
 export type SceneFrame = {
   time: number
+  dt: number
   /** 0..3, which formation we're on (fractions blend between them) */
   morph: number
   /** 0..1, particles flying in on first load */
@@ -25,12 +32,34 @@ export type SceneFrame = {
   scale: number
   /** Tunnel travel; keeps increasing while the tunnel flows */
   flow: number
-  /** Cursor in clip space plus how strongly it bends nearby points */
+  /** Cursor in clip space plus how strongly it pushes nearby points */
   mouseX: number
   mouseY: number
   mouseForce: number
   fade: number
+  /** 0..1, how present the black hole is */
+  hole: number
+  /** Cursor ripples: x, z (disk space), start time, strength. 8 of them. */
+  ripples: Float32Array
 }
+
+const n = (v: number) => v.toFixed(4)
+
+const RIPPLE_GLSL = /* glsl */ `
+uniform vec4 uRip[8];
+float ripple(vec2 q) {
+  float w = 0.0;
+  for (int i = 0; i < 8; i++) {
+    vec4 R = uRip[i];
+    float age = uTime - R.z;
+    if (R.w > 0.0 && age > 0.0 && age < 7.0) {
+      float x = length(q - R.xy) - age * 3.4;
+      w += sin(x * 2.4) * exp(-x * x / (2.0 + age * 2.5)) * exp(-age * 0.55) * R.w;
+    }
+  }
+  return w;
+}
+`
 
 const VERTEX = /* glsl */ `
 precision highp float;
@@ -57,18 +86,30 @@ uniform float uFlow;
 uniform vec3 uMouse;
 uniform float uFade;
 uniform float uHalo;
+uniform float uLens;
+uniform float uImage;
 
 varying vec3 vColor;
 varying float vAlpha;
 varying float vHalo;
+varying float vStar;
 
 const float PI = 3.14159265;
-const vec3 SUN = vec3(-0.62, 0.48, 0.62);
+const float RS = ${n(DISK.rs)};
+const float INNER = ${n(DISK.inner)};
+const float OUTER = ${n(DISK.outer)};
+const float TILT = ${n(DISK.tilt)};
+const float DROLL = ${n(DISK.roll)};
+const float SPIN = ${n(DISK.spin)};
+const float ORBIT = ${n(DISK.orbit)};
+
+${RIPPLE_GLSL}
 
 vec3 rotX(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(p.x, c * p.y - s * p.z, s * p.y + c * p.z); }
 vec3 rotY(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z); }
 vec3 rotZ(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(c * p.x - s * p.y, s * p.x + c * p.y, p.z); }
 vec3 view(vec3 p) { return rotZ(rotX(rotY(p, uRot.x), uRot.y), uRot.z); }
+vec3 toModel(vec3 q) { return rotZ(rotX(q, TILT), DROLL); }
 
 // How far this particle is through morph step i. Each particle leaves at
 // its own moment, so shapes dissolve gradually instead of all at once.
@@ -77,37 +118,33 @@ float progress(float i) {
   return x * x * (3.0 - 2.0 * x);
 }
 
+void hide() {
+  gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+  gl_PointSize = 0.0;
+  vColor = vec3(0.0);
+  vAlpha = 0.0;
+  vStar = 0.0;
+}
+
 void main() {
   float t = uTime;
   vHalo = uHalo;
 
-  // A: planet. The body turns as one piece; ring and dust orbit slower the
-  // further out they are, like real orbits.
-  bool lit = aGlow.x < 0.0;
-  bool body = lit && length(aA) < 1.2;
-  float orbit = length(aA.xz);
-  float spin = lit ? 0.07 : 0.22 * pow(max(orbit, 1.3), -1.5);
-  vec3 a = rotZ(rotX(rotY(aA, t * spin), 0.38), -0.3);
-  float gA = abs(aGlow.x);
-  if (lit) {
-    gA *= 0.07 + 1.1 * smoothstep(-0.25, 0.75, dot(normalize(a), SUN));
-  } else {
-    // The planet's shadow falling across the ring
-    float along = dot(a, SUN);
-    float off = length(a - along * SUN);
-    gA *= 1.0 - step(along, 0.0) * 0.8 * (1.0 - smoothstep(0.9, 1.05, off));
-  }
-  // Hide whatever is behind the planet, so it reads as solid
-  vec3 av = view(a);
-  if (body) {
-    gA *= smoothstep(-0.14, 0.06, av.z);
-  } else {
-    gA *= 1.0 - step(av.z, 0.0) * (1.0 - smoothstep(0.94, 1.04, length(av.xy)));
-  }
+  // A: accretion disk. Keplerian orbits; ripples lift the gas as they pass.
+  vec3 q = aA;
+  float orbitR = max(length(q.xz), 0.001);
+  q = rotY(q, -SPIN * ORBIT * pow(max(orbitR, INNER), -1.5) * t);
+  float w = orbitR < OUTER * 1.4 ? ripple(q.xz) : 0.0;
+  q.y += w * 0.55;
+  vec3 a = toModel(q * RS);
+  // Doppler beaming, matching the ray-traced gas
+  vec3 orbitDir = view(toModel(SPIN * vec3(-q.z, 0.0, q.x) / orbitR));
+  float beta = sqrt(0.5 / max(orbitR, INNER));
+  float gA = aGlow.x * (1.0 + max(w, 0.0) * 0.9) * pow(sqrt(1.0 - beta * beta) / (1.0 - beta * orbitDir.z), 2.5);
 
-  // B: design layers, gently swaying, each layer bobbing out of step
-  vec3 b = rotY(aB, sin(t * 0.21) * 0.1);
-  b.y += sin(t * 0.7 + aB.z * 4.0) * 0.025;
+  // B: Orion, swaying gently
+  vec3 b = rotY(aB, sin(t * 0.2) * 0.12);
+  b.y += sin(t * 0.5) * 0.02;
 
   // C: devices
   vec3 c = rotY(aC, sin(t * 0.18 + 1.0) * 0.08);
@@ -148,14 +185,45 @@ void main() {
 
   float dist = uCam - p.z;
   if (dist < 0.06) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    gl_PointSize = 0.0;
-    vColor = vec3(0.0);
-    vAlpha = 0.0;
+    hide();
+    return;
+  }
+  vec2 sky = p.xy / dist;
+
+  // Gravitational lensing around the hole at the origin. Points behind it
+  // are seen at the thin-lens image positions: the main image is pushed
+  // outward (the arch), the second one lands on the opposite side.
+  float lensed = 1.0;
+  if (uLens > 0.001) {
+    float rsW = RS * uScale;
+    float behind = -p.z;
+    if (behind > 0.0) {
+      float beta2 = length(sky) + 1e-6;
+      float e2 = 2.0 * rsW * behind / (uCam * dist);
+      float root = sqrt(beta2 * beta2 + 4.0 * e2);
+      float uu = beta2 / sqrt(e2);
+      float mu = (uu * uu + 2.0) / (2.0 * uu * sqrt(uu * uu + 4.0));
+      float img = uImage > 0.5 ? 0.5 * (beta2 - root) : 0.5 * (beta2 + root);
+      mu = uImage > 0.5 ? mu - 0.5 : mu + 0.5;
+      sky = mix(sky, sky / beta2 * img, uLens);
+      lensed = mix(1.0, clamp(mu, 0.0, 2.5), uLens);
+      // Images that land inside the shadow are gone
+      float shadow = 2.6 * rsW / uCam;
+      lensed *= 1.0 - uLens * (1.0 - smoothstep(shadow * 0.95, shadow * 1.05, abs(img)));
+    } else if (uImage > 0.5) {
+      lensed = 0.0;
+    }
+    // Anything that strays across the horizon is swallowed
+    lensed *= 1.0 - uLens * (1.0 - smoothstep(1.0, 1.8, length(p) / rsW));
+  } else if (uImage > 0.5) {
+    lensed = 0.0;
+  }
+  if (lensed <= 0.001) {
+    hide();
     return;
   }
 
-  vec2 ndc = p.xy * (uFocal / dist);
+  vec2 ndc = sky * uFocal;
   ndc.x /= uAspect;
   ndc += uOffset;
 
@@ -166,14 +234,20 @@ void main() {
 
   gl_Position = vec4(ndc, 0.0, 1.0);
 
+  // Constellation stars (glow over 3) are drawn big, with spikes
+  float star = smoothstep(2.95, 3.2, g) * (1.0 - uHalo);
+  vStar = star;
+
   float size = aSeed.y * (0.6 + 0.4 * sqrt(g)) * uPx * uFocal / dist * mix(1.0, 3.4, uHalo);
-  float alpha = g * uFade * (1.0 - 0.55 * smoothstep(6.0, 26.0, dist)) * smoothstep(0.06, 1.4, dist);
+  size *= 1.0 + star * (7.5 + (g - 3.2) * 5.0) / aSeed.y;
+  float alpha = g * uFade * lensed * (1.0 - 0.55 * smoothstep(6.0, 26.0, dist)) * smoothstep(0.06, 1.4, dist);
+  alpha *= mix(1.0, 0.32, star);
   if (size < 1.25) {
     alpha *= size / 1.25;
     size = 1.25;
   }
   gl_PointSize = min(size, uMaxSize);
-  vAlpha = alpha * mix(1.0, 0.075, uHalo);
+  vAlpha = alpha * mix(1.0, 0.075, uHalo) * mix(1.0, 0.45, uImage);
 
   vec3 violet = vec3(0.46, 0.28, 1.0);
   vec3 lavender = vec3(0.79, 0.68, 1.0);
@@ -192,13 +266,19 @@ precision mediump float;
 varying vec3 vColor;
 varying float vAlpha;
 varying float vHalo;
+varying float vStar;
 
 void main() {
   vec2 c = gl_PointCoord - 0.5;
   float d = dot(c, c) * 4.0;
   if (d > 1.0) discard;
   float soft = (1.0 - d) * (1.0 - d);
-  float a = mix(soft * 0.6 + exp(-d * 16.0) * 0.75, soft, vHalo) * vAlpha;
+  float dot1 = soft * 0.6 + exp(-d * 16.0) * 0.75;
+  // Flared star: tight core, soft halo and four thin diffraction spikes
+  vec2 ac = abs(c);
+  float spikes = exp(-ac.y * 130.0) * (1.0 - ac.x * 2.0) + exp(-ac.x * 130.0) * (1.0 - ac.y * 2.0);
+  float flare = exp(-d * 70.0) * 1.6 + exp(-d * 10.0) * 0.3 + spikes * 0.7;
+  float a = mix(mix(dot1, flare, vStar), soft, vHalo) * vAlpha;
   gl_FragColor = vec4(vColor * a, a * 0.35);
 }
 `
@@ -214,34 +294,17 @@ const ATTRIBUTES = [
 
 const UNIFORMS = [
   'uTime', 'uMorph', 'uIntro', 'uRot', 'uCam', 'uFocal', 'uAspect', 'uOffset', 'uScale',
-  'uPx', 'uMaxSize', 'uFlow', 'uMouse', 'uFade', 'uHalo',
+  'uPx', 'uMaxSize', 'uFlow', 'uMouse', 'uFade', 'uHalo', 'uLens', 'uImage', 'uRip',
 ] as const
 
-type Uniform = (typeof UNIFORMS)[number]
-
-/** ~38° vertical field of view, pulled back on narrow screens so wide shapes still fit */
-export const focalFor = (aspect: number) => 2.9 * Math.min(1, Math.max(0.52, aspect / 1.35))
-
-function compile(gl: WebGLRenderingContext, type: number, source: string) {
-  const shader = gl.createShader(type)
-  if (!shader) return null
-  gl.shaderSource(shader, source)
-  gl.compileShader(shader)
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.warn('[hero] shader:', gl.getShaderInfoLog(shader))
-    gl.deleteShader(shader)
-    return null
-  }
-  return shader
-}
-
-export class ParticleScene {
+export class HeroScene {
   private readonly gl: WebGLRenderingContext
   private readonly program: WebGLProgram
   private readonly buffer: WebGLBuffer
-  private readonly u: Record<Uniform, WebGLUniformLocation | null>
+  private readonly u: Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>
   private readonly count: number
   private readonly maxSize: number
+  private readonly hole: BlackHolePass | null
   private width = 1
   private height = 1
   private dpr = 1
@@ -258,7 +321,7 @@ export class ParticleScene {
     })
     if (!gl) return null
     try {
-      return new ParticleScene(gl, data)
+      return new HeroScene(gl, data)
     } catch (err) {
       console.warn('[hero] WebGL setup failed', err)
       return null
@@ -268,16 +331,17 @@ export class ParticleScene {
   private constructor(gl: WebGLRenderingContext, data: Formations) {
     this.gl = gl
     this.count = data.count
+    this.program = program(gl, VERTEX, FRAGMENT, ATTRIBUTES.map(([name]) => name))
+    this.u = uniforms(gl, this.program, UNIFORMS)
 
-    const vs = compile(gl, gl.VERTEX_SHADER, VERTEX)
-    const fs = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT)
-    const program = gl.createProgram()
-    if (!vs || !fs || !program) throw new Error('shader compile failed')
-    gl.attachShader(program, vs)
-    gl.attachShader(program, fs)
-    gl.linkProgram(program)
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) ?? 'link failed')
-    this.program = program
+    // The black hole is a bonus: if its shader won't build, keep the particles
+    let hole: BlackHolePass | null = null
+    try {
+      hole = new BlackHolePass(gl)
+    } catch (err) {
+      console.warn('[hero] black hole disabled', err)
+    }
+    this.hole = hole
 
     // Interleave everything into one buffer: 20 floats per particle
     const stride = 20
@@ -291,35 +355,14 @@ export class ParticleScene {
       packed.set(data.glow.subarray(i * 4, i * 4 + 4), o + 12)
       packed.set(data.seed.subarray(i * 4, i * 4 + 4), o + 16)
     }
-
-    const buffer = gl.createBuffer()
-    if (!buffer) throw new Error('no buffer')
-    this.buffer = buffer
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    this.buffer = gl.createBuffer()!
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer)
     gl.bufferData(gl.ARRAY_BUFFER, packed, gl.STATIC_DRAW)
 
-    gl.useProgram(program)
-    let offset = 0
-    for (const [name, size] of ATTRIBUTES) {
-      const loc = gl.getAttribLocation(program, name)
-      if (loc >= 0) {
-        gl.enableVertexAttribArray(loc)
-        gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride * 4, offset * 4)
-      }
-      offset += size
-    }
-
-    this.u = Object.fromEntries(UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)])) as Record<
-      Uniform,
-      WebGLUniformLocation | null
-    >
-
     const range = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE) as Float32Array | null
-    this.maxSize = Math.min(64, range?.[1] ?? 32)
+    this.maxSize = Math.min(96, range?.[1] ?? 32)
 
     gl.disable(gl.DEPTH_TEST)
-    gl.enable(gl.BLEND)
-    gl.blendFunc(gl.ONE, gl.ONE)
     gl.clearColor(0, 0, 0, 0)
   }
 
@@ -331,6 +374,18 @@ export class ParticleScene {
     canvas.width = Math.round(this.width * dpr)
     canvas.height = Math.round(this.height * dpr)
     this.gl.viewport(0, 0, canvas.width, canvas.height)
+    this.hole?.resize(canvas.width, canvas.height, dpr)
+  }
+
+  private bindParticles() {
+    const { gl } = this
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer)
+    let offset = 0
+    ATTRIBUTES.forEach(([, size], i) => {
+      gl.enableVertexAttribArray(i)
+      gl.vertexAttribPointer(i, size, gl.FLOAT, false, 20 * 4, offset * 4)
+      offset += size
+    })
   }
 
   render(f: SceneFrame) {
@@ -339,9 +394,31 @@ export class ParticleScene {
     const focal = focalFor(aspect)
     const px = 6.2 * this.dpr * Math.min(1.35, Math.max(0.75, this.height / 950))
 
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight)
     gl.clear(gl.COLOR_BUFFER_BIT)
     if (f.fade <= 0.001) return
 
+    const lens = this.hole ? f.hole : 0
+    if (this.hole && lens > 0.002) {
+      const camera = diskCamera(f)
+      this.hole.render({
+        aspect,
+        focal,
+        x: f.x,
+        y: f.y,
+        camRot: camera.columns,
+        camPos: camera.pos,
+        time: f.time,
+        gain: lens * f.fade,
+        ripples: f.ripples,
+      })
+      this.hole.adapt(f.dt)
+    }
+
+    this.bindParticles()
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE)
     gl.useProgram(this.program)
     gl.uniform1f(u.uTime, f.time)
     gl.uniform1f(u.uMorph, f.morph)
@@ -357,17 +434,26 @@ export class ParticleScene {
     gl.uniform1f(u.uFlow, f.flow)
     gl.uniform3f(u.uMouse, f.mouseX, f.mouseY, f.mouseForce)
     gl.uniform1f(u.uFade, f.fade)
+    gl.uniform1f(u.uLens, lens)
+    gl.uniform4fv(u.uRip, f.ripples)
 
     // Soft glow under a random third of the points (the buffer is shuffled,
-    // so the first third is a fair sample), then the points themselves
+    // so the first third is a fair sample), then the points themselves, then
+    // the second lensed image while the hole is around
+    gl.uniform1f(u.uImage, 0)
     gl.uniform1f(u.uHalo, 1)
     gl.drawArrays(gl.POINTS, 0, Math.floor(this.count / 3))
     gl.uniform1f(u.uHalo, 0)
     gl.drawArrays(gl.POINTS, 0, this.count)
+    if (lens > 0.01) {
+      gl.uniform1f(u.uImage, 1)
+      gl.drawArrays(gl.POINTS, 0, this.count)
+    }
   }
 
   dispose() {
     const { gl } = this
+    this.hole?.dispose()
     gl.deleteBuffer(this.buffer)
     gl.deleteProgram(this.program)
   }

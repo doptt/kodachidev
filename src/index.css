@@ -239,11 +239,11 @@ body {
 
 /* --------------------------------------------------------------------------
    Hero
-   The particle scene itself is WebGL (see lib/space). These are the DOM
-   layers around it: the bloom that follows the shape, the soft dark scrims
+   The black hole and particles are WebGL (see lib/space). These are the DOM
+   layers around them: the bloom that follows the shape, the soft dark scrims
    that keep text readable over bright particles, and the chapter rail.
    -------------------------------------------------------------------------- */
-.hero-orb {
+.hero-glow {
   position: absolute;
   top: 0;
   left: 0;
@@ -252,9 +252,6 @@ body {
   border-radius: 50%;
   pointer-events: none;
   will-change: transform, opacity;
-}
-
-.hero-glow {
   background: radial-gradient(
     circle,
     rgb(155 109 255 / 0.32) 0%,
@@ -262,13 +259,6 @@ body {
     rgb(117 71 255 / 0.04) 55%,
     transparent 70%
   );
-}
-
-/* Shaded body under the planet's particles, lit from the upper left like
-   the particles are. Hides the stars behind it so the planet looks solid. */
-.hero-planet {
-  background: radial-gradient(circle at 34% 28%, rgb(58 40 116) 0%, rgb(26 18 52) 36%, rgb(10 8 20) 66%, rgb(7 6 13) 100%);
-  box-shadow: inset -6px -8px 18px rgb(0 0 0 / 0.45), 0 0 6px rgb(155 109 255 / 0.25);
 }
 
 .hero-scrim::before,
@@ -279,6 +269,14 @@ body {
   z-index: -1;
   pointer-events: none;
   background: radial-gradient(closest-side, rgb(7 6 13 / 0.62), rgb(7 6 13 / 0.3) 60%, transparent);
+}
+/* The intro's lower edge sits over the black hole's glow, so it reaches
+   further down and stays darker there */
+.hero-scrim::before {
+  inset: -3rem -5rem -4.5rem;
+  background:
+    radial-gradient(closest-side, rgb(7 6 13 / 0.62), rgb(7 6 13 / 0.3) 60%, transparent),
+    radial-gradient(46% 20% at 50% 78%, rgb(7 6 13 / 0.6), transparent);
 }
 
 /* On phones the chapter text sits at the bottom over a solid fade instead */

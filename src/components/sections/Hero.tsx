@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react'
+import { RIPPLES } from '../../lib/space/blackHole'
+import { DISK, diskHit, focalFor, type View } from '../../lib/space/camera'
 import { buildFormations, type Formations } from '../../lib/space/formations'
-import { ParticleScene, focalFor } from '../../lib/space/particleScene'
+import { HeroScene } from '../../lib/space/heroScene'
 import { clamp01, lerp, prefersReducedMotion, sky, smooth } from '../../lib/space/sky'
 
 /*
  * The hero is a tall section with a pinned "stage". While you scroll through
  * it, one particle cloud re-forms into a new shape for each chapter:
  *
- *   intro    a ringed planet rises behind the headline
- *   01       the planet dissolves into an exploded, layered website
- *   02       that site reflows onto a laptop and a phone
+ *   intro    a black hole, its lensed disk arching up behind the headline
+ *   01       the disk tears away and re-forms as Orion, in 3D
+ *   02       a website on a laptop and a phone
  *   03       everything pours into a warp tunnel and the camera dives in
  *
  * Scroll position is eased, then mapped through the POSES timeline below.
@@ -20,7 +22,7 @@ import { clamp01, lerp, prefersReducedMotion, sky, smooth } from '../../lib/spac
 type Pose = {
   /** Scroll progress (0..1) this pose belongs to */
   p: number
-  /** Formation: 0 planet, 1 design, 2 devices, 3 tunnel */
+  /** Formation: 0 black hole disk, 1 constellation, 2 devices, 3 tunnel */
   m: number
   yaw: number
   pitch: number
@@ -33,22 +35,22 @@ type Pose = {
   /** Soft CSS glow behind the shape: opacity and size (in model units) */
   glow: number
   glowSize: number
-  /** Opacity of the dark planet disc that makes the planet read as solid */
-  disc: number
+  /** How present the ray-traced black hole is (it fades as the disk leaves) */
+  hole: number
   /** x, y, scale used instead on narrow screens */
   compact: [number, number, number]
 }
 
 const POSES: Pose[] = [
-  { p: 0.0, m: 0, yaw: 0, pitch: 0, roll: 0, cam: 7, x: 0, y: -0.8, scale: 1.32, fade: 1, glow: 0.9, glowSize: 2.4, disc: 1, compact: [0, -0.5, 1.05] },
-  { p: 0.11, m: 0, yaw: 0.12, pitch: 0.06, roll: 0, cam: 7, x: 0, y: -0.06, scale: 1.05, fade: 1, glow: 0.8, glowSize: 2.6, disc: 1, compact: [0, 0.12, 0.85] },
-  { p: 0.24, m: 1, yaw: -0.58, pitch: 0.18, roll: 0, cam: 7.4, x: 0.32, y: 0, scale: 0.9, fade: 1, glow: 0.4, glowSize: 3.4, disc: 0, compact: [0, 0.3, 0.7] },
-  { p: 0.41, m: 1, yaw: -0.2, pitch: 0.1, roll: 0, cam: 7.1, x: 0.32, y: 0, scale: 0.9, fade: 1, glow: 0.4, glowSize: 3.4, disc: 0, compact: [0, 0.3, 0.7] },
-  { p: 0.54, m: 2, yaw: 0.5, pitch: 0.24, roll: 0, cam: 7.4, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, disc: 0, compact: [0, 0.3, 0.68] },
-  { p: 0.7, m: 2, yaw: 0.14, pitch: 0.16, roll: 0, cam: 7.1, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, disc: 0, compact: [0, 0.3, 0.68] },
-  { p: 0.82, m: 3, yaw: 0.08, pitch: 0.05, roll: 0, cam: 12, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.7, glowSize: 1.2, disc: 0, compact: [0, 0.22, 0.8] },
-  { p: 0.9, m: 3, yaw: 0.08, pitch: 0.05, roll: 0.2, cam: 6.5, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.9, glowSize: 1.1, disc: 0, compact: [0, 0.22, 0.8] },
-  { p: 1.0, m: 3, yaw: 0, pitch: 0, roll: 0.7, cam: 0.6, x: 0, y: 0, scale: 1, fade: 0, glow: 0, glowSize: 1, disc: 0, compact: [0, 0, 1] },
+  { p: 0.0, m: 0, yaw: 0, pitch: 0.02, roll: 0, cam: 7, x: 0, y: -1.06, scale: 1.3, fade: 1, glow: 0.45, glowSize: 2.6, hole: 1, compact: [0, -0.76, 0.85] },
+  { p: 0.11, m: 0, yaw: 0.06, pitch: 0.03, roll: 0, cam: 7, x: 0, y: -0.02, scale: 1.12, fade: 1, glow: 0.4, glowSize: 2.8, hole: 1, compact: [0, 0.1, 0.8] },
+  { p: 0.24, m: 1, yaw: -0.75, pitch: 0.22, roll: 0, cam: 7.4, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.41, m: 1, yaw: -0.05, pitch: 0.04, roll: 0, cam: 7.2, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.54, m: 2, yaw: 0.5, pitch: 0.24, roll: 0, cam: 7.4, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.7, m: 2, yaw: 0.14, pitch: 0.16, roll: 0, cam: 7.1, x: -0.36, y: -0.02, scale: 0.8, fade: 1, glow: 0.4, glowSize: 3.4, hole: 0, compact: [0, 0.3, 0.68] },
+  { p: 0.82, m: 3, yaw: 0.08, pitch: 0.05, roll: 0, cam: 12, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.7, glowSize: 1.2, hole: 0, compact: [0, 0.22, 0.8] },
+  { p: 0.9, m: 3, yaw: 0.08, pitch: 0.05, roll: 0.2, cam: 6.5, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.9, glowSize: 1.1, hole: 0, compact: [0, 0.22, 0.8] },
+  { p: 1.0, m: 3, yaw: 0, pitch: 0, roll: 0.7, cam: 0.6, x: 0, y: 0, scale: 1, fade: 0, glow: 0, glowSize: 1, hole: 0, compact: [0, 0, 1] },
 ]
 
 type Chapter = {
@@ -128,7 +130,7 @@ function poseAt(p: number, compact: boolean) {
     fade: mix('fade'),
     glow: mix('glow'),
     glowSize: mix('glowSize'),
-    disc: mix('disc'),
+    hole: mix('hole'),
   }
 }
 
@@ -162,7 +164,6 @@ export default function Hero() {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glowRef = useRef<HTMLDivElement>(null)
-  const discRef = useRef<HTMLDivElement>(null)
   const introRef = useRef<HTMLDivElement>(null)
   const chapterRefs = useRef<(HTMLElement | null)[]>([])
   const railRef = useRef<HTMLOListElement>(null)
@@ -181,7 +182,7 @@ export default function Hero() {
     const count = Math.round((wide >= 1100 ? 22000 : wide >= 700 ? 15000 : 10000) * (cores <= 4 ? 0.65 : 1))
 
     let formations: Formations | null = buildFormations(count)
-    let scene = ParticleScene.create(canvas, formations)
+    let scene = HeroScene.create(canvas, formations)
 
     let width = 1
     let height = 1
@@ -216,7 +217,7 @@ export default function Hero() {
     }
     const onRestored = () => {
       formations ??= buildFormations(count)
-      scene = ParticleScene.create(canvas, formations)
+      scene = HeroScene.create(canvas, formations)
       scene?.resize(width, height, dpr)
     }
     canvas.addEventListener('webglcontextlost', onLost)
@@ -233,6 +234,25 @@ export default function Hero() {
       lastMove = performance.now()
     }
     window.addEventListener('pointermove', onPointer, { passive: true })
+
+    // Ripples through the disk: a stream of small ones while the cursor moves
+    // over it, a big one on click. Stored in disk space for the shaders.
+    const ripples = new Float32Array(RIPPLES * 4)
+    let slot = 0
+    let lastRipple: [number, number] | null = null
+    let lastRippleAt = -Infinity
+    let clicked = false
+    const addRipple = (x: number, z: number, strength: number) => {
+      ripples.set([x, z, time, strength], slot * 4)
+      slot = (slot + 1) % RIPPLES
+      lastRipple = [x, z]
+      lastRippleAt = time
+    }
+    const onDown = (e: PointerEvent) => {
+      onPointer(e)
+      clicked = true
+    }
+    window.addEventListener('pointerdown', onDown, { passive: true })
 
     const progressNow = () => clamp01((window.scrollY - top) / range)
 
@@ -275,10 +295,7 @@ export default function Hero() {
       tiltX += ((reduced ? 0 : mouseX) - tiltX) * ease(2.5)
       tiltY += ((reduced ? 0 : mouseY) - tiltY) * ease(2.5)
 
-      scene?.render({
-        time,
-        morph: pose.m,
-        intro,
+      const view: View = {
         yaw: pose.yaw + tiltX * 0.14,
         pitch: pose.pitch - tiltY * 0.08,
         roll: pose.roll,
@@ -286,25 +303,45 @@ export default function Hero() {
         x: pose.x,
         y: pose.y,
         scale: pose.scale,
+      }
+
+      if (!reduced && pose.hole > 0.3 && (moving || clicked)) {
+        const hit = diskHit(view, width / height, mouseX, mouseY)
+        const r = hit ? Math.hypot(hit[0], hit[1]) : 0
+        if (hit && r > DISK.inner * 0.8 && r < DISK.outer * 1.15) {
+          const moved = lastRipple ? Math.hypot(hit[0] - lastRipple[0], hit[1] - lastRipple[1]) : Infinity
+          if (clicked) addRipple(hit[0], hit[1], 1.6)
+          else if (moved > 1.4 || (moved > 0.3 && time - lastRippleAt > 0.3)) addRipple(hit[0], hit[1], Math.min(1, 0.35 + moved * 0.1))
+        }
+      }
+      clicked = false
+
+      scene?.render({
+        ...view,
+        time,
+        dt,
+        morph: pose.m,
+        intro,
         flow,
         mouseX,
         mouseY,
-        mouseForce: force * (1 - smooth(clamp01((p - 0.8) / 0.08))),
+        // The gravity well is for the particle shapes; the disk gets ripples
+        mouseForce: force * (1 - pose.hole) * (1 - smooth(clamp01((p - 0.8) / 0.08))),
         fade: pose.fade,
+        hole: pose.hole * intro,
+        ripples,
       })
 
-      // Soft bloom that follows the shape around, and the planet's dark
-      // body. Both are 100px circles, moved and scaled into place.
-      const unit = ((focalFor(width / height) * pose.scale) / pose.cam) * (height / 2)
-      const cx = ((pose.x + 1) / 2) * width - 50
-      const cy = ((1 - pose.y) / 2) * height - 50
-      const place = (el: HTMLElement | null, diameter: number, opacity: number) => {
-        if (!el) return
-        el.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0) scale(${(Math.max(1, diameter) / 100).toFixed(3)})`
-        el.style.opacity = opacity.toFixed(3)
+      // Soft bloom that follows the shape around (a 100px circle, moved and
+      // scaled into place)
+      const glow = glowRef.current
+      if (glow) {
+        const unit = ((focalFor(width / height) * pose.scale) / pose.cam) * (height / 2)
+        const cx = ((pose.x + 1) / 2) * width - 50
+        const cy = ((1 - pose.y) / 2) * height - 50
+        glow.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0) scale(${(Math.max(1, unit * pose.glowSize * 2) / 100).toFixed(3)})`
+        glow.style.opacity = (pose.glow * intro).toFixed(3)
       }
-      place(glowRef.current, unit * pose.glowSize * 2, pose.glow * intro)
-      place(discRef.current, unit * 1.98, pose.disc * intro * intro)
 
       // Text layers
       const introShow = band(p, [-1, 0, 0.025, 0.09])
@@ -346,6 +383,7 @@ export default function Hero() {
       visibility.disconnect()
       resizeObserver.disconnect()
       window.removeEventListener('pointermove', onPointer)
+      window.removeEventListener('pointerdown', onDown)
       canvas.removeEventListener('webglcontextlost', onLost)
       canvas.removeEventListener('webglcontextrestored', onRestored)
       scene?.dispose()
@@ -356,8 +394,7 @@ export default function Hero() {
   return (
     <section id="home" ref={sectionRef} className="relative h-[400vh]">
       <div ref={stageRef} className="sticky top-0 h-svh w-full overflow-hidden">
-        <div ref={glowRef} className="hero-orb hero-glow" style={{ opacity: 0 }} aria-hidden />
-        <div ref={discRef} className="hero-orb hero-planet" style={{ opacity: 0 }} aria-hidden />
+        <div ref={glowRef} className="hero-glow" style={{ opacity: 0 }} aria-hidden />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
 
         {/* Intro: the first thing anyone sees */}

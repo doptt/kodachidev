@@ -1,12 +1,13 @@
+import { DISK } from './camera'
 import { mulberry32 } from './sky'
 
 /*
  * Point clouds for the hero scene. Every particle has one position in each
  * formation, and the vertex shader blends between them as you scroll:
  *
- *   A  planet    a ringed gas giant with a small moon
- *   B  design    an exploded, layered website, drawn like a constellation
- *   C  devices   the same site reflowed onto a laptop and a phone
+ *   A  disk      the black hole's accretion disk (in Schwarzschild radii)
+ *   B  orion     the Orion constellation in 3D, inside a celestial sphere
+ *   C  devices   a website on a laptop and a phone
  *   D  launch    a warp tunnel (stored as angle / depth / jitter; the
  *                shader turns it into xyz so it can flow)
  *
@@ -21,7 +22,7 @@ export type Formations = {
   b: Float32Array
   c: Float32Array
   d: Float32Array
-  /** Brightness in A, B, C, D. Negative in A means "lit by the sun". */
+  /** Brightness in A, B, C, D. Over 3 = a star drawn with diffraction spikes. */
   glow: Float32Array
   /** Per particle: stagger, size, color tone, spare random */
   seed: Float32Array
@@ -109,21 +110,6 @@ class Cloud {
     }
   }
 
-  circle(cx: number, cy: number, z: number, r: number, count: number, b: number) {
-    for (let k = 0; k < count; k++) {
-      const a = this.rand() * TAU
-      this.point(cx + Math.cos(a) * r, cy + Math.sin(a) * r, z + this.jitter(0.01), b)
-    }
-  }
-
-  disc(cx: number, cy: number, z: number, r: number, count: number, b: number) {
-    for (let k = 0; k < count; k++) {
-      const a = this.rand() * TAU
-      const d = Math.sqrt(this.rand()) * r
-      this.point(cx + Math.cos(a) * d, cy + Math.sin(a) * d, z, b)
-    }
-  }
-
   /** A line of "text": a few word-shaped bars with small gaps */
   text(x: number, y: number, z: number, w: number, thick: number, count: number, b: number) {
     const words: [number, number][] = []
@@ -185,135 +171,158 @@ class Cloud {
 
 /* -------------------------------------------------------------------------- */
 
-function planet(c: Cloud) {
+// A: the accretion disk around the black hole, in Schwarzschild radii (the
+// ray tracer draws the smooth gas; these points add glitter on top, and are
+// what flies off when you scroll). Glow falls off outward like the gas does.
+function accretionDisk(c: Cloud) {
   const { rand } = c
+  const { inner, outer } = DISK
 
-  // Gas giant body. Particles crowd into latitude bands, so the stripes
-  // show even at low density. Negative glow = lit by the sun.
-  const body = c.share(0.3)
-  for (let k = 0; k < body; ) {
-    const y = rand() * 2 - 1
-    const lat = Math.asin(y)
-    const band = 0.5 + 0.5 * Math.sin(lat * 11 + Math.sin(lat * 4) * 1.8)
-    if (rand() > 0.25 + band * 0.75) continue
+  const gas = c.share(0.6)
+  for (let k = 0; k < gas; ) {
+    const r = inner + (outer - inner) * Math.pow(rand(), 1.7)
+    // Crowd into the same kind of lanes the shader draws
+    if (rand() > 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(r * 4.3))) continue
     const a = rand() * TAU
-    const s = Math.sqrt(1 - y * y)
-    const r = 1 + (rand() - 0.5) * 0.02
-    c.point(Math.cos(a) * s * r, y * r, Math.sin(a) * s * r, -(0.45 + band * (0.8 + rand() * 0.6)))
+    const thick = (rand() + rand() + rand() - 1.5) * (0.02 + 0.014 * r)
+    c.point(Math.cos(a) * r, thick, Math.sin(a) * r, Math.pow(inner / r, 0.85) * (0.3 + rand() * 0.45))
     k++
   }
 
-  // A storm, so the spin is visible
-  const storm = c.share(0.008)
-  for (let k = 0; k < storm; k++) {
-    const lat = -0.38 + (rand() - 0.5) * 0.12
-    const lon = 0.9 + (rand() - 0.5) * 0.34
-    c.point(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon), -1.9)
-  }
-
-  // Thin atmosphere hugging the surface
-  const air = c.share(0.06)
-  for (let k = 0; k < air; k++) {
-    const y = rand() * 2 - 1
+  // Bright inner edge
+  const edge = c.share(0.06)
+  for (let k = 0; k < edge; k++) {
+    const r = inner * (1 + rand() * 0.12)
     const a = rand() * TAU
-    const s = Math.sqrt(1 - y * y)
-    const r = 1.012 + rand() * rand() * 0.09
-    c.point(Math.cos(a) * s * r, y * r, Math.sin(a) * s * r, -0.6)
+    c.point(Math.cos(a) * r, (rand() - 0.5) * 0.04, Math.sin(a) * r, 0.6 + rand() * 0.3)
   }
 
-  // Rings, with a few gaps carved out of them
-  const density = (r: number) => {
-    if (r < 1.62) return 0.22
-    if (r < 2.0) return 1
-    if (r < 2.08) return 0.04 // the big gap
-    if (r < 2.36) return Math.abs(r - 2.27) < 0.012 ? 0.05 : 0.72
-    if (r < 2.43) return 0.06
-    if (r < 2.47) return 0.6 // narrow outer ring
-    return 0
-  }
-  const ring = c.share(0.46)
-  for (let k = 0; k < ring; ) {
-    const r = 1.38 + rand() * 1.1
-    const d = density(r)
-    if (rand() > d) continue
+  // Everything else: a wide, faint haze of dust well outside the disk
+  while (!c.full) {
+    const r = outer * (1 + Math.pow(rand(), 0.8) * 1.8)
     const a = rand() * TAU
-    const thick = (rand() + rand() - 1) * 0.012
-    c.point(Math.cos(a) * r, thick, Math.sin(a) * r, 0.35 + d * 1.05 + rand() * 0.25)
-    k++
+    c.point(Math.cos(a) * r, (rand() - 0.5) * r * 0.22, Math.sin(a) * r, 0.08 + rand() * 0.22)
   }
-
-  // Small moon
-  const moon = c.share(0.016)
-  for (let k = 0; k < moon; k++) {
-    const y = rand() * 2 - 1
-    const a = rand() * TAU
-    const s = Math.sqrt(1 - y * y)
-    c.point(2.95 + Math.cos(a) * s * 0.11, 0.06 + y * 0.11, 0.9 + Math.sin(a) * s * 0.11, -1.2)
-  }
-
-  c.dust([2.8, 7.5], 0.3, [0.12, 0.36])
 }
 
 /* -------------------------------------------------------------------------- */
 
-function design(c: Cloud) {
-  const W = 3.6
-  const H = 2.3
-  const back = -0.45
-  const mid = 0
-  const front = 0.45
-  const s = (f: number) => c.share(f * 1.2)
+// B: Orion, in 3D. x/y come from each star's real sky position and z from
+// its real distance (log-compressed), so the figure only lines up when you
+// look at it head-on and drifts apart in depth as it turns.
+//            right ascension (h), declination (°), distance (ly), magnitude
+const ORION: Record<string, [number, number, number, number]> = {
+  betelgeuse: [5.919, 7.41, 548, 0.5],
+  rigel: [5.242, -8.2, 860, 0.13],
+  bellatrix: [5.419, 6.35, 250, 1.64],
+  mintaka: [5.533, -0.3, 1200, 2.23],
+  alnilam: [5.603, -1.2, 2000, 1.69],
+  alnitak: [5.679, -1.94, 1260, 1.77],
+  saiph: [5.796, -9.67, 650, 2.06],
+  meissa: [5.585, 9.93, 1100, 3.33],
+  hatysa: [5.59, -5.91, 1300, 2.77],
+  m42: [5.588, -5.39, 1344, 4.0],
+  ori42: [5.59, -4.84, 1300, 4.6],
+  pi1: [4.915, 10.15, 116, 4.65],
+  pi2: [4.843, 8.9, 194, 4.35],
+  pi3: [4.83, 6.96, 26, 3.19],
+  pi4: [4.853, 5.6, 1000, 3.68],
+  pi5: [4.904, 2.44, 1340, 3.71],
+  pi6: [4.976, 1.71, 950, 4.47],
+  mu: [6.04, 9.65, 155, 4.12],
+  nu: [6.126, 14.77, 520, 4.42],
+  xi: [6.199, 14.21, 630, 4.48],
+  chi1: [5.907, 20.28, 28, 4.39],
+  chi2: [6.065, 20.14, 4900, 4.63],
+}
 
-  // Back layer: the browser window itself
-  c.rect(0, 0, back, W, H, 0.14, s(0.07), 1.1)
-  c.line(-W / 2, H / 2 - 0.26, W / 2, H / 2 - 0.26, back, s(0.014), 0.75)
-  for (const dx of [0.2, 0.33, 0.46]) c.disc(-W / 2 + dx, H / 2 - 0.13, back, 0.035, s(0.003), 1.7)
-  c.rect(0.25, H / 2 - 0.13, back, 1.5, 0.1, 0.05, s(0.012), 0.55)
-  c.fill(0, -0.13, back, W - 0.1, H - 0.36, s(0.05), 0.16)
-  c.corners(0, 0, back, W, H)
+const FIGURE: [string, string][] = [
+  ['mintaka', 'alnilam'], ['alnilam', 'alnitak'], // belt
+  ['bellatrix', 'mintaka'], ['betelgeuse', 'alnitak'], ['mintaka', 'rigel'], ['alnitak', 'saiph'],
+  ['bellatrix', 'meissa'], ['meissa', 'betelgeuse'],
+  ['betelgeuse', 'mu'], ['mu', 'xi'], ['xi', 'chi2'], ['xi', 'nu'], ['nu', 'chi1'], // raised club
+  ['bellatrix', 'pi3'], ['pi1', 'pi2'], ['pi2', 'pi3'], ['pi3', 'pi4'], ['pi4', 'pi5'], ['pi5', 'pi6'], // shield
+  ['ori42', 'm42'], ['m42', 'hatysa'], // sword
+]
 
-  // Middle layer: nav, headline, buttons and a hero image
-  c.fill(-1.45, 0.74, mid, 0.34, 0.08, s(0.006), 1.3)
-  for (let k = 0; k < 4; k++) c.text(0.3 + k * 0.32, 0.74, mid, 0.2, 0.02, s(0.004), 0.75)
-  c.text(-1.62, 0.38, mid, 1.75, 0.09, s(0.05), 1.3)
-  c.text(-1.62, 0.17, mid, 1.2, 0.09, s(0.035), 1.3)
-  c.text(-1.62, -0.05, mid, 1.5, 0.024, s(0.012), 0.6)
-  c.text(-1.62, -0.15, mid, 1.05, 0.024, s(0.01), 0.6)
-  c.rect(-1.3, -0.44, mid, 0.62, 0.17, 0.085, s(0.015), 1.6)
-  c.fill(-1.3, -0.44, mid, 0.5, 0.1, s(0.01), 0.9)
-  c.rect(-0.56, -0.44, mid, 0.56, 0.17, 0.085, s(0.011), 0.75)
-  c.node(-1.61, -0.44, mid)
-  c.node(-0.99, -0.44, mid)
+function constellation(c: Cloud) {
+  const { rand } = c
+  const R = 2.05
 
-  c.rect(0.95, 0.14, mid, 1.2, 0.95, 0.08, s(0.03), 1.0)
-  c.corners(0.95, 0.14, mid, 1.2, 0.95, 2.2)
-  const ridge: [number, number][] = [[0.42, -0.24], [0.72, 0.12], [0.92, -0.06], [1.2, 0.28], [1.48, -0.24]]
-  for (let k = 0; k < ridge.length - 1; k++) {
-    const [x0, y0] = ridge[k]
-    const [x1, y1] = ridge[k + 1]
-    c.line(x0, y0, x1, y1, mid, s(0.004), 1.15)
-  }
-  c.circle(1.22, 0.4, mid, 0.075, s(0.004), 1.5)
-  c.disc(1.22, 0.4, mid, 0.05, s(0.003), 1.2)
-
-  // Front layer: three cards
-  for (const x of [-1.15, 0, 1.15]) {
-    const y = -0.8
-    c.rect(x, y, front, 1.0, 0.42, 0.06, s(0.018), 1.0)
-    c.fill(x, y, front, 0.94, 0.36, s(0.006), 0.22)
-    c.circle(x - 0.36, y + 0.08, front, 0.055, s(0.003), 1.4)
-    c.text(x - 0.24, y + 0.09, front, 0.5, 0.02, s(0.004), 0.75)
-    c.text(x - 0.4, y - 0.08, front, 0.76, 0.016, s(0.004), 0.5)
-    c.corners(x, y, front, 1.0, 0.42, 2.2)
+  const at = (name: string) => {
+    const [ra, dec, ly] = ORION[name]
+    return [-(ra - 5.55) * 1.5 * 0.95, (dec - 5.3) * 0.1 * 0.95, Math.max(-1.2, Math.min(1.2, -0.5 * Math.log(ly / 700)))]
   }
 
-  // Exploded-view guides tying the layers together
-  for (const [x, y] of [[-W / 2, -H / 2], [W / 2, -H / 2], [W / 2, H / 2], [-W / 2, H / 2]]) {
-    const n = s(0.004)
-    for (let k = 0; k < n; k++) c.point(x, y, back + c.rand() * (front - back) * 1.4, 0.32)
+  // Stars: one big flared point (glow over 3 = drawn with spikes) in a
+  // tight cluster of bright ones
+  for (const [name, [, , , mag]] of Object.entries(ORION)) {
+    const [x, y, z] = at(name)
+    c.point(x, y, z, 3.3 + (4.7 - mag) * 0.32)
+    c.node(x, y, z, 2.2, 5 + Math.round((4.7 - mag) * 2))
   }
 
-  c.dust([2.6, 6], 0.55, [0.08, 0.26])
+  // Constellation lines, stopping short of each star like a star chart
+  for (const [from, to] of FIGURE) {
+    const a = at(from)
+    const b = at(to)
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])
+    const gap = Math.min(0.3, 0.075 / len)
+    const n = Math.round(len * c.n * 0.02)
+    for (let k = 0; k < n; k++) {
+      const t = gap + rand() * (1 - 2 * gap)
+      c.point(a[0] + (b[0] - a[0]) * t + c.jitter(0.006), a[1] + (b[1] - a[1]) * t + c.jitter(0.006), a[2] + (b[2] - a[2]) * t + c.jitter(0.006), 1.05)
+    }
+  }
+
+  // The Orion Nebula, a soft glow in the sword
+  const [nx, ny, nz] = at('m42')
+  const neb = c.share(0.014)
+  for (let k = 0; k < neb; k++) {
+    const g = () => (rand() + rand() + rand() - 1.5) * 0.06
+    c.point(nx + g(), ny + g() * 1.2, nz + g() * 0.6, 0.3 + rand() * 0.55)
+  }
+
+  // Celestial sphere around it: equator, meridians and a tilted ecliptic
+  const ring = (count: number, b: number, tilt: number, turn: number) => {
+    for (let k = 0; k < count; k++) {
+      const a = rand() * TAU
+      let [x, y, z] = [Math.cos(a) * R, 0, Math.sin(a) * R]
+      ;[y, z] = [y * Math.cos(tilt) - z * Math.sin(tilt), y * Math.sin(tilt) + z * Math.cos(tilt)]
+      ;[x, z] = [x * Math.cos(turn) + z * Math.sin(turn), -x * Math.sin(turn) + z * Math.cos(turn)]
+      c.point(x, y, z, b)
+    }
+  }
+  ring(c.share(0.045), 0.42, 0, 0)
+  for (const turn of [0, Math.PI / 3, (2 * Math.PI) / 3]) ring(c.share(0.022), 0.26, Math.PI / 2, turn)
+  ring(c.share(0.036), 0.55, 0.409, 0.5)
+
+  // Hour ticks on the equator, and brighter marks along the ecliptic
+  for (let h = 0; h < 24; h++) {
+    const a = (h / 24) * TAU
+    const n = h % 6 === 0 ? 14 : 7
+    for (let k = 0; k < n; k++) {
+      const r = R * (1 + rand() * (h % 6 === 0 ? 0.06 : 0.035))
+      c.point(Math.cos(a) * r, 0, Math.sin(a) * r, 0.7)
+    }
+  }
+  for (let m = 0; m < 12; m++) {
+    const a = (m / 12) * TAU
+    const [x0, y0, z0] = [Math.cos(a) * R, 0, Math.sin(a) * R]
+    const [y1, z1] = [y0 * Math.cos(0.409) - z0 * Math.sin(0.409), y0 * Math.sin(0.409) + z0 * Math.cos(0.409)]
+    c.node(x0 * Math.cos(0.5) + z1 * Math.sin(0.5), y1, -x0 * Math.sin(0.5) + z1 * Math.cos(0.5), 1.5, 3)
+  }
+
+  // Leftovers: faint background stars, some on the globe's surface
+  while (!c.full) {
+    const u = rand() * 2 - 1
+    const a = rand() * TAU
+    const s = Math.sqrt(1 - u * u)
+    const onSphere = rand() < 0.4
+    const r = onSphere ? R * (1 + (rand() - 0.5) * 0.02) : 0.4 + Math.pow(rand(), 0.6) * 5
+    const bright = rand() < 0.04 ? 0.5 + rand() * 0.5 : 0.06 + rand() * 0.16
+    c.point(Math.cos(a) * s * r, u * r, Math.sin(a) * s * r, bright)
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -427,7 +436,7 @@ function tunnel(n: number, rand: Rand) {
 export function buildFormations(count: number): Formations {
   const rand = mulberry32(0x6b6f6461) // "koda"
 
-  const shapes = [planet, design, devices].map((draw) => {
+  const shapes = [accretionDisk, constellation, devices].map((draw) => {
     const cloud = new Cloud(count, rand)
     draw(cloud)
     cloud.shuffle(3)
