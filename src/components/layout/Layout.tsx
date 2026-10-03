@@ -30,9 +30,9 @@ export default function Layout({ children, onHome = true }: LayoutProps) {
         aria-hidden
         style={{
           background: [
-            'radial-gradient(ellipse 80% 60% at 50% -10%, rgb(117 71 255 / 0.12) 0%, transparent 60%)',
-            'radial-gradient(ellipse 60% 40% at 100% 60%, rgb(155 109 255 / 0.06) 0%, transparent 50%)',
-            'radial-gradient(ellipse 50% 40% at 0% 80%, rgb(117 71 255 / 0.07) 0%, transparent 50%)',
+            'radial-gradient(ellipse 80% 60% at 50% -10%, rgb(117 71 255 / 0.13) 0%, rgb(117 71 255 / 0.04) 35%, transparent 60%)',
+            'radial-gradient(ellipse 60% 40% at 100% 60%, rgb(155 109 255 / 0.07) 0%, rgb(155 109 255 / 0.015) 30%, transparent 50%)',
+            'radial-gradient(ellipse 50% 40% at 0% 80%, rgb(117 71 255 / 0.08) 0%, rgb(117 71 255 / 0.02) 30%, transparent 50%)',
           ].join(', '),
         }}
       />
