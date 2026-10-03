@@ -150,8 +150,10 @@ export class SkyRenderer {
     const blob = (x: number, y: number, radius: number, rgb: string, alpha: number) => {
       for (const dy of [-ch, 0, ch]) {
         const grad = g.createRadialGradient(x, y + dy, 0, x, y + dy, radius)
-        grad.addColorStop(0, `rgb(${rgb} / ${alpha})`)
-        grad.addColorStop(0.5, `rgb(${rgb} / ${alpha * 0.4})`)
+        // steep falloff, so the colour stays in the middle and the gaps go dark
+        grad.addColorStop(0, `rgb(${rgb} / ${alpha * 1.15})`)
+        grad.addColorStop(0.3, `rgb(${rgb} / ${alpha * 0.5})`)
+        grad.addColorStop(0.65, `rgb(${rgb} / ${alpha * 0.08})`)
         grad.addColorStop(1, `rgb(${rgb} / 0)`)
         g.fillStyle = grad
         g.fillRect(x - radius, y + dy - radius, radius * 2, radius * 2)

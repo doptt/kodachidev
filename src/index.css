@@ -5,9 +5,9 @@
 
 /* Colours and fonts. Each --color-x becomes text-x, bg-x, border-x/20 etc. */
 @theme {
-  --color-night: #07060d;   /* page background */
-  --color-deep: #0d0b16;    /* panels */
-  --color-surface: #151121; /* raised cards */
+  --color-night: #020104;   /* page background */
+  --color-deep: #0a0812;    /* panels */
+  --color-surface: #110e1b; /* raised cards */
   --color-accent: #9b6dff;
   --color-violet: #7547ff;
   --color-lavender: #c6a9ff;
@@ -126,26 +126,26 @@ body {
 
   /* Service + trait cards */
   .card {
-    background: rgb(21 17 33 / 0.45);
+    background: rgb(17 14 27 / 0.45);
     border: 1px solid rgb(155 109 255 / 0.1);
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   }
   .card:hover {
-    background: rgb(21 17 33 / 0.85);
+    background: rgb(17 14 27 / 0.85);
     border-color: rgb(155 109 255 / 0.25);
     box-shadow: 0 0 40px rgb(117 71 255 / 0.08), 0 8px 32px rgb(0 0 0 / 0.3);
     transform: translateY(-3px);
   }
   /* An opened service card keeps a soft glow so it reads as "active" */
   .card[data-expanded='true'] {
-    background: rgb(21 17 33 / 0.85);
+    background: rgb(17 14 27 / 0.85);
     border-color: rgb(155 109 255 / 0.32);
     box-shadow: 0 0 48px rgb(117 71 255 / 0.12), 0 8px 32px rgb(0 0 0 / 0.3);
   }
 
   /* Frosted panel used for the pricing box, stack box, form and terms */
   .panel {
-    background: rgb(13 11 22 / 0.8);
+    background: rgb(10 8 18 / 0.8);
     border: 1px solid rgb(155 109 255 / 0.14);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
@@ -182,7 +182,7 @@ body {
     font-size: 14px;
     line-height: 1.6;
     color: var(--color-ink);
-    background: rgb(7 6 13 / 0.65);
+    background: rgb(2 1 4 / 0.65);
     border: 1px solid rgb(155 109 255 / 0.15);
     border-radius: 14px;
     outline: none;
@@ -248,14 +248,14 @@ body {
   inset: -3rem -4rem;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(closest-side, rgb(7 6 13 / 0.62), rgb(7 6 13 / 0.3) 60%, transparent);
+  background: radial-gradient(closest-side, rgb(2 1 4 / 0.62), rgb(2 1 4 / 0.3) 60%, transparent);
 }
 
 /* Otherwise the chapter text sits at the bottom over a solid fade */
 @media (max-width: 899px), (max-aspect-ratio: 21 / 20) {
   .hero-chapter::before {
     inset: 0;
-    background: linear-gradient(to top, var(--color-night) 35%, rgb(7 6 13 / 0.75) 65%, transparent);
+    background: linear-gradient(to top, var(--color-night) 35%, rgb(2 1 4 / 0.75) 65%, transparent);
   }
 }
 
@@ -319,21 +319,68 @@ body {
 .animate-status { animation: status-pulse 2s ease-in-out infinite; }
 .animate-scroll-hint { animation: scroll-hint 2s ease-in-out infinite; }
 
-/* Phone hero: the black hole loop tucks under the buttons and runs off both sides */
-.phone-hero-stage {
-  --art: min(135vw, 170svh);
+/* Phone hero: a spiral galaxy, painted face on by lib/space/galaxy.ts and tilted here */
+.galaxy-stage {
+  --g: min(140vw, 600px);
   position: relative;
   flex: 1;
-  min-height: calc(var(--art) * 0.62);
+  min-height: 20rem;
 }
 
-.phone-hero-art {
+.galaxy {
   position: absolute;
-  top: calc(var(--art) * -0.13);
+  top: 48%;
   left: 50%;
-  width: var(--art);
-  aspect-ratio: 1080 / 840;
-  transform: translateX(-53%);
+  width: var(--g);
+  height: var(--g);
+  margin: calc(var(--g) / -2) 0 0 calc(var(--g) / -2);
+  transform: rotate(32deg) scaleY(0.36);
+}
+
+.galaxy-disk {
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.2s ease-out;
+  animation: galaxy-spin 300s linear infinite;
+}
+.galaxy-disk[data-ready] { opacity: 1; }
+
+@keyframes galaxy-spin {
+  to { transform: rotate(-360deg); }
+}
+
+/* The bulge is round, so its glow sits outside the tilt */
+.galaxy-core {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  width: 40vw;
+  height: 40vw;
+  margin: -20vw 0 0 -20vw;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(240 232 255 / 0.55), rgb(198 169 255 / 0.22) 30%, rgb(117 71 255 / 0.08) 60%, transparent);
+}
+
+/* Four point stars, like a camera picks up */
+.sparkle {
+  position: absolute;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: -0.875rem 0 0 -0.875rem;
+  background:
+    radial-gradient(closest-side, #fff 8%, rgb(198 169 255 / 0.5) 18%, transparent 34%),
+    linear-gradient(to right, transparent, rgb(235 228 255 / 0.9), transparent) center / 100% 1px no-repeat,
+    linear-gradient(to bottom, transparent, rgb(235 228 255 / 0.9), transparent) center / 1px 100% no-repeat;
+  animation: twinkle 5s ease-in-out infinite;
+}
+.sparkle:nth-of-type(1) { top: -6%; left: 88%; width: 2.25rem; height: 2.25rem; margin: -1.125rem 0 0 -1.125rem; }
+.sparkle:nth-of-type(2) { top: 36%; left: 62%; animation-delay: -1.5s; }
+.sparkle:nth-of-type(3) { top: 86%; left: 10%; animation-delay: -3s; }
+.sparkle:nth-of-type(4) { top: 92%; left: 78%; width: 1.25rem; height: 1.25rem; margin: -0.625rem 0 0 -0.625rem; animation-delay: -4s; }
+
+@keyframes twinkle {
+  50% { opacity: 0.4; transform: scale(0.75); }
 }
 
 /* Hero entrance. `both` keeps things hidden until their delay starts. */
@@ -361,7 +408,7 @@ body {
 .marquee:focus-within .marquee-track { animation-play-state: paused; }
 
 .review-card {
-  background: linear-gradient(160deg, rgb(21 17 33 / 0.92), rgb(13 11 22 / 0.92));
+  background: linear-gradient(160deg, rgb(17 14 27 / 0.92), rgb(10 8 18 / 0.92));
   border: 1px solid rgb(155 109 255 / 0.12);
   box-shadow: 0 8px 32px rgb(0 0 0 / 0.25);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
@@ -426,6 +473,9 @@ body {
   .dropdown-option {
     animation: none;
   }
+
+  .galaxy-disk,
+  .sparkle { animation: none; }
 
   .service-text,
   .hero-rail-label,

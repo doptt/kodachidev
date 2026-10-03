@@ -14,7 +14,7 @@ The top of the page is a scroll-driven WebGL scene, written without a 3D library
 
 The code lives in `src/lib/space/`, and the scroll timeline is at the top of `src/components/sections/ScrollHero.tsx`.
 
-Phones get a lighter version: just the intro, with a pre-rendered loop of the black hole instead of the live ray tracer. The video stores colour in the top half of each frame and transparency in the bottom half, and a small WebGL shader puts them back together so the stars still show through. Tablets and desktops get the full scene.
+Phones get a lighter version: just the intro, over a spiral galaxy. A shader paints the galaxy once, face on, and CSS tilts it and turns it slowly, so after the first frame it costs next to nothing. Tablets and desktops get the full scene.
 
 ## Running it
 
@@ -48,10 +48,9 @@ src/
     layout/           Layout, Nav, Footer, Starfield
     sections/         Home page sections. Hero picks ScrollHero or PhoneHero
     ui/               Reveal, Select
-  assets/             The black hole loop and its still frame, for phones
   hooks/              Scroll-into-view detection, phone detection
   lib/contact.ts      Form limits and the request to the API
-  lib/space/          Black hole, particles and starfield
+  lib/space/          Black hole, particles, starfield and the phone galaxy
   pages/Terms.tsx     The /terms page
   index.css           Theme, shared classes and animations
 index.html            Home page
