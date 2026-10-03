@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Wide enough, and landscape, for the hero text to sit beside the 3D scene */
+@custom-variant wide (@media (min-width: 900px) and (min-aspect-ratio: 21 / 20));
+
 /* Colours and fonts. Each --color-x becomes text-x, bg-x, border-x/20 etc. */
 @theme {
   --color-night: #07060d;   /* page background */
@@ -248,8 +251,8 @@ body {
   background: radial-gradient(closest-side, rgb(7 6 13 / 0.62), rgb(7 6 13 / 0.3) 60%, transparent);
 }
 
-/* On phones the chapter text sits at the bottom over a solid fade instead */
-@media (max-width: 767px) {
+/* Otherwise the chapter text sits at the bottom over a solid fade */
+@media (max-width: 899px), (max-aspect-ratio: 21 / 20) {
   .hero-chapter::before {
     inset: 0;
     background: linear-gradient(to top, var(--color-night) 35%, rgb(7 6 13 / 0.75) 65%, transparent);
@@ -315,6 +318,23 @@ body {
 
 .animate-status { animation: status-pulse 2s ease-in-out infinite; }
 .animate-scroll-hint { animation: scroll-hint 2s ease-in-out infinite; }
+
+/* Phone hero: the black hole loop tucks under the buttons and runs off both sides */
+.phone-hero-stage {
+  --art: min(135vw, 170svh);
+  position: relative;
+  flex: 1;
+  min-height: calc(var(--art) * 0.62);
+}
+
+.phone-hero-art {
+  position: absolute;
+  top: calc(var(--art) * -0.13);
+  left: 50%;
+  width: var(--art);
+  aspect-ratio: 1080 / 840;
+  transform: translateX(-53%);
+}
 
 /* Hero entrance. `both` keeps things hidden until their delay starts. */
 .animate-fade-up { animation: fade-up 0.8s ease-out both; }
