@@ -12,7 +12,9 @@ The top of the page is a scroll-driven WebGL scene, written without a 3D library
 - About 20k particles that sit on the disk at first, then break away into the Orion constellation (real star positions and distances, so it only lines up from the front), then pour into a tunnel the camera dives through.
 - A canvas starfield behind every page, with parallax, the odd comet, and stars that streak during the dive.
 
-The code lives in `src/lib/space/`, and the scroll timeline is at the top of `src/components/sections/Hero.tsx`.
+The code lives in `src/lib/space/`, and the scroll timeline is at the top of `src/components/sections/ScrollHero.tsx`.
+
+Phones get a lighter version: just the intro, with a pre-rendered loop of the black hole instead of the live ray tracer. The video stores colour in the top half of each frame and transparency in the bottom half, and a small WebGL shader puts them back together so the stars still show through. Tablets and desktops get the full scene.
 
 ## Running it
 
@@ -44,9 +46,10 @@ public/               Favicon, robots.txt, sitemap
 src/
   components/
     layout/           Layout, Nav, Footer, Starfield
-    sections/         Home page sections, top to bottom
+    sections/         Home page sections. Hero picks ScrollHero or PhoneHero
     ui/               Reveal, Select
-  hooks/useReveal.ts  Scroll-into-view detection
+  assets/             The black hole loop and its still frame, for phones
+  hooks/              Scroll-into-view detection, phone detection
   lib/contact.ts      Form limits and the request to the API
   lib/space/          Black hole, particles and starfield
   pages/Terms.tsx     The /terms page
