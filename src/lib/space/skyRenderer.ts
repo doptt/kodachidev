@@ -86,7 +86,6 @@ export class SkyRenderer {
   private nextFlyer = 1.4
   private time = 0
   private warp = 0
-  private travel = 0
   private w = 1
   private h = 1
   private dpr = 1
@@ -238,8 +237,6 @@ export class SkyRenderer {
     // eased, so the streaks wind down instead of snapping off
     this.warp += ((animate ? sky.warp : 0) - this.warp) * (1 - Math.exp(-dt * 5))
     const warp = this.warp < 0.002 ? 0 : this.warp
-    const [dirX, dirY] = sky.direction
-    if (animate) this.travel += warp * dt * 700
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.globalCompositeOperation = 'source-over'
@@ -255,27 +252,32 @@ export class SkyRenderer {
 
     ctx.globalCompositeOperation = 'lighter'
     ctx.lineCap = 'round'
+    const cx = w / 2
+    const cy = h / 2
+    const reach = Math.hypot(cx, cy)
     const smear = Math.max(-40, Math.min(40, velocity * 0.012))
 
     for (const s of this.stars) {
       const layer = LAYERS[s.layer]
-      const travel = this.travel * layer.depth
-      const x = mod(s.x + mx * layer.depth * 14 + dirX * travel, w)
-      const y = mod(s.y - scroll * layer.parallax + my * layer.depth * 10 + dirY * travel, h)
+      const x = mod(s.x + mx * layer.depth * 14, w)
+      const y = mod(s.y - scroll * layer.parallax + my * layer.depth * 10, h)
       const twinkle = animate ? Math.sin(t * s.speed + s.phase) * 0.5 + Math.sin(t * s.speed * 2.7 + s.phase * 1.3) * 0.2 : 0
       const alpha = Math.max(0.05, Math.min(1, s.base * (1 + s.amp * twinkle)))
       const color = COLORS[s.color]
 
-      // streak behind themselves during the warp, and vertically when scrolling fast
-      const streak = warp * layer.depth * 150
+      // streak outward during the warp dive, and vertically when scrolling fast
+      const dx = x - cx
+      const dy = y - cy
+      const dist = Math.hypot(dx, dy) || 1
+      const radial = warp * layer.depth * (dist / reach) * 260
       const vertical = smear * layer.depth
-      if (streak > 1.5 || Math.abs(vertical) > 1.5) {
-        ctx.globalAlpha = alpha * (streak > 1.5 ? 0.35 + warp * 0.5 : 0.45)
+      if (radial > 1.5 || Math.abs(vertical) > 1.5) {
+        ctx.globalAlpha = alpha * (radial > 1.5 ? 0.35 + warp * 0.5 : 0.45)
         ctx.strokeStyle = color
         ctx.lineWidth = s.size * 0.9
         ctx.beginPath()
         ctx.moveTo(x, y)
-        ctx.lineTo(x - dirX * streak, y - dirY * streak + vertical)
+        ctx.lineTo(x + (dx / dist) * radial, y + (dy / dist) * radial + vertical)
         ctx.stroke()
       }
 
