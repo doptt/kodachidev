@@ -1,5 +1,5 @@
 import { DISK } from './camera'
-import { mulberry32 } from './sky'
+import { lerp, mulberry32 } from './sky'
 
 // Particle positions for the three hero shapes. Every particle has a spot in
 // each shape and the vertex shader blends between them while you scroll.
@@ -12,8 +12,12 @@ export type Formations = {
   disk: Float32Array
   /** Orion and its celestial sphere */
   orion: Float32Array
-  /** Tunnel as (angle, depth 0-1, radial jitter); the shader makes it 3D */
-  tunnel: Float32Array
+  /**
+   * Rocket, 4 numbers each. Hull points are (x, y, z, kind): kind 1 is on the
+   * hull and dims when facing away, kind 2 always shows. Exhaust is (angle,
+   * start time, spread, -length) and the shader moves it.
+   */
+  rocket: Float32Array
   /** Brightness in each shape. Anything over 3 is drawn as a flared star. */
   glow: Float32Array
   /** Per particle: stagger, size, colour, spare random number */
@@ -244,29 +248,107 @@ function orion(c: Cloud) {
   }
 }
 
-function tunnel(n: number, rand: Rand) {
-  const params = new Float32Array(n * 3)
-  const glow = new Float32Array(n)
-  const arms = 7
+/** Rocket size in model units. It points up the y axis. */
+export const ROCKET = {
+  tail: -1.2,
+  tip: 1.4,
+  radius: 0.36,
+  /** Bottom of the nozzle, where the exhaust comes out */
+  exit: -1.5,
+} as const
 
+/** Hull radius at height y: a rounded body narrowing to a pointed nose */
+function hull(y: number) {
+  const t = (y - ROCKET.tail) / (ROCKET.tip - ROCKET.tail)
+  if (t < 0.62) return ROCKET.radius * (0.62 + 0.38 * Math.sin((Math.min(1, t / 0.4) * Math.PI) / 2))
+  const u = (t - 0.62) / 0.38
+  return ROCKET.radius * Math.pow(Math.max(0, 1 - u * u), 0.65)
+}
+
+type Particle = [x: number, y: number, z: number, kind: number, glow: number]
+
+function rocket(n: number, rand: Rand) {
+  const { tail, tip, exit } = ROCKET
+  const span = tip - tail
+  const angle = () => rand() * TAU
+  const pick = <T>(list: readonly T[]) => list[Math.floor(rand() * list.length)]
+
+  const onHull = (y: number, phi: number, glow: number): Particle => {
+    const r = hull(y) + 0.004
+    return [Math.cos(phi) * r, y, Math.sin(phi) * r, 1, glow]
+  }
+
+  // Fins, swept back. u runs from root to tip, v from trailing to leading edge.
+  const fins = [Math.PI / 2, Math.PI / 2 + TAU / 3, Math.PI / 2 - TAU / 3]
+  const onFin = (u: number, v: number, glow: number): Particle => {
+    const phi = pick(fins)
+    const y = lerp(lerp(tail, -1.56, u), lerp(-0.5, -1.22, u), v)
+    const s = lerp(hull(y), 0.8, u)
+    return [Math.cos(phi) * s + (rand() - 0.5) * 0.01, y, Math.sin(phi) * s, 2, glow]
+  }
+
+  // A porthole facing the camera
+  const windowY = 0.1
+  const onWindow = (radius: number, glow: number): Particle => {
+    const a = angle()
+    return onHull(windowY + Math.sin(a) * radius, Math.PI / 2 - (Math.cos(a) * radius) / hull(windowY), glow)
+  }
+
+  const exhaust = (spread: number, length: number, glow: number): Particle => [angle(), rand(), spread, -length, glow]
+
+  const parts: [share: number, make: () => Particle][] = [
+    // hull: a faint fill, then latitude rings and meridians like a wireframe
+    [0.07, () => {
+      let y = tail
+      do y = tail + rand() * span
+      while (rand() > hull(y) / ROCKET.radius)
+      return onHull(y, angle(), 0.35 + rand() * 0.3)
+    }],
+    [0.07, () => onHull(tail + (span * (Math.floor(rand() * 12) + 0.5)) / 12, angle(), 0.85)],
+    [0.05, () => onHull(tail + rand() * span, (Math.floor(rand() * 8) / 8) * TAU + 0.2, 0.75)],
+    // seams where the nose meets the body and around the tail
+    [0.03, () => onHull(pick([tail + span * 0.62, tail + span * 0.14]), angle(), 1.5)],
+    [0.02, () => onWindow(0.13, 2)],
+    [0.006, () => onWindow(0.165, 1.1)],
+    [0.009, () => onWindow(Math.sqrt(rand()) * 0.11, 0.7)],
+    [0.05, () => {
+      const edge = rand()
+      return edge < 0.4 ? onFin(rand(), 1, 1.3) : edge < 0.75 ? onFin(rand(), 0, 1.3) : onFin(1, rand(), 1.3)
+    }],
+    [0.03, () => onFin(rand(), rand(), 0.45)],
+    // nozzle bell, its rim and the hot glow inside
+    [0.025, () => {
+      const k = rand()
+      const r = lerp(0.15, 0.26, Math.pow(k, 1.6))
+      const a = angle()
+      return [Math.cos(a) * r, lerp(tail, exit, k), Math.sin(a) * r, 2, 0.45]
+    }],
+    [0.01, () => {
+      const a = angle()
+      return [Math.cos(a) * 0.26, exit, Math.sin(a) * 0.26, 2, 1.2]
+    }],
+    [0.012, () => {
+      const a = angle()
+      const r = Math.sqrt(rand()) * 0.22
+      return [Math.cos(a) * r, exit + 0.02, Math.sin(a) * r, 2, 1.7]
+    }],
+    [0.004, () => [(rand() - 0.5) * 0.02, tip, (rand() - 0.5) * 0.02, 2, 1.6]],
+    // exhaust: a hot core, the main plume, loose sparks and a few flared stars
+    [0.12, () => exhaust(rand() * 0.2, 2, 1.1 + rand() * 0.7)],
+    [0.36, () => exhaust(0.1 + rand() * 0.5, 7, 0.6 + rand() * 0.7)],
+    [0.03, () => exhaust(0.15 + rand() * 0.6, 7.5, 3.3 + rand() * 0.5)],
+    [1, () => exhaust(0.6 + rand() * 1.1, 5, 0.25 + rand() * 0.35)],
+  ]
+
+  const params = new Float32Array(n * 4)
+  const glow = new Float32Array(n)
   for (let i = 0; i < n; i++) {
-    const kind = rand()
-    let angle = rand() * TAU
-    let jitter: number
-    if (kind < 0.62) {
-      // spiral arms
-      angle = (Math.floor(rand() * arms) / arms) * TAU + (rand() - 0.5) * 0.22
-      jitter = (rand() - 0.5) * 0.12
-      glow[i] = 0.9 + rand() * 0.6
-    } else if (kind < 0.92) {
-      jitter = (rand() - 0.5) * 0.4
-      glow[i] = 0.35 + rand() * 0.35
-    } else {
-      // loose haze around the outside
-      jitter = 0.4 + rand() * 1.6
-      glow[i] = 0.18 + rand() * 0.2
-    }
-    params.set([angle, rand(), jitter], i * 3)
+    let roll = rand()
+    let k = 0
+    while (k < parts.length - 1 && roll >= parts[k][0]) roll -= parts[k++][0]
+    const [x, y, z, w, g] = parts[k][1]()
+    params.set([x, y, z, w], i * 4)
+    glow[i] = g
   }
   return { params, glow }
 }
@@ -282,16 +364,16 @@ export function buildFormations(count: number): Formations {
   orion(sky)
   sky.shuffle()
 
-  const warp = tunnel(count, rand)
+  const ship = rocket(count, rand)
 
   const glow = new Float32Array(count * 3)
   const seed = new Float32Array(count * 4)
   for (let i = 0; i < count; i++) {
-    glow.set([disk.glow[i], sky.glow[i], warp.glow[i]], i * 3)
+    glow.set([disk.glow[i], sky.glow[i], ship.glow[i]], i * 3)
 
     const size = rand() < 0.025 ? 1.9 + rand() * 0.8 : 0.55 + rand() * rand() * 1.1
     seed.set([rand(), size, Math.pow(rand(), 0.8), rand()], i * 4)
   }
 
-  return { count, disk: disk.pos, orion: sky.pos, tunnel: warp.params, glow, seed }
+  return { count, disk: disk.pos, orion: sky.pos, rocket: ship.params, glow, seed }
 }

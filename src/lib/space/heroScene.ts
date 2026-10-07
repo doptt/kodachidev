@@ -1,6 +1,6 @@
 import { BlackHolePass, RIPPLE_GLSL } from './blackHole'
 import { DISK, diskCamera, focalFor } from './camera'
-import type { Formations } from './formations'
+import { ROCKET, type Formations } from './formations'
 import { program, uniforms } from './gl'
 
 // Renders the hero: the ray traced black hole, then the particles on top
@@ -10,7 +10,7 @@ import { program, uniforms } from './gl'
 export type SceneFrame = {
   time: number
   dt: number
-  /** 0 = disk, 1 = Orion, 2 = tunnel, fractions blend between them */
+  /** 0 = disk, 1 = Orion, 2 = rocket, fractions blend between them */
   morph: number
   /** 0-1, particles flying in on page load */
   intro: number
@@ -22,8 +22,12 @@ export type SceneFrame = {
   x: number
   y: number
   scale: number
-  /** How far the tunnel has scrolled past the camera */
-  flow: number
+  /** Rocket heading (0 is straight up), lean towards the camera, spin about its axis and click boost */
+  rocket: [number, number, number, number]
+  rocketPos: [number, number, number]
+  /** Heading, lean and position from a moment ago, which the exhaust trails behind */
+  trailTurn: [number, number]
+  trailPos: [number, number, number]
   mouseX: number
   mouseY: number
   mouseForce: number
@@ -41,7 +45,7 @@ precision highp float;
 
 attribute vec3 aDisk;
 attribute vec3 aOrion;
-attribute vec3 aTunnel;
+attribute vec4 aRocket;
 attribute vec3 aGlow;
 attribute vec4 aSeed;
 
@@ -56,7 +60,10 @@ uniform vec2 uOffset;
 uniform float uScale;
 uniform float uPx;
 uniform float uMaxSize;
-uniform float uFlow;
+uniform vec4 uRocket;
+uniform vec3 uRocketPos;
+uniform vec2 uTrailTurn;
+uniform vec3 uTrailPos;
 uniform vec3 uMouse;
 uniform float uFade;
 uniform float uHalo;
@@ -76,6 +83,7 @@ const float TILT = ${glsl(DISK.tilt)};
 const float DISK_ROLL = ${glsl(DISK.roll)};
 const float SPIN = ${glsl(DISK.spin)};
 const float ORBIT = ${glsl(DISK.orbit)};
+const float EXIT = ${glsl(ROCKET.exit)};
 
 ${RIPPLE_GLSL}
 
@@ -84,6 +92,7 @@ vec3 rotY(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(c *
 vec3 rotZ(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(c * p.x - s * p.y, s * p.x + c * p.y, p.z); }
 vec3 view(vec3 p) { return rotZ(rotX(rotY(p, uRot.x), uRot.y), uRot.z); }
 vec3 diskToModel(vec3 q) { return rotZ(rotX(q, TILT), DISK_ROLL); }
+vec3 rocketToModel(vec3 q, vec2 turn) { return rotZ(rotX(q, turn.y), turn.x); }
 
 // Each particle leaves at a slightly different moment, so shapes dissolve
 // rather than all moving at once
@@ -121,18 +130,37 @@ void main() {
   vec3 orion = rotY(aOrion, sin(t * 0.2) * 0.12);
   orion.y += sin(t * 0.5) * 0.02;
 
-  // Tunnel: depth wraps around forever and the radius narrows into a throat
-  float depth = fract(aTunnel.y + uFlow);
-  float z = mix(-15.0, 5.0, depth);
-  float r = (0.16 + 2.7 * exp((z - 5.0) / 3.6)) * (1.0 + aTunnel.z);
-  float angle = aTunnel.x + z * 0.32 + t * 0.12;
-  vec3 tunnel = vec3(cos(angle) * r, sin(angle) * r, z);
-  float tunnelGlow = aGlow.z * smoothstep(0.0, 0.12, depth) * (1.0 - smoothstep(0.92, 1.0, depth));
+  // Rocket: the hull turns slowly on its axis and the exhaust streams out of
+  // the nozzle. Older exhaust follows where the rocket was a moment ago, so
+  // the trail bends behind it when it turns.
+  vec3 rocket;
+  float life = 1.0;
+  float heat = 0.0;
+  if (aRocket.w > 0.0) {
+    vec3 q = rotY(aRocket.xyz, uRocket.z);
+    rocket = rocketToModel(q, uRocket.xy) + uRocketPos;
+    // Dim the far side so the hull doesn't look see-through, and light the
+    // edges so the outline reads
+    if (aRocket.w < 1.5) {
+      vec3 normal = view(rocketToModel(normalize(vec3(q.x, 0.0, q.z) + 1e-5), uRocket.xy));
+      life = mix(0.2, 1.0, smoothstep(-0.3, 0.3, normal.z)) * (1.0 + pow(1.0 - abs(normal.z), 4.0) * 1.6);
+    }
+  } else {
+    float age = fract(aRocket.y + t * 0.4);
+    float d = -aRocket.w * (1.0 + uRocket.w * 0.6) * pow(age, 1.5);
+    float a = aRocket.x + d * 0.5;
+    float r = 0.05 + aRocket.z * (0.15 + d * 0.2) + sin(d * 2.3 - t * 3.0 + aRocket.x * 3.0) * 0.03 * d;
+    float lag = smoothstep(0.0, 0.8, age);
+    vec3 q = vec3(cos(a) * r, EXIT - d, sin(a) * r);
+    rocket = rocketToModel(q, mix(uRocket.xy, uTrailTurn, lag)) + mix(uRocketPos, uTrailPos, lag);
+    life = smoothstep(0.0, 0.05, age) * pow(1.0 - age, 0.8) * (1.0 + uRocket.w * 0.8);
+    heat = pow(1.0 - age, 6.0);
+  }
 
   float k1 = progress(0.0);
   float k2 = progress(1.0);
-  vec3 p = mix(mix(disk, orion, k1), tunnel, k2);
-  float g = mix(mix(diskGlow, aGlow.y, k1), tunnelGlow, k2);
+  vec3 p = mix(mix(disk, orion, k1), rocket, k2);
+  float g = mix(mix(diskGlow, aGlow.y, k1), aGlow.z, k2);
 
   // A random direction per particle, for the in-between swirl and the intro
   float th = aSeed.w * 18.85 + aSeed.x * 11.0;
@@ -207,7 +235,7 @@ void main() {
   float size = aSeed.y * (0.6 + 0.4 * sqrt(g)) * uPx * uFocal / dist * mix(1.0, 3.4, uHalo);
   size *= 1.0 + star * (7.5 + (g - 3.2) * 5.0) / aSeed.y;
   float alpha = g * uFade * lensed * (1.0 - 0.55 * smoothstep(6.0, 26.0, dist)) * smoothstep(0.06, 1.4, dist);
-  alpha *= mix(1.0, 0.32, star);
+  alpha *= mix(1.0, 0.32, star) * mix(1.0, life, k2);
   // Fade sub-pixel points instead of letting them flicker
   if (size < 1.25) {
     alpha *= size / 1.25;
@@ -222,7 +250,7 @@ void main() {
   vec3 col = mix(violet, lavender, aSeed.z);
   col = mix(col, ice, step(0.9, aSeed.w) * 0.75);
   col = mix(col, vec3(1.0, 0.97, 1.0), clamp((g - 1.1) * 0.6, 0.0, 0.75));
-  col = mix(col, vec3(1.0, 0.96, 1.0), pow(1.0 - depth, 5.0) * k2 * 0.7);
+  col = mix(col, vec3(1.0, 0.96, 1.0), heat * k2 * 0.8);
   vColor = col;
 }
 `
@@ -256,7 +284,7 @@ void main() {
 const ATTRIBUTES = [
   ['aDisk', 3],
   ['aOrion', 3],
-  ['aTunnel', 3],
+  ['aRocket', 4],
   ['aGlow', 3],
   ['aSeed', 4],
 ] as const
@@ -265,7 +293,8 @@ const STRIDE = ATTRIBUTES.reduce((sum, [, size]) => sum + size, 0)
 
 const UNIFORMS = [
   'uTime', 'uMorph', 'uIntro', 'uRot', 'uCam', 'uFocal', 'uAspect', 'uOffset', 'uScale',
-  'uPx', 'uMaxSize', 'uFlow', 'uMouse', 'uFade', 'uHalo', 'uLens', 'uImage', 'uRip',
+  'uPx', 'uMaxSize', 'uMouse', 'uFade', 'uHalo', 'uLens', 'uImage', 'uRip',
+  'uRocket', 'uRocketPos', 'uTrailTurn', 'uTrailPos',
 ] as const
 
 export class HeroScene {
@@ -314,7 +343,7 @@ export class HeroScene {
     }
     this.hole = hole
 
-    const sources = [data.disk, data.orion, data.tunnel, data.glow, data.seed]
+    const sources = [data.disk, data.orion, data.rocket, data.glow, data.seed]
     const packed = new Float32Array(data.count * STRIDE)
     for (let i = 0; i < data.count; i++) {
       let offset = i * STRIDE
@@ -399,7 +428,10 @@ export class HeroScene {
     gl.uniform1f(u.uScale, f.scale)
     gl.uniform1f(u.uPx, px)
     gl.uniform1f(u.uMaxSize, this.maxSize)
-    gl.uniform1f(u.uFlow, f.flow)
+    gl.uniform4fv(u.uRocket, f.rocket)
+    gl.uniform3fv(u.uRocketPos, f.rocketPos)
+    gl.uniform2fv(u.uTrailTurn, f.trailTurn)
+    gl.uniform3fv(u.uTrailPos, f.trailPos)
     gl.uniform3f(u.uMouse, f.mouseX, f.mouseY, f.mouseForce)
     gl.uniform1f(u.uFade, f.fade)
     gl.uniform1f(u.uLens, lens)

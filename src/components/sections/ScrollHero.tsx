@@ -9,7 +9,7 @@ import { clamp01, lerp, prefersReducedMotion, sky, smooth } from '../../lib/spac
 // The full hero for desktops and tablets: a tall section with a sticky stage. Scrolling moves
 // through a timeline of camera poses: the black hole rises behind the
 // headline, moves aside for the first chapter, breaks apart into Orion,
-// then everything pours into a tunnel and the camera dives in.
+// then gathers into a rocket that launches off screen at the end.
 //
 // The animation loop writes straight to the canvas and the DOM, so React
 // doesn't re-render while you scroll.
@@ -17,7 +17,7 @@ import { clamp01, lerp, prefersReducedMotion, sky, smooth } from '../../lib/spac
 type Pose = {
   /** Scroll progress (0-1) this pose sits at */
   p: number
-  /** Shape: 0 black hole, 1 Orion, 2 tunnel */
+  /** Shape: 0 black hole, 1 Orion, 2 rocket */
   shape: number
   yaw: number
   pitch: number
@@ -41,9 +41,9 @@ const POSES: Pose[] = [
   { p: 0.27, shape: 0, yaw: -0.08, pitch: 0.06, roll: 0, cam: 6.6, x: 0.4, y: -0.02, scale: 0.95, fade: 1, glow: 0.4, glowSize: 2.8, hole: 1, mobile: [0, 0.22, 1.1] },
   { p: 0.39, shape: 1, yaw: -0.75, pitch: 0.22, roll: 0, cam: 7.4, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, mobile: [0, 0.28, 0.9] },
   { p: 0.56, shape: 1, yaw: -0.05, pitch: 0.04, roll: 0, cam: 7.2, x: 0.3, y: 0, scale: 0.95, fade: 1, glow: 0.3, glowSize: 3, hole: 0, mobile: [0, 0.28, 0.9] },
-  { p: 0.7, shape: 2, yaw: 0.08, pitch: 0.05, roll: 0, cam: 12, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.7, glowSize: 1.2, hole: 0, mobile: [0, 0.2, 0.95] },
-  { p: 0.84, shape: 2, yaw: 0.08, pitch: 0.05, roll: 0.2, cam: 6.5, x: 0, y: 0.12, scale: 1, fade: 1, glow: 0.9, glowSize: 1.1, hole: 0, mobile: [0, 0.2, 0.95] },
-  { p: 1, shape: 2, yaw: 0, pitch: 0, roll: 0.7, cam: 0.6, x: 0, y: 0, scale: 1, fade: 0, glow: 0, glowSize: 1, hole: 0, mobile: [0, 0, 1] },
+  { p: 0.7, shape: 2, yaw: 0.12, pitch: 0.04, roll: 0, cam: 8.4, x: 0.36, y: 0.1, scale: 0.8, fade: 1, glow: 0.3, glowSize: 1.6, hole: 0, mobile: [0.05, 0.3, 0.78] },
+  { p: 0.86, shape: 2, yaw: -0.06, pitch: 0.04, roll: 0, cam: 8, x: 0.36, y: 0.1, scale: 0.8, fade: 1, glow: 0.3, glowSize: 1.6, hole: 0, mobile: [0.05, 0.3, 0.78] },
+  { p: 1, shape: 2, yaw: -0.1, pitch: 0.04, roll: 0, cam: 8, x: 0.36, y: 0.1, scale: 0.8, fade: 0, glow: 0, glowSize: 1.6, hole: 0, mobile: [0.05, 0.3, 0.78] },
 ]
 
 type Chapter = {
@@ -80,11 +80,16 @@ const CHAPTERS: Chapter[] = [
     title: 'Launched, and',
     accent: 'kept in orbit.',
     body: 'Hosting, domains and deployment handled for you, with security built in from day one.',
-    align: 'center',
+    align: 'left',
     show: [0.74, 0.79, 0.93, 0.98],
     cta: true,
   },
 ]
+
+// Where the rocket points when the cursor leaves it alone (negative leans
+// right), and how far it leans towards the camera
+const ROCKET_HEADING = -0.55
+const ROCKET_LEAN = 0.3
 
 // Chapter rail on the right: where each stop scrolls to and where it lights up
 const STOPS = [
@@ -238,12 +243,20 @@ export default function ScrollHero() {
 
     let p = scrollProgress()
     let time = 0
-    let flow = 0
     let force = 0
     let tiltX = 0
     let tiltY = 0
     let introStart = -1
     let activeStop = -1
+
+    // The rocket points at the cursor while it's moving, a click fires the
+    // engine, and scrolling past the last chapter launches it off screen
+    let heading = ROCKET_HEADING
+    let trailHeading = heading
+    let boost = 0
+    const rocketPos: [number, number, number] = [0, 0, 0]
+    const trailPos: [number, number, number] = [0, 0, 0]
+
     let last = performance.now()
     let raf = 0
 
@@ -262,13 +275,7 @@ export default function ScrollHero() {
       if (introStart < 0) introStart = now
       const intro = reduced ? 1 : clamp01((now - introStart) / 2600)
 
-      // Warp builds up during the dive and settles as the next section arrives
-      const warp = reduced ? 0 : smooth(clamp01((p - 0.8) / 0.08)) * (1 - smooth(clamp01((p - 0.95) / 0.05)) * 0.7)
-      sky.warp = warp
-      if (!reduced) {
-        time += dt
-        flow += dt * (0.022 + warp * 0.5)
-      }
+      if (!reduced) time += dt
 
       const moving = !reduced && now - lastMove < 1400
       force += ((moving ? 1 : 0) - force) * ease(moving ? 4 : 1.5)
@@ -297,7 +304,32 @@ export default function ScrollHero() {
           }
         }
       }
+
+      const rocketShown = !reduced && pose.shape > 1.5
+      let aim = ROCKET_HEADING
+      if (rocketShown && now - lastMove < 3000) {
+        const angle = Math.atan2((mouseX - pose.x) * width, (mouseY - pose.y) * height)
+        aim = -Math.max(-1.2, Math.min(1.2, angle))
+      }
+      if (rocketShown && clicked) boost = 1
       clicked = false
+      boost *= Math.exp(-dt * 1.8)
+      heading += (aim - heading) * ease(3)
+      trailHeading += (heading - trailHeading) * ease(1.5)
+
+      const launch = reduced ? 0 : smooth(clamp01((p - 0.9) / 0.08))
+      const thrust = launch * launch * 14 + boost * 0.3
+      rocketPos[0] = -Math.sin(heading) * Math.cos(ROCKET_LEAN) * thrust
+      rocketPos[1] = Math.cos(heading) * Math.cos(ROCKET_LEAN) * thrust + Math.sin(time * 1.1) * 0.05
+      rocketPos[2] = Math.sin(ROCKET_LEAN) * thrust
+      for (let i = 0; i < 3; i++) trailPos[i] += (rocketPos[i] - trailPos[i]) * ease(1.5)
+
+      // The stars rush past the other way while the rocket's out, hardest
+      // during the launch
+      const cruise = smooth(clamp01((p - 0.72) / 0.08))
+      sky.warp = reduced ? 0 : Math.min(1, cruise * 0.15 + Math.sin(Math.PI * launch) * 0.8 + boost * 0.3)
+      sky.direction[0] = Math.sin(heading)
+      sky.direction[1] = Math.cos(heading)
 
       scene?.render({
         ...view,
@@ -305,7 +337,10 @@ export default function ScrollHero() {
         dt,
         morph: pose.shape,
         intro,
-        flow,
+        rocket: [heading, ROCKET_LEAN, Math.sin(time * 0.5) * 0.6, boost],
+        rocketPos,
+        trailTurn: [trailHeading, ROCKET_LEAN],
+        trailPos,
         mouseX,
         mouseY,
         // the disk gets ripples instead of the cursor push
