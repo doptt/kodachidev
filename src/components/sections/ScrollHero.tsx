@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react'
 import HeroIntro, { ArrowIcon } from './HeroIntro'
 import { RIPPLES } from '../../lib/space/blackHole'
 import { DISK, diskHit, focalFor, type View } from '../../lib/space/camera'
-import { buildFormations, type Formations } from '../../lib/space/formations'
-import { HeroScene } from '../../lib/space/heroScene'
+import { buildFormations, ROCKET, type Formations } from '../../lib/space/formations'
+import { HeroScene, NozzleTrail } from '../../lib/space/heroScene'
 import { clamp01, lerp, prefersReducedMotion, sky, smooth } from '../../lib/space/sky'
 
 // The full hero for desktops and tablets: a tall section with a sticky stage. Scrolling moves
@@ -87,9 +87,19 @@ const CHAPTERS: Chapter[] = [
 ]
 
 // Where the rocket points when the cursor leaves it alone (negative leans
-// right), and how far it leans towards the camera
+// right), how far it leans towards the camera, and its top speed in model
+// units per second
 const ROCKET_HEADING = -0.55
 const ROCKET_LEAN = 0.3
+const ROCKET_SPEED = 5
+
+const TAU = Math.PI * 2
+
+/** Turns angle `from` towards `to` the short way round, by fraction `t` */
+function turnTowards(from: number, to: number, t: number) {
+  const diff = ((((to - from) % TAU) + TAU * 1.5) % TAU) - Math.PI
+  return from + diff * t
+}
 
 // Chapter rail on the right: where each stop scrolls to and where it lights up
 const STOPS = [
@@ -249,13 +259,18 @@ export default function ScrollHero() {
     let introStart = -1
     let activeStop = -1
 
-    // The rocket points at the cursor while it's moving, a click fires the
-    // engine, and scrolling past the last chapter launches it off screen
+    // The rocket flies after the cursor while it's moving and drifts home
+    // when it stops. A click fires the engine, and scrolling past the last
+    // chapter launches it off screen. Positions are model units on the z = 0
+    // plane, relative to the pose's centre.
     let heading = ROCKET_HEADING
-    let trailHeading = heading
+    let rocketX = 0
+    let rocketY = 0
+    let velX = 0
+    let velY = 0
     let boost = 0
     const rocketPos: [number, number, number] = [0, 0, 0]
-    const trailPos: [number, number, number] = [0, 0, 0]
+    const trail = new NozzleTrail()
 
     let last = performance.now()
     let raf = 0
@@ -282,9 +297,11 @@ export default function ScrollHero() {
       tiltX += ((reduced ? 0 : mouseX) - tiltX) * ease(2.5)
       tiltY += ((reduced ? 0 : mouseY) - tiltY) * ease(2.5)
 
+      // no cursor tilt while the rocket is out, so it lines up with the cursor
+      const tilt = 1 - clamp01(pose.shape - 1)
       const view: View = {
-        yaw: pose.yaw + tiltX * 0.14,
-        pitch: pose.pitch - tiltY * 0.08,
+        yaw: pose.yaw + tiltX * 0.14 * tilt,
+        pitch: pose.pitch - tiltY * 0.08 * tilt,
         roll: pose.roll,
         cam: reduced ? Math.max(pose.cam, 5) : pose.cam,
         x: pose.x,
@@ -305,31 +322,63 @@ export default function ScrollHero() {
         }
       }
 
+      const launch = reduced ? 0 : smooth(clamp01((p - 0.9) / 0.08))
       const rocketShown = !reduced && pose.shape > 1.5
-      let aim = ROCKET_HEADING
-      if (rocketShown && now - lastMove < 3000) {
-        const angle = Math.atan2((mouseX - pose.x) * width, (mouseY - pose.y) * height)
-        aim = -Math.max(-1.2, Math.min(1.2, angle))
+      const chasing = rocketShown && launch === 0 && now - lastMove < 2500
+      if (rocketShown && clicked) {
+        boost = 1
+        velX -= Math.sin(heading) * 3
+        velY += Math.cos(heading) * 3
       }
-      if (rocketShown && clicked) boost = 1
       clicked = false
       boost *= Math.exp(-dt * 1.8)
-      heading += (aim - heading) * ease(3)
-      trailHeading += (heading - trailHeading) * ease(1.5)
 
-      const launch = reduced ? 0 : smooth(clamp01((p - 0.9) / 0.08))
-      const thrust = launch * launch * 14 + boost * 0.3
-      rocketPos[0] = -Math.sin(heading) * Math.cos(ROCKET_LEAN) * thrust
-      rocketPos[1] = Math.cos(heading) * Math.cos(ROCKET_LEAN) * thrust + Math.sin(time * 1.1) * 0.05
+      if (!reduced) {
+        // Head for the cursor so the nose stops just short of it, or for home
+        let goalX = 0
+        let goalY = 0
+        if (chasing) {
+          const unit = pose.cam / (focalFor(width / height) * pose.scale)
+          goalX = (mouseX - pose.x) * (width / height) * unit
+          goalY = (mouseY - pose.y) * unit
+        }
+        const dx = goalX - rocketX
+        const dy = goalY - rocketY
+        const dist = Math.hypot(dx, dy)
+        const speed = Math.min(ROCKET_SPEED, Math.max(0, dist - (chasing ? ROCKET.tip : 0)) * 2.5)
+        const want = dist > 0.001 ? speed / dist : 0
+        velX += (dx * want - velX) * ease(4)
+        velY += (dy * want - velY) * ease(4)
+        rocketX += velX * dt
+        rocketY += velY * dt
+
+        // Face the way it's flying, the cursor once it's there, or the
+        // resting angle at home
+        let aim = ROCKET_HEADING
+        if (Math.hypot(velX, velY) > 0.4) aim = -Math.atan2(velX, velY)
+        else if (chasing && dist > 0.2) aim = -Math.atan2(dx, dy)
+        else if (chasing) aim = heading
+        heading = turnTowards(heading, aim, ease(5))
+      }
+
+      const thrust = launch * launch * 14
+      const lean = Math.cos(ROCKET_LEAN)
+      rocketPos[0] = rocketX - Math.sin(heading) * lean * thrust
+      rocketPos[1] = rocketY + Math.cos(heading) * lean * thrust + Math.sin(time * 1.1) * 0.05
       rocketPos[2] = Math.sin(ROCKET_LEAN) * thrust
-      for (let i = 0; i < 3; i++) trailPos[i] += (rocketPos[i] - trailPos[i]) * ease(1.5)
+      if (!reduced) {
+        const exit = ROCKET.exit
+        trail.update(
+          dt,
+          rocketPos[0] - Math.sin(heading) * lean * exit,
+          rocketPos[1] + Math.cos(heading) * lean * exit,
+          rocketPos[2] + Math.sin(ROCKET_LEAN) * exit,
+          heading,
+        )
+      }
 
-      // The stars rush past the other way while the rocket's out, hardest
-      // during the launch
-      const cruise = smooth(clamp01((p - 0.72) / 0.08))
-      sky.warp = reduced ? 0 : Math.min(1, cruise * 0.15 + Math.sin(Math.PI * launch) * 0.8 + boost * 0.3)
-      sky.direction[0] = Math.sin(heading)
-      sky.direction[1] = Math.cos(heading)
+      // The stars only rush past while it launches
+      sky.warp = reduced ? 0 : Math.sin(Math.PI * launch) * 0.85
 
       scene?.render({
         ...view,
@@ -339,8 +388,7 @@ export default function ScrollHero() {
         intro,
         rocket: [heading, ROCKET_LEAN, Math.sin(time * 0.5) * 0.6, boost],
         rocketPos,
-        trailTurn: [trailHeading, ROCKET_LEAN],
-        trailPos,
+        trail,
         mouseX,
         mouseY,
         // the disk gets ripples instead of the cursor push

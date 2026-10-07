@@ -9,8 +9,8 @@ It's a React + TypeScript site built with Vite and Tailwind, hosted on Vercel. T
 The top of the page is a scroll-driven WebGL scene, written without a 3D library:
 
 - A black hole, ray traced in a fragment shader. Light is bent around it properly, which is where the arch over the top and the thin ring underneath come from. Moving the mouse over the disk sends ripples through it.
-- About 20k particles that sit on the disk at first, then break away into the Orion constellation (real star positions and distances, so it only lines up from the front), then gather into a rocket. It turns to point at your cursor, a click fires the engine, and stars stream out of the nozzle and bend behind it as it turns. Scroll on and it launches off screen.
-- A canvas starfield behind every page, with parallax, the odd comet, and stars that rush past while the rocket flies.
+- About 20k particles that sit on the disk at first, then break away into the Orion constellation (real star positions and distances, so it only lines up from the front), then gather into a rocket. It flies after your cursor and a click fires the engine. Every speck of exhaust remembers where the nozzle was when it came out, so the rocket leaves a trail of stars along its path. Scroll on and it launches off screen.
+- A canvas starfield behind every page, with parallax, the odd comet, and stars that streak as the rocket launches.
 
 The code lives in `src/lib/space/`, and the scroll timeline is at the top of `src/components/sections/ScrollHero.tsx`.
 

@@ -1,10 +1,8 @@
 // Written by the hero and read by the starfield on every frame. A plain
 // object on purpose, since React state would re-render for nothing.
 export const sky = {
-  /** 0-1, how fast the background stars rush past, streaking as they go */
+  /** 0-1, how hard the background stars streak during the warp dive */
   warp: 0,
-  /** Screen direction they rush in, as a unit vector (y points down) */
-  direction: [0, 1] as [number, number],
 }
 
 export const prefersReducedMotion = () =>

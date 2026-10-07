@@ -25,9 +25,8 @@ export type SceneFrame = {
   /** Rocket heading (0 is straight up), lean towards the camera, spin about its axis and click boost */
   rocket: [number, number, number, number]
   rocketPos: [number, number, number]
-  /** Heading, lean and position from a moment ago, which the exhaust trails behind */
-  trailTurn: [number, number]
-  trailPos: [number, number, number]
+  /** Where the nozzle has been, see NozzleTrail */
+  trail: NozzleTrail
   mouseX: number
   mouseY: number
   mouseForce: number
@@ -39,6 +38,38 @@ export type SceneFrame = {
 }
 
 const glsl = (v: number) => v.toFixed(4)
+
+/** How long a speck of exhaust lives, in seconds */
+const EXHAUST_LIFE = 2.5
+const TRAIL_SAMPLES = 40
+const TRAIL_STEP = EXHAUST_LIFE / (TRAIL_SAMPLES - 2)
+
+/**
+ * Remembers where the nozzle has been and which way it pointed, so exhaust
+ * that's already out stays where it was let go instead of swinging round
+ * with the rocket. Sample 0 is always the current position, the rest are
+ * TRAIL_STEP apart, and `phase` is how far it's got towards the next one.
+ */
+export class NozzleTrail {
+  readonly samples = new Float32Array(TRAIL_SAMPLES * 4)
+  phase = 0
+  private empty = true
+
+  update(dt: number, x: number, y: number, z: number, heading: number) {
+    const now = [x, y, z, heading]
+    if (this.empty) {
+      for (let i = 0; i < TRAIL_SAMPLES; i++) this.samples.set(now, i * 4)
+      this.empty = false
+    }
+    this.phase += dt / TRAIL_STEP
+    while (this.phase >= 1) {
+      this.samples.copyWithin(8, 4, this.samples.length - 4)
+      this.samples.set(now, 4)
+      this.phase -= 1
+    }
+    this.samples.set(now, 0)
+  }
+}
 
 const VERTEX = /* glsl */ `
 precision highp float;
@@ -62,8 +93,8 @@ uniform float uPx;
 uniform float uMaxSize;
 uniform vec4 uRocket;
 uniform vec3 uRocketPos;
-uniform vec2 uTrailTurn;
-uniform vec3 uTrailPos;
+uniform vec4 uTrail[${TRAIL_SAMPLES}];
+uniform float uTrailPhase;
 uniform vec3 uMouse;
 uniform float uFade;
 uniform float uHalo;
@@ -84,6 +115,8 @@ const float DISK_ROLL = ${glsl(DISK.roll)};
 const float SPIN = ${glsl(DISK.spin)};
 const float ORBIT = ${glsl(DISK.orbit)};
 const float EXIT = ${glsl(ROCKET.exit)};
+const float EXHAUST_LIFE = ${glsl(EXHAUST_LIFE)};
+const float TRAIL_STEP = ${glsl(TRAIL_STEP)};
 
 ${RIPPLE_GLSL}
 
@@ -93,6 +126,15 @@ vec3 rotZ(vec3 p, float a) { float c = cos(a); float s = sin(a); return vec3(c *
 vec3 view(vec3 p) { return rotZ(rotX(rotY(p, uRot.x), uRot.y), uRot.z); }
 vec3 diskToModel(vec3 q) { return rotZ(rotX(q, TILT), DISK_ROLL); }
 vec3 rocketToModel(vec3 q, vec2 turn) { return rotZ(rotX(q, turn.y), turn.x); }
+
+// Nozzle position and heading this many seconds ago
+vec4 nozzleAt(float ago) {
+  float k = ago / TRAIL_STEP;
+  k = k < uTrailPhase ? k / max(uTrailPhase, 0.001) : k - uTrailPhase + 1.0;
+  k = min(k, ${TRAIL_SAMPLES - 1}.0 - 0.001);
+  int i = int(k);
+  return mix(uTrail[i], uTrail[i + 1], fract(k));
+}
 
 // Each particle leaves at a slightly different moment, so shapes dissolve
 // rather than all moving at once
@@ -131,8 +173,8 @@ void main() {
   orion.y += sin(t * 0.5) * 0.02;
 
   // Rocket: the hull turns slowly on its axis and the exhaust streams out of
-  // the nozzle. Older exhaust follows where the rocket was a moment ago, so
-  // the trail bends behind it when it turns.
+  // the nozzle. Each speck starts from wherever the nozzle was when it came
+  // out and keeps going that way, so the rocket leaves a trail as it moves.
   vec3 rocket;
   float life = 1.0;
   float heat = 0.0;
@@ -146,13 +188,12 @@ void main() {
       life = mix(0.2, 1.0, smoothstep(-0.3, 0.3, normal.z)) * (1.0 + pow(1.0 - abs(normal.z), 4.0) * 1.6);
     }
   } else {
-    float age = fract(aRocket.y + t * 0.4);
-    float d = -aRocket.w * (1.0 + uRocket.w * 0.6) * pow(age, 1.5);
+    float age = fract(aRocket.y + t / EXHAUST_LIFE);
+    vec4 nozzle = nozzleAt(age * EXHAUST_LIFE);
+    float d = -aRocket.w * pow(age, 1.5);
     float a = aRocket.x + d * 0.5;
     float r = 0.05 + aRocket.z * (0.15 + d * 0.2) + sin(d * 2.3 - t * 3.0 + aRocket.x * 3.0) * 0.03 * d;
-    float lag = smoothstep(0.0, 0.8, age);
-    vec3 q = vec3(cos(a) * r, EXIT - d, sin(a) * r);
-    rocket = rocketToModel(q, mix(uRocket.xy, uTrailTurn, lag)) + mix(uRocketPos, uTrailPos, lag);
+    rocket = nozzle.xyz + rocketToModel(vec3(cos(a) * r, -d, sin(a) * r), vec2(nozzle.w, uRocket.y));
     life = smoothstep(0.0, 0.05, age) * pow(1.0 - age, 0.8) * (1.0 + uRocket.w * 0.8);
     heat = pow(1.0 - age, 6.0);
   }
@@ -294,7 +335,7 @@ const STRIDE = ATTRIBUTES.reduce((sum, [, size]) => sum + size, 0)
 const UNIFORMS = [
   'uTime', 'uMorph', 'uIntro', 'uRot', 'uCam', 'uFocal', 'uAspect', 'uOffset', 'uScale',
   'uPx', 'uMaxSize', 'uMouse', 'uFade', 'uHalo', 'uLens', 'uImage', 'uRip',
-  'uRocket', 'uRocketPos', 'uTrailTurn', 'uTrailPos',
+  'uRocket', 'uRocketPos', 'uTrail', 'uTrailPhase',
 ] as const
 
 export class HeroScene {
@@ -430,8 +471,8 @@ export class HeroScene {
     gl.uniform1f(u.uMaxSize, this.maxSize)
     gl.uniform4fv(u.uRocket, f.rocket)
     gl.uniform3fv(u.uRocketPos, f.rocketPos)
-    gl.uniform2fv(u.uTrailTurn, f.trailTurn)
-    gl.uniform3fv(u.uTrailPos, f.trailPos)
+    gl.uniform4fv(u.uTrail, f.trail.samples)
+    gl.uniform1f(u.uTrailPhase, f.trail.phase)
     gl.uniform3f(u.uMouse, f.mouseX, f.mouseY, f.mouseForce)
     gl.uniform1f(u.uFade, f.fade)
     gl.uniform1f(u.uLens, lens)
