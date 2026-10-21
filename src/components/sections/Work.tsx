@@ -24,12 +24,12 @@ const PROJECTS: Project[] = [
     summary: 'Designed and built from scratch, with a layout that holds up on every screen from phones to wide monitors.',
     tags: ['Design', 'Development', 'Responsive'],
     image: '/work/starblossom.png',
-    // a red desert under a thin blue sky, lit from the right
+    // a soft pink desert under a thin lavender sky, lit from the right
     planet: {
       kind: 'dust',
-      colors: ['#6a1418', '#d8361f', '#ffac86'],
-      air: '#9db4c6',
-      haze: 0.85,
+      colors: ['#7a3450', '#e8889a', '#ffd8cc'],
+      air: '#b8a8d8',
+      haze: 0.7,
       sun: [0.7, 0.3, 0.72],
       tilt: 0.3,
       seed: 3.1,
