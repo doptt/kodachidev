@@ -104,8 +104,7 @@ export default function Reviews() {
   const lap = Array.from({ length: repeats }, () => REVIEWS).flat()
 
   return (
-    // id is "work" because the nav and hero link here
-    <section id="work" className="relative overflow-hidden py-36">
+    <section id="reviews" className="relative overflow-hidden py-36">
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <div
           className="absolute top-[40%] left-1/2 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 blur-[60px]"

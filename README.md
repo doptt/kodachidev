@@ -16,6 +16,10 @@ The code lives in `src/lib/space/`, and the scroll timeline is at the top of `sr
 
 Phones get a lighter version: just the intro, over a spiral galaxy. A shader paints the galaxy once, face on, and CSS tilts it and turns it slowly, so after the first frame it costs next to nothing. Tablets and desktops get the full scene.
 
+## Work
+
+Below the services, each project I've built is a planet, drawn by one fragment shader in `src/lib/space/planets.ts`. Click one and the camera flies in, with the details and a screenshot beside it. Projects are listed at the top of `src/components/sections/Work.tsx`, and their screenshots go in `public/work/`. Until a screenshot is there it shows the address in the planet's colours instead.
+
 ## Running it
 
 You'll need Node 20 or newer.
@@ -42,11 +46,11 @@ Import the repo into Vercel, keep the detected Vite settings and add the variabl
 
 ```
 api/contact.ts        Contact form endpoint
-public/               Favicon, robots.txt, sitemap
+public/               Favicon, robots.txt, sitemap, project screenshots in work/
 src/
   components/
     layout/           Layout, Nav, Footer, Starfield
-    sections/         Home page sections. Hero picks ScrollHero or PhoneHero
+    sections/         Home page sections. Hero picks ScrollHero or PhoneHero, Work has the planets
     ui/               Reveal, Select
   hooks/              Scroll-into-view detection, phone detection
   lib/contact.ts      Form limits and the request to the API
