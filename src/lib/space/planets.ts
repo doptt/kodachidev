@@ -3,7 +3,9 @@ import { program, uniforms } from './gl'
 // The planets in the Work section. Every planet is drawn analytically in one
 // fragment shader: each pixel works out where it lands on each sphere, looks
 // up a noise surface there and lights it. There is no mesh and no texture,
-// so a planet stays sharp however close the camera gets.
+// so a planet stays sharp however close the camera gets. The noise adds
+// octaves as a planet takes up more pixels, so zooming in keeps finding
+// finer detail instead of blur.
 //
 // Layout and animation all happen in JS. The shader only gets told, per
 // planet, where its centre is, how big it is and how it looks.
@@ -11,14 +13,27 @@ import { program, uniforms } from './gl'
 export const MAX_PLANETS = 6
 
 export type PlanetLook = {
-  /** gas giants get bands and a storm, oceans get land, ice caps and clouds */
-  kind: 'gas' | 'ocean'
+  /**
+   * dust: a desert world, wind-blown streaks, canyons, craters and clouds.
+   * cracked: a dark rocky world split into plates by a web of veins.
+   */
+  kind: 'dust' | 'cracked'
   /** dark, middle and light surface colours, as hex */
   colors: [string, string, string]
-  /** the glow around the edge */
+  /** the haze on the limb and the glow around the edge */
   air: string
+  /** how thick the air is, 0 to 1. Thick air also tints the night side */
+  haze?: number
+  /** direction to the sun, x right, y up, z towards the viewer */
+  sun?: [number, number, number]
+  /** a sun glare on the limb, 0 to 1 */
+  flare?: number
   /** rings, as inner and outer radius in planet radii */
   ring?: [number, number]
+  /** the ring colour, defaults to the light surface colour */
+  ringColor?: string
+  /** how many rocks tumble through the rings, 0 to 1 */
+  rocks?: number
   /** lean of the spin axis, in radians */
   tilt?: number
   /** any number, shuffles the noise so two planets of a kind differ */
@@ -54,14 +69,14 @@ uniform int uCount;
 uniform float uTime;
 uniform vec4 uGeo[MAX];   // centre x, y in device pixels, radius, opacity
 uniform vec4 uLook[MAX];  // kind, seed, spin, tilt
-uniform vec2 uRing[MAX];  // inner and outer radius, 0 for none
+uniform vec4 uRing[MAX];  // inner and outer radius (0 for none), rocks, unused
+uniform vec4 uAtmo[MAX];  // haze, flare, unused, unused
+uniform vec3 uSun[MAX];
 uniform vec3 uDeep[MAX];
 uniform vec3 uMid[MAX];
 uniform vec3 uLight[MAX];
 uniform vec3 uAir[MAX];
-
-// The sun is up and to the left, a little in front
-const vec3 SUN = vec3(-0.56, 0.46, 0.69);
+uniform vec3 uRingCol[MAX];
 
 float hash(vec3 p) {
   p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
@@ -80,15 +95,31 @@ float noise(vec3 x) {
   );
 }
 
-float fbm(vec3 p) {
+// Octaves are added up to a cutoff that the caller works out from the size
+// on screen, so a small planet stays cheap and a zoomed one keeps gaining
+// detail. The last octave fades in so nothing pops while the size changes.
+float fbm(vec3 p, float oct) {
   float v = 0.0;
   float amp = 0.5;
-  for (int i = 0; i < 5; i++) {
-    v += amp * noise(p);
+  for (int i = 0; i < 8; i++) {
+    float w = clamp(oct - float(i), 0.0, 1.0);
+    if (w <= 0.0) break;
+    v += amp * w * noise(p);
     p = p * 2.02 + vec3(1.7, 9.2, 3.1);
     amp *= 0.5;
   }
   return v;
+}
+
+// 1 along the middle of the range, 0 at both ends. Makes thin lines out of
+// noise where it crosses the middle.
+float ridge(float v) {
+  return 1.0 - abs(v * 2.0 - 1.0);
+}
+
+// A thin line where the noise crosses its middle, from the cut upwards
+float line(float v, float cut) {
+  return smoothstep(cut, 1.0, ridge(v));
 }
 
 vec3 spinY(vec3 p, float a) {
@@ -101,115 +132,205 @@ vec3 spinZ(vec3 p, float a) {
   return vec3(c * p.x - s * p.y, s * p.x + c * p.y, p.z);
 }
 
-// Ring density at a distance from the centre: fine bands with a couple of gaps
-float ringAt(float d, vec2 ring, float seed) {
+// Craters: at most one per grid cell, each at a random spot with a random
+// size, kept inside its cell so nothing has to look next door. The bowl is
+// shaded by hand: the wall on the sun side faces away from it.
+float craters(vec3 p, float seed, vec3 sun) {
+  vec3 i = floor(p);
+  vec3 f = p - i;
+  float h = hash(i + seed);
+  if (h > 0.22) return 0.0;
+  float rad = 0.1 + 0.18 * hash(i + seed + 5.0);
+  vec3 c = vec3(hash(i + seed + 1.0), hash(i + seed + 2.0), hash(i + seed + 3.0)) * (1.0 - 2.0 * rad) + rad;
+  vec3 o = (f - c) / rad;
+  float d = length(o);
+  if (d > 1.2) return 0.0;
+  float facing = -dot(normalize(o), sun);
+  float bowl = (1.0 - smoothstep(0.75, 0.95, d)) * (0.35 * facing - 0.25);
+  float rim = smoothstep(0.7, 0.95, d) * (1.0 - smoothstep(1.0, 1.2, d)) * (0.25 - 0.3 * facing);
+  return bowl + rim;
+}
+
+// Noise smeared along a direction: the average of a few samples stepped
+// along it. The streaks follow the direction wherever it bends, and the
+// input is already stretched round the planet, so they come out long.
+float smear(vec3 s, vec3 d, float freq, float step, float seed) {
+  float v = 0.0;
+  for (int k = -3; k <= 3; k++) {
+    v += noise((s + d * (float(k) * step)) * freq * vec3(1.0, 2.2, 1.0) + seed);
+  }
+  return (v / 7.0 - 0.5) * 1.9 + 0.5;
+}
+
+// A red desert. A wind runs round the planet, bent by a slow field, and
+// the dust is noise smeared along it at three sizes: broad strokes, hairs
+// and a finer fuzz that only shows up close. Where the wind bends the
+// strokes fan out, which is the feathered look. Darker ground and thin
+// cuts sit under the strokes, craters on top, and the clouds are the same
+// smear thresholded hard, so they tear into wisps at their edges.
+vec3 dust(vec3 s, float seed, float oct, vec3 sun, vec3 deep, vec3 mid, vec3 light, out float cloud) {
+  vec3 p = s * 1.5 + seed;
+  vec3 bend = vec3(fbm(p * 0.8, 3.0), fbm(p * 0.8 + 4.3, 3.0), fbm(p * 0.8 + 9.1, 3.0)) - 0.5;
+  vec3 d = normalize(cross(s, vec3(0.0, 1.0, 0.0) + bend * 3.5) + vec3(0.001, 0.0, 0.0));
+
+  float strokes = smear(s, d, 16.0, 0.03, seed);
+  float hairs = smear(s, d, 55.0, 0.013, seed + 3.0);
+  float hairW = clamp((oct - 5.5) * 0.7, 0.0, 1.0);
+  float fuzzW = clamp((oct - 6.3) * 0.8, 0.0, 1.0);
+  float fuzz = fuzzW > 0.0 ? smear(s, d, 160.0, 0.006, seed + 5.0) : 0.5;
+  float grain = fuzzW > 0.0 ? fbm(p * 14.0, oct) : 0.5;
+  // up close the hairs split into sharp lines
+  float lines = fuzzW > 0.0 ? pow(ridge(fuzz), 3.0) : 0.0;
+
+  // crimson in the low ground, scarlet over most of it, coral where it rises
+  float ground = fbm(p * 1.1 + 2.0, oct - 2.0);
+  float tone = ground + (strokes - 0.5) * 0.3;
+  vec3 col = mix(deep, mid, smoothstep(0.2, 0.5, tone));
+  col = mix(col, light, smoothstep(0.54, 0.8, tone) * 0.85);
+  // the strokes ease off when the planet is small, so it reads as a
+  // smooth red disc from a distance rather than fur
+  col *= 1.0 + (strokes - 0.5) * mix(0.18, 0.3, clamp((oct - 4.5) * 0.7, 0.0, 1.0));
+  col *= 1.0 + (hairs - 0.5) * 0.4 * hairW;
+  col *= 1.0 + (fuzz - 0.5) * 0.45 * fuzzW + (grain - 0.5) * 0.5 * fuzzW;
+  col = mix(col, light, (smoothstep(0.7, 0.95, hairs) * 0.3 * hairW + lines * 0.25 * fuzzW));
+
+  // dark ridges and canyons: broad darker ground, and thin deep cuts
+  float ridges = smoothstep(0.56, 0.72, fbm(p * 1.6 + 13.0, oct - 2.0));
+  float cut = line(fbm(p * 2.5 + 17.0, 2.5), 0.95) * smoothstep(0.4, 0.6, ground);
+  col = mix(col, deep * 0.75, ridges * 0.55);
+  col = mix(col, deep * 0.4, cut * 0.3);
+
+  // craters at two sizes, as a lit and shadowed bump on the colour
+  float crater = craters(p * 4.0, seed, sun) + craters(p * 10.0 + 3.0, seed + 2.0, sun) * 0.7;
+  col *= 1.0 + crater * 1.6;
+
+  // clouds: a few long stretches of sky, and inside them the wind smear
+  // again, cut off high so only the strongest strands make it out to the
+  // edges
+  vec3 c = spinY(s, uTime * 0.01);
+  float sky = fbm(c * vec3(0.9, 1.8, 0.9) + 21.0 + seed, 3.0);
+  float band = smoothstep(0.52, 0.66, sky);
+  float puff = smear(c, d, 22.0, 0.05, seed + 7.0);
+  float wisp = smear(c, d, 70.0, 0.018, seed + 9.0);
+  float thr = mix(0.92, 0.52, band);
+  cloud = smoothstep(thr, thr + 0.18, puff + (wisp - 0.5) * 0.45);
+  cloud *= 0.5 + 0.5 * smoothstep(0.3, 0.8, wisp);
+  return col;
+}
+
+// Cells for the cracked plates: the nearest and second nearest of one
+// jittered point per cell, searching the 2x2x2 block around the sample.
+// The points stay near their cell centres so that block nearly always
+// holds both, and a miss only nudges a crack.
+void cells(vec3 p, float seed, out float edge, out float id, out vec3 toward) {
+  vec3 b = floor(p - 0.5);
+  float f1 = 9.0;
+  float f2 = 9.0;
+  id = 0.0;
+  toward = vec3(0.0, 0.0, 1.0);
+  for (int x = 0; x < 2; x++) {
+    for (int y = 0; y < 2; y++) {
+      for (int z = 0; z < 2; z++) {
+        vec3 c = b + vec3(float(x), float(y), float(z));
+        vec3 pt = c + 0.5 + (vec3(hash(c + seed), hash(c + seed + 1.0), hash(c + seed + 2.0)) - 0.5) * 0.7;
+        vec3 o = pt - p;
+        float d = length(o);
+        if (d < f1) {
+          f2 = f1;
+          f1 = d;
+          id = hash(c + seed + 3.0);
+          toward = o;
+        } else if (d < f2) {
+          f2 = d;
+        }
+      }
+    }
+  }
+  edge = f2 - f1;
+}
+
+// One layer of veins: a hairline along each cell edge with a soft lip
+// beside it, lit on the side that faces the sun and shaded on the other.
+// Lines never go thinner than about a pixel and a half, they fade out
+// instead, so nothing shimmers when the planet is small.
+float veins(vec3 w, float k, float seed, vec3 sun, float px, out float relief, out float id) {
+  float edge;
+  vec3 toward;
+  cells(w * k, seed, edge, id, toward);
+  float wd = max(0.025, px * k * 1.3);
+  float crack = 1.0 - smoothstep(0.0, wd, edge);
+  float lip = (1.0 - smoothstep(wd, wd * 4.5, edge)) * (1.0 - crack);
+  float fade = clamp(0.1 / (px * k), 0.0, 1.0);
+  // the lip slopes down into the crack, so it faces away from its own cell
+  relief = -lip * dot(normalize(toward), sun) * fade;
+  return crack * fade;
+}
+
+// A cracked rocky world: plates of bronze, amber and pale gold, each a
+// slightly different tone, crazed by a web of fine veins at three sizes.
+// The widest ones glow faintly, so the night side is not blank.
+vec3 cracked(vec3 s, float seed, float oct, vec3 sun, float px, vec3 deep, vec3 mid, vec3 light, out float vein, out float ember) {
+  vec3 p = s * 2.4 + seed;
+  vec2 q = vec2(fbm(p * 0.7, oct - 2.0), fbm(p * 0.7 + 3.7, oct - 2.0)) - 0.5;
+  vec3 w = p + q.xyx * 0.5;
+
+  float plates = fbm(w * 1.1, oct - 1.0);
+  float grain = fbm(w * 6.0 + 4.0, oct);
+
+  float r1, r2, r3, id1, id2, id3;
+  float c1 = veins(w, 5.0, seed, sun, px, r1, id1);
+  float c2 = veins(w + 0.3, 13.0, seed + 7.0, sun, px, r2, id2);
+  float c3 = veins(w + 0.7, 34.0, seed + 9.0, sun, px, r3, id3);
+  vein = clamp(c1 + c2 * 0.7 + c3 * 0.45, 0.0, 1.0);
+  float relief = r1 * 0.12 + r2 * 0.08 + r3 * 0.05;
+
+  // every plate its own tone, only a little apart from its neighbours
+  float tone = id1 * 0.5 + id2 * 0.5;
+  vec3 col = mix(deep, mid, 0.4 + 0.55 * smoothstep(0.3, 0.7, plates));
+  col = mix(col, light, smoothstep(0.45, 0.85, plates + (tone - 0.5) * 0.15) * 0.75);
+  col = mix(col, light * vec3(1.0, 0.97, 0.9), tone * 0.12);
+  col *= 0.88 + 0.24 * grain;
+  col *= 1.0 + relief;
+  col = mix(col, deep * 0.6, vein * 0.45);
+
+  ember = c1 * smoothstep(0.5, 0.68, fbm(w * 0.6 + 14.0, oct - 3.0));
+  return col;
+}
+
+// Ring density at a distance from the centre: a few broad bands, a couple
+// of gaps and a great many fine grooves. The grooves are only added while
+// they are wider than a pixel or two, px is how wide a pixel is in radii.
+float ringAt(float d, vec4 ring, float seed, float px) {
   if (ring.y <= 0.0) return 0.0;
   float t = (d - ring.x) / (ring.y - ring.x);
   if (t < 0.0 || t > 1.0) return 0.0;
-  float bands = 0.55 + 0.45 * sin(t * 70.0 + noise(vec3(t * 18.0, seed, 0.0)) * 6.0);
-  float grain = noise(vec3(t * 140.0, seed + 3.0, 0.0));
-  float gaps = smoothstep(0.02, 0.05, abs(t - 0.62)) * smoothstep(0.01, 0.025, abs(t - 0.3));
-  float edges = smoothstep(0.0, 0.06, t) * smoothstep(1.0, 0.85, t);
-  return bands * (0.6 + 0.4 * grain) * gaps * edges;
+  float width = (ring.y - ring.x) / px;
+  float broad = fbm(vec3(t * 5.0, seed, 2.0), 4.0);
+  float g1 = noise(vec3(t * 48.0, seed + 3.0, 0.0));
+  float g2 = noise(vec3(t * 150.0, seed + 5.0, 0.0)) * clamp(width / 450.0, 0.0, 1.0);
+  float g3 = noise(vec3(t * 420.0, seed + 7.0, 0.0)) * clamp(width / 1300.0, 0.0, 1.0);
+  float grooves = 0.5 + 0.5 * sin(t * 90.0 + g1 * 7.0);
+  grooves *= 0.7 + 0.3 * sin(t * 300.0 + g2 * 9.0) * clamp(width / 900.0, 0.0, 1.0);
+  float gaps = smoothstep(0.015, 0.045, abs(t - 0.55)) * smoothstep(0.01, 0.03, abs(t - 0.26)) * (1.0 - 0.6 * smoothstep(0.02, 0.0, abs(t - 0.79)));
+  float edges = smoothstep(0.0, 0.04, t) * smoothstep(1.0, 0.82, t);
+  float dens = (0.5 + 0.6 * broad) * mix(0.7, 1.0, g1) * mix(0.8, 1.0, g2 + 0.5 * g3) * (0.75 + 0.35 * grooves);
+  return clamp(dens * 1.35, 0.0, 1.0) * gaps * edges;
 }
 
-// Gas bands. Everything is worked out from a bent latitude: big slow
-// meanders, then a smaller warp that curls the edges of the bands where
-// they slide past each other. Sampling noise in latitude-stretched space
-// keeps the detail running along the bands, like it does on a real giant.
-// The accent is the air colour, used as a second hue between the others.
-vec3 gas(vec3 s, float seed, vec3 deep, vec3 mid, vec3 light, vec3 accent) {
-  vec3 p = s + seed;
-  float meander = fbm(p * vec3(1.1, 2.6, 1.1));
-  vec3 q = vec3(fbm(p * vec3(2.2, 6.0, 2.2)), fbm(p * vec3(2.2, 6.0, 2.2) + 5.2), 0.0);
-  float lat = s.y + (meander - 0.5) * 0.32 + (q.x - 0.5) * 0.1;
-
-  // a few belts churn much harder than the rest
-  float belt = smoothstep(0.5, 0.72, noise(vec3(lat * 7.0, seed, 1.0)));
-
-  // curls along the band edges
-  vec3 along = vec3(s.x * 3.2, lat * 16.0, s.z * 3.2);
-  float curls = fbm(along + vec3(q.xy, q.y) * (3.0 + belt * 3.0));
-  lat += (curls - 0.5) * (0.04 + belt * 0.09);
-
-  float b = lat * 17.0;
-  float v = 0.5 + 0.5 * (0.55 * sin(b + seed) + 0.3 * sin(b * 2.3 + 1.1) + 0.15 * sin(b * 5.3 + 2.0));
-
-  // dark purple, violet, magenta, pale pink
-  vec3 col = mix(deep, accent, smoothstep(0.0, 0.34, v));
-  col = mix(col, mid, smoothstep(0.3, 0.62, v));
-  col = mix(col, light, smoothstep(0.66, 1.0, v) * 0.85);
-
-  // fine streaks running along the bands
-  float streak = fbm(vec3(s.x * 5.0, lat * 70.0, s.z * 5.0) + q * 2.0);
-  col *= 0.82 + 0.36 * streak;
-
-  // thin pale wisps that trace the churning edges
-  float ridge = 1.0 - abs(noise(vec3(s.x * 4.0, lat * 46.0, s.z * 4.0) + q * 4.0) * 2.0 - 1.0);
-  float wisps = pow(ridge, 9.0) * smoothstep(0.42, 0.68, curls) * 0.6;
-  // and broader white swirls in the churning belts
-  float swirl = 1.0 - abs(fbm(along * vec3(1.4, 1.0, 1.4) + q * 6.0) * 2.0 - 1.0);
-  wisps += pow(swirl, 5.0) * belt;
-  // added rather than mixed, so they glow over the dark bands instead of
-  // going grey
-  wisps = clamp(wisps, 0.0, 1.0);
-  col = mix(col, light, wisps * 0.45) + light * wisps * 0.4;
-
-  // violet towards the top, warmer and redder towards the bottom
-  col = mix(col, accent, smoothstep(0.3, 0.95, s.y) * 0.35);
-  col = mix(col, mid * vec3(1.1, 0.45, 0.6), smoothstep(-0.2, -0.95, s.y) * 0.35);
-  return col;
-}
-
-// The rings glow like the black hole's disk: clumps of gas and thin
-// filaments, hottest at the inner edge, brighter on the side coming towards
-// us. They turn slowly but stay rigid, nothing ripples.
-vec4 ringGlow(vec3 q, vec3 axis, vec2 ring, float seed) {
-  float r = length(q);
-  float t = (r - ring.x) / (ring.y - ring.x);
-  if (t < -0.05 || t > 1.0) return vec4(0.0);
-
-  vec3 e1 = normalize(vec3(axis.y, -axis.x, 0.0));
-  vec3 e2 = cross(axis, e1);
-  float a = atan(dot(q, e2), dot(q, e1)) + uTime * 0.035;
-  vec2 cs = vec2(cos(a), sin(a));
-
-  float broad = noise(vec3(r * 2.2, cs * 1.4) + seed);
-  float f1 = 1.0 - abs(noise(vec3(r * 9.0, cs * 2.4) + seed + 3.1) * 2.0 - 1.0);
-  float f2 = 1.0 - abs(noise(vec3(r * 26.0, cs * 3.6) + seed + 7.7) * 2.0 - 1.0);
-  float gas = broad * 0.5 + f1 * f1 * f1 * 0.4 + f2 * f2 * f2 * f2 * 0.45;
-  float lanes = 0.5 + 0.5 * sin(r * 22.0 + gas * 6.0);
-
-  float edge = smoothstep(-0.05, 0.06, t) * (1.0 - smoothstep(0.45, 1.0, t));
-  float dens = edge * pow(ring.x / r, 1.6) * mix(0.15, 1.6, gas * gas * 1.5) * mix(0.7, 1.15, lanes);
-
-  // stands in for Doppler beaming, the left side swings towards the camera
-  float side = dot(normalize(q), e1);
-  float beam = mix(0.45, 1.7, 0.5 + 0.5 * side);
-
-  vec3 violet = vec3(0.6, 0.18, 1.0);
-  vec3 magenta = vec3(1.0, 0.28, 0.78);
-  vec3 tint = mix(magenta, violet, smoothstep(0.1, 0.7, t));
-  tint = mix(tint, vec3(1.0, 0.82, 1.0), smoothstep(0.18, 0.0, t) * 0.7);
-  return vec4(tint * dens * beam * 2.4, clamp(dens * 1.1, 0.0, 0.9));
-}
-
-// Seas, land, ice at the poles and a cloud layer that drifts on its own
-vec3 ocean(vec3 s, float seed, vec3 deep, vec3 mid, vec3 light, out float wet, out float cloud) {
-  float h = fbm(s * 1.8 + seed) * 0.7 + fbm(s * 5.5 + seed + 4.0) * 0.3;
-  float land = smoothstep(0.5, 0.52, h);
-  vec3 sea = mix(deep, mix(deep, mid, 0.35), smoothstep(0.38, 0.5, h));
-  vec3 ground = mix(mid, light, smoothstep(0.56, 0.72, h));
-  vec3 col = mix(sea, ground, land);
-
-  float ice = smoothstep(0.78, 0.86, abs(s.y) + (noise(s * 6.0 + seed) - 0.5) * 0.18);
-  col = mix(col, vec3(0.92, 0.95, 1.0), ice);
-  wet = (1.0 - land) * (1.0 - ice);
-
-  vec3 c = spinY(s, uTime * 0.012);
-  float swirl = fbm(c * 2.5 + seed + 7.0);
-  cloud = smoothstep(0.5, 0.72, fbm(c * vec3(3.0, 6.0, 3.0) + swirl * 1.8 + seed));
-  return col;
+// Rocks in the ring plane: at most one per grid cell, kept inside its cell.
+// Returns how much of the pixel it covers and which way its lit side faces.
+vec2 rocks(vec2 x, float seed, float fill, vec2 sun, float px) {
+  vec2 i = floor(x);
+  vec2 f = x - i;
+  float h = hash(vec3(i, seed));
+  if (h > fill) return vec2(0.0);
+  float rad = 0.07 + 0.2 * hash(vec3(i, seed + 1.0)) * hash(vec3(i, seed + 4.0));
+  vec2 c = vec2(hash(vec3(i, seed + 2.0)), hash(vec3(i, seed + 3.0))) * (1.0 - 2.0 * rad) + rad;
+  vec2 o = f - c;
+  // a bit lumpy rather than round
+  float d = length(o) / rad * (0.85 + 0.3 * hash(vec3(i, seed + 6.0) + floor(atan(o.y, o.x) * 1.6)));
+  float cover = 1.0 - smoothstep(1.0 - px / rad, 1.0 + px / rad, d);
+  return vec2(cover, dot(normalize(o + 0.0001), sun));
 }
 
 void main() {
@@ -220,18 +341,24 @@ void main() {
     if (i >= uCount) break;
     vec4 geo = uGeo[i];
     vec4 look = uLook[i];
-    vec2 ring = uRing[i];
+    vec4 ring = uRing[i];
+    vec4 atmo = uAtmo[i];
     if (geo.w <= 0.0 || geo.z <= 0.5) continue;
 
     vec2 p = (gl_FragCoord.xy - geo.xy) / geo.z;
     float d = length(p);
-    float reach = max(1.6, ring.y + 0.1);
+    float reach = max(1.7, ring.y + 0.1);
     if (d > reach) continue;
 
-    float aa = 1.5 / geo.z;
+    float px = 1.0 / geo.z;
+    float aa = 1.5 * px;
     float seed = look.y;
     float tilt = look.w;
-    vec3 sun = normalize(SUN);
+    vec3 sun = normalize(uSun[i]);
+    vec3 air = uAir[i];
+    float haze = atmo.x;
+    // how many noise octaves this size on screen can show
+    float oct = clamp(log2(geo.z / 5.0), 3.0, 8.0);
 
     // The rings lie in the equator, so they lean with the spin axis. The
     // view is from slightly above, which is the extra lean towards us.
@@ -246,58 +373,100 @@ void main() {
       vec3 n = vec3(p, z);
       // into the planet's own frame, where y is the spin axis
       vec3 s = spinY(spinZ(n, -tilt), look.z);
-
-      float wet = 0.0;
-      float cloud = 0.0;
-      vec3 surf = look.x < 0.5
-        ? gas(s, seed, uDeep[i], uMid[i], uLight[i], uAir[i])
-        : ocean(s, seed, uDeep[i], uMid[i], uLight[i], wet, cloud);
+      vec3 sunLocal = spinY(spinZ(sun, -tilt), look.z);
+      // the limb is foreshortened, so it can take fewer octaves
+      float o = oct + log2(max(z, 0.08)) * 0.6;
 
       float ndl = dot(n, sun);
-      float day = smoothstep(-0.18, 0.5, ndl);
-      vec3 lit = surf * (0.03 + 1.15 * day * (0.35 + 0.65 * max(ndl, 0.0)));
+      float day = smoothstep(-0.25, 0.3, ndl);
+      float shine = 0.3 + 0.7 * max(ndl, 0.0);
 
-      // sunlight off the water
-      vec3 hv = normalize(sun + vec3(0.0, 0.0, 1.0));
-      lit += vec3(1.0, 0.96, 0.9) * pow(max(dot(n, hv), 0.0), 60.0) * wet * 0.7 * day;
+      float cloud = 0.0;
+      float vein = 0.0;
+      float ember = 0.0;
+      vec3 surf = look.x < 0.5
+        ? dust(s, seed, o, sunLocal, uDeep[i], uMid[i], uLight[i], cloud)
+        : cracked(s, seed, o, sunLocal, px, uDeep[i], uMid[i], uLight[i], vein, ember);
 
-      lit = mix(lit, vec3(1.0) * (0.04 + 1.05 * day), cloud * 0.92);
+      vec3 lit = surf * (0.03 + 1.9 * day * shine);
+
+      // clouds: white in the sun, going blue-grey where the light leaves
+      vec3 cloudCol = mix(air * 0.5, vec3(1.0, 0.98, 0.96), smoothstep(-0.05, 0.5, ndl));
+      lit = mix(lit, cloudCol * (0.03 + 1.5 * day * shine), cloud * 0.9);
+
+      // the cracks glow a little, mostly seen on the night side
+      lit += vec3(1.0, 0.36, 0.08) * ember * (0.9 - 0.7 * day);
 
       // shadow of the rings on the planet
       float facing = dot(sun, axis);
       if (abs(facing) > 0.001) {
         float t = -dot(n, axis) / facing;
-        if (t > 0.0) lit *= 1.0 - 0.4 * ringAt(length(n + sun * t), ring, seed);
+        if (t > 0.0) lit *= 1.0 - 0.55 * ringAt(length(n + sun * t), ring, seed, px);
       }
 
-      // air thickens towards the edge, and the lit limb glows
-      float rim = pow(1.0 - z, 2.2);
-      lit += uAir[i] * rim * (0.12 + 1.1 * smoothstep(-0.35, 0.7, ndl));
-      // a faint violet bounce on the night side so it never goes flat black
-      lit += vec3(0.16, 0.1, 0.32) * pow(1.0 - z, 1.4) * (1.0 - day) * 0.5;
+      // air: a haze that thickens towards the limb and catches the sun
+      // there, plus a little scattered light on the night side
+      float limbLit = smoothstep(-0.5, 0.5, ndl);
+      vec3 limbCol = air * (0.12 + 1.3 * limbLit);
+      // thick air wraps the whole limb, and more of it on the night side
+      // where it is all there is to see
+      float rim = pow(1.0 - z, mix(1.4, 2.4, day));
+      lit = mix(lit, limbCol, rim * haze * 0.85);
+      lit += air * (0.07 + 0.3 * pow(1.0 - z, 0.8)) * haze * haze * (1.0 - day);
+      // every planet gets a glow towards the lit edge and a bright line on
+      // it, sharper and whiter where the air is thin
+      lit += limbCol * pow(1.0 - z, 3.0) * limbLit * 0.5;
+      lit += mix(air, vec3(1.0), 0.6) * pow(1.0 - z, 7.0 - 3.0 * haze) * limbLit * limbLit * (1.6 - 0.8 * haze);
 
       body = lit;
       cover = smoothstep(1.0, 1.0 - aa, d);
     }
 
-    float glowSide = smoothstep(-0.5, 0.9, dot(normalize(vec3(p, 0.001)), sun));
-    float glow = exp(-max(d - 1.0, 0.0) * 9.0) * (0.15 + 0.85 * glowSide) * (1.0 - cover);
+    float glowSide = smoothstep(-0.6, 0.9, dot(normalize(vec3(p, 0.001)), sun));
+    float glow = exp(-max(d - 1.0, 0.0) * (14.0 - 7.0 * haze)) * (0.1 + 0.9 * glowSide) * (1.0 - cover) * (0.3 + haze);
     if (d < 1.0) glow = 0.0;
 
-    // Rings: where this pixel's view line crosses the ring plane
+    // Rings: where this pixel's view line crosses the ring plane, lit by
+    // the sun, with the planet throwing its shadow across them and rocks
+    // scattered through the inner part
     vec3 ringCol = vec3(0.0);
     float ringA = 0.0;
     bool ringFront = true;
     if (ring.y > 0.0) {
       float rz = -(p.x * axis.x + p.y * axis.y) / axis.z;
       vec3 q = vec3(p, rz);
-      vec4 glowing = ringGlow(q, axis, ring, seed);
-      if (glowing.a > 0.0) {
-        // dimmer where the planet blocks the sun, but it glows on its own
+      float r = length(q);
+      float t = (r - ring.x) / (ring.y - ring.x);
+      if (t > -0.35 && t < 1.0) {
+        float dens = ringAt(r, ring, seed, px);
+
+        // the sun side of the ring is lit, the far side sits in the shadow
         float along = dot(q, sun);
-        float shade = along < 0.0 ? smoothstep(0.9, 1.08, length(q - sun * along)) : 1.0;
-        ringCol = glowing.rgb * (0.35 + 0.65 * shade);
-        ringA = glowing.a;
+        float shade = along < 0.0 ? smoothstep(0.92, 1.1, length(q - sun * along)) : 1.0;
+        // light scattering forward through the dust, strongest towards the sun
+        float toSun = dot(normalize(q), sun);
+        float lamp = 0.9 + 0.6 * abs(dot(sun, axis)) + 1.5 * pow(max(toSun, 0.0), 3.0);
+        vec3 tint = mix(uRingCol[i] * 0.55, mix(uRingCol[i], vec3(1.0, 0.95, 0.85), 0.3) * 1.25, dens);
+        // a pale sheen where the light comes through towards the sun
+        tint = mix(tint, vec3(1.0, 0.93, 0.78) * 1.3, pow(max(toSun, 0.0), 1.5) * 0.4 * dens);
+        ringCol = tint * dens * lamp * (0.05 + 0.95 * shade);
+        ringA = clamp(dens * 1.15, 0.0, 0.96);
+
+        if (ring.z > 0.0) {
+          vec3 e1 = normalize(vec3(axis.y, -axis.x, 0.0));
+          vec3 e2 = cross(axis, e1);
+          vec2 u = vec2(dot(q, e1), dot(q, e2));
+          vec2 sun2 = normalize(vec2(dot(sun, e1), dot(sun, e2)));
+          // thickest near the planet, thinning out across the rings
+          float fill = ring.z * (0.15 + 0.85 * (1.0 - smoothstep(-0.05, 0.7, t))) * smoothstep(-0.35, -0.12, t);
+          vec2 big = rocks(u * 7.0, seed + 20.0, fill * 0.7, sun2, px * 7.0);
+          vec2 small = rocks(u * 24.0, seed + 40.0, fill * 0.9, sun2, px * 24.0);
+          float rock = max(big.x, small.x);
+          float face = big.x > small.x ? big.y : small.y;
+          vec3 rockCol = mix(uDeep[i] * 0.12, uRingCol[i] * 0.4, smoothstep(-0.2, 1.0, face) * 0.8) * (0.1 + 0.9 * shade);
+          ringCol = mix(ringCol, rockCol, rock);
+          ringA = mix(ringA, 1.0, rock);
+        }
         ringFront = rz > z || d > 1.0;
       }
     }
@@ -311,11 +480,25 @@ void main() {
     }
     c = body * cover + c * (1.0 - cover);
     a = cover + a * (1.0 - cover);
-    c += uAir[i] * glow * 0.55;
-    a = max(a, glow * 0.45);
+    c += air * glow * 0.7;
+    a = max(a, glow * 0.5);
     if (ringFront) {
       c = ringCol + c * (1.0 - ringA);
       a = ringA + a * (1.0 - ringA);
+    }
+
+    // The sun peeking round the limb: a hot core just outside the edge,
+    // a wide soft halo and a streak along the ring plane
+    if (atmo.y > 0.0) {
+      vec2 at = normalize(sun.xy) * 1.02;
+      vec2 off = p - at;
+      float dd = length(off);
+      vec2 e1 = normalize(vec2(axis.y, -axis.x));
+      float streak = exp(-abs(dot(off, vec2(-e1.y, e1.x))) * 28.0) * exp(-dd * 2.2);
+      float core = exp(-dd * dd * 70.0) * 1.2 + exp(-dd * 4.0) * 0.55;
+      float f = (core + streak * 0.6) * atmo.y;
+      c += mix(uRingCol[i], vec3(1.0, 0.95, 0.85), clamp(f * 0.8, 0.0, 1.0)) * f;
+      a = max(a, min(f, 1.0));
     }
 
     c *= geo.w;
@@ -324,8 +507,11 @@ void main() {
     alpha = a + alpha * (1.0 - a);
   }
 
-  // a soft tone curve so the bright side doesn't clip
-  col = col / (1.0 + col * 0.35);
+  // a little extra saturation, then a soft shoulder so the bright side
+  // doesn't clip
+  float lum = dot(col, vec3(0.3, 0.59, 0.11));
+  col = max(mix(vec3(lum), col, 1.1), 0.0);
+  col = col / (1.0 + col * 0.3);
   gl_FragColor = vec4(col, alpha);
 }
 `
@@ -339,6 +525,9 @@ function rgb(hex: string): [number, number, number] {
     number,
   ]
 }
+
+// The sun is up and to the left, a little in front, unless a look says otherwise
+const DEFAULT_SUN: [number, number, number] = [-0.56, 0.46, 0.69]
 
 export type PlanetScene = {
   resize(width: number, height: number, dpr: number): void
@@ -364,10 +553,13 @@ export function createPlanetScene(canvas: HTMLCanvasElement): PlanetScene | null
     'uGeo',
     'uLook',
     'uRing',
+    'uAtmo',
+    'uSun',
     'uDeep',
     'uMid',
     'uLight',
     'uAir',
+    'uRingCol',
   ] as const)
 
   const quad = gl.createBuffer()
@@ -376,11 +568,14 @@ export function createPlanetScene(canvas: HTMLCanvasElement): PlanetScene | null
 
   const geo = new Float32Array(MAX_PLANETS * 4)
   const look = new Float32Array(MAX_PLANETS * 4)
-  const ring = new Float32Array(MAX_PLANETS * 2)
+  const ring = new Float32Array(MAX_PLANETS * 4)
+  const atmo = new Float32Array(MAX_PLANETS * 4)
+  const sun = new Float32Array(MAX_PLANETS * 3)
   const deep = new Float32Array(MAX_PLANETS * 3)
   const mid = new Float32Array(MAX_PLANETS * 3)
   const light = new Float32Array(MAX_PLANETS * 3)
   const air = new Float32Array(MAX_PLANETS * 3)
+  const ringCol = new Float32Array(MAX_PLANETS * 3)
   // hex parsing is cached per look so it doesn't run every frame
   const parsed = new WeakMap<PlanetLook, [number, number, number][]>()
 
@@ -403,17 +598,20 @@ export function createPlanetScene(canvas: HTMLCanvasElement): PlanetScene | null
         const l = looks[i]
         let colors = parsed.get(l)
         if (!colors) {
-          colors = [...l.colors.map(rgb), rgb(l.air)]
+          colors = [...l.colors.map(rgb), rgb(l.air), rgb(l.ringColor ?? l.colors[2])]
           parsed.set(l, colors)
         }
         // GL counts y from the bottom
         geo.set([place.x * scale, (height - place.y) * scale, place.r * scale, place.opacity], i * 4)
-        look.set([l.kind === 'gas' ? 0 : 1, l.seed ?? i * 7.3, place.spin, l.tilt ?? 0], i * 4)
-        ring.set(l.ring ?? [0, 0], i * 2)
+        look.set([l.kind === 'dust' ? 0 : 1, l.seed ?? i * 7.3, place.spin, l.tilt ?? 0], i * 4)
+        ring.set([...(l.ring ?? [0, 0]), l.rocks ?? 0, 0], i * 4)
+        atmo.set([l.haze ?? 0.6, l.flare ?? 0, 0, 0], i * 4)
+        sun.set(l.sun ?? DEFAULT_SUN, i * 3)
         deep.set(colors[0], i * 3)
         mid.set(colors[1], i * 3)
         light.set(colors[2], i * 3)
         air.set(colors[3], i * 3)
+        ringCol.set(colors[4], i * 3)
       }
 
       gl.clearColor(0, 0, 0, 0)
@@ -423,11 +621,14 @@ export function createPlanetScene(canvas: HTMLCanvasElement): PlanetScene | null
       gl.uniform1f(u.uTime, time)
       gl.uniform4fv(u.uGeo, geo)
       gl.uniform4fv(u.uLook, look)
-      gl.uniform2fv(u.uRing, ring)
+      gl.uniform4fv(u.uRing, ring)
+      gl.uniform4fv(u.uAtmo, atmo)
+      gl.uniform3fv(u.uSun, sun)
       gl.uniform3fv(u.uDeep, deep)
       gl.uniform3fv(u.uMid, mid)
       gl.uniform3fv(u.uLight, light)
       gl.uniform3fv(u.uAir, air)
+      gl.uniform3fv(u.uRingCol, ringCol)
       gl.bindBuffer(gl.ARRAY_BUFFER, quad)
       gl.enableVertexAttribArray(0)
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
