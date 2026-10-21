@@ -24,12 +24,14 @@ const PROJECTS: Project[] = [
     summary: 'Designed and built from scratch, with a layout that holds up on every screen from phones to wide monitors.',
     tags: ['Design', 'Development', 'Responsive'],
     image: '/work/starblossom.png',
+    // a red desert under a thin blue sky, lit from the right
     planet: {
-      kind: 'gas',
-      colors: ['#5a1a78', '#ec3d9e', '#ffc8ec'],
-      air: '#b24be6',
-      ring: [1.35, 2.15],
-      tilt: 0.38,
+      kind: 'dust',
+      colors: ['#5a0c10', '#d6301f', '#ff8a5a'],
+      air: '#9db4c6',
+      haze: 0.85,
+      sun: [0.7, 0.3, 0.72],
+      tilt: 0.3,
       seed: 3.1,
     },
   },
@@ -40,11 +42,18 @@ const PROJECTS: Project[] = [
     summary: 'A personal page, designed and built by me and deployed on Vercel.',
     tags: ['Design', 'Development', 'Vercel'],
     image: '/work/timmypage.png',
+    // a cracked bronze world in wide amber rings, the sun just past its limb
     planet: {
-      kind: 'ocean',
-      colors: ['#041d38', '#2e8a6a', '#e3dcae'],
-      air: '#70c4ff',
-      tilt: -0.3,
+      kind: 'cracked',
+      colors: ['#4a2c16', '#b07c46', '#f0cc92'],
+      air: '#e0a060',
+      haze: 0.3,
+      sun: [0.75, 0.5, 0.4],
+      flare: 1,
+      ring: [1.35, 2.15],
+      ringColor: '#eaa650',
+      rocks: 1,
+      tilt: -0.35,
       seed: 11.4,
     },
   },
@@ -128,10 +137,13 @@ function overview(i: number, n: number, w: number, h: number, wide: boolean): La
   return { x: w * (i % 2 ? 0.64 : 0.36), y: h * ((i + 0.5) / n), r, opacity: 1 }
 }
 
-function closeUp(w: number, h: number, wide: boolean, panelTop: number): Layout {
-  if (wide) return { x: w * 0.25, y: h * 0.5, r: Math.min(h * 0.36, w * 0.19), opacity: 1 }
-  return { x: w * 0.5, y: panelTop * 0.52, r: Math.min(w * 0.34, panelTop * 0.4), opacity: 1 }
+function closeUp(w: number, h: number, wide: boolean, panelTop: number, zoom: number): Layout {
+  if (wide) return { x: w * 0.25, y: h * 0.5, r: Math.min(h * 0.36, w * 0.19) * zoom, opacity: 1 }
+  return { x: w * 0.5, y: panelTop * 0.52, r: Math.min(w * 0.34, panelTop * 0.4) * zoom, opacity: 1 }
 }
+
+// How far the open planet can be zoomed in
+const MAX_ZOOM = 3
 
 export default function Work() {
   const sectionRef = useRef<HTMLElement>(null)
@@ -203,6 +215,10 @@ export default function Work() {
     let stageW = 0
     let stageH = 0
     let panelTop = 0
+    // zoom on the open planet, eased towards what the wheel or a pinch asks for
+    let zoom = 1
+    let zoomTarget = 1
+    let zoomed = -1
 
     const measure = () => {
       wide = sideBySide()
@@ -229,7 +245,7 @@ export default function Work() {
         const lift = hoverRef.current === i ? 1.07 : 1
         return { ...base, r: base.r * lift }
       }
-      if (i === f) return closeUp(stageW, stageH, wide, panelTop)
+      if (i === f) return closeUp(stageW, stageH, wide, panelTop, zoom)
       // the rest fly past the camera and out of view
       const from = overview(f, n, stageW, stageH, wide)
       const dx = base.x - from.x || 1
@@ -238,24 +254,52 @@ export default function Work() {
       return { x: base.x + (dx / len) * stageW * 0.7, y: base.y + (dy / len) * stageH * 0.5, r: base.r * 2.2, opacity: 0 }
     }
 
-    // Dragging spins the open planet, and it keeps turning for a moment after
+    // Dragging spins the open planet, and it keeps turning for a moment after.
+    // A second finger turns the drag into a pinch, which zooms instead.
     let drag: { x: number; at: number } | null = null
     let fling = 0
+    const fingers = new Map<number, { x: number; y: number }>()
+    let pinch = 0
 
-    const overOpenPlanet = (e: PointerEvent) => {
+    const overOpenPlanet = (e: { clientX: number; clientY: number }) => {
       const f = focusRef.current
       if (f < 0) return false
       const box = stage.getBoundingClientRect()
       const p = now[f]
       return Math.hypot(e.clientX - box.left - p.x, e.clientY - box.top - p.y) < p.r
     }
+    const setZoom = (z: number) => {
+      zoomTarget = Math.min(MAX_ZOOM, Math.max(1, z))
+    }
+    const span = () => {
+      const [a, b] = [...fingers.values()]
+      return Math.hypot(a.x - b.x, a.y - b.y)
+    }
     const onDown = (e: PointerEvent) => {
-      if (!overOpenPlanet(e)) return
-      drag = { x: e.clientX, at: performance.now() }
+      // the second finger can land a little off the planet
+      if (fingers.size === 0 ? !overOpenPlanet(e) : fingers.size >= 2) return
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY })
       stage.setPointerCapture(e.pointerId)
+      if (fingers.size === 2) {
+        drag = null
+        pinch = span()
+        return
+      }
+      drag = { x: e.clientX, at: performance.now() }
       stage.dataset.grabbing = ''
     }
     const onMove = (e: PointerEvent) => {
+      const finger = fingers.get(e.pointerId)
+      if (finger) {
+        finger.x = e.clientX
+        finger.y = e.clientY
+      }
+      if (fingers.size >= 2) {
+        const next = span()
+        if (pinch > 0) setZoom(zoomTarget * (next / pinch))
+        pinch = next
+        return
+      }
       if (!drag) {
         stage.toggleAttribute('data-grab', overOpenPlanet(e))
         return
@@ -268,14 +312,25 @@ export default function Work() {
       fling = -moved / Math.max((t - drag.at) / 1000, 0.008)
       drag = { x: e.clientX, at: t }
     }
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
+      fingers.delete(e.pointerId)
+      if (fingers.size < 2) pinch = 0
       drag = null
       delete stage.dataset.grabbing
+    }
+    // The wheel zooms only while the pointer is over the open planet, so the
+    // page still scrolls normally everywhere else
+    const onWheel = (e: WheelEvent) => {
+      if (!overOpenPlanet(e)) return
+      e.preventDefault()
+      const lines = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
+      setZoom(zoomTarget * Math.exp(-e.deltaY * lines * 0.0018))
     }
     stage.addEventListener('pointerdown', onDown)
     stage.addEventListener('pointermove', onMove)
     stage.addEventListener('pointerup', onUp)
     stage.addEventListener('pointercancel', onUp)
+    stage.addEventListener('wheel', onWheel, { passive: false })
 
     let raf = 0
     let last = performance.now()
@@ -287,6 +342,15 @@ export default function Work() {
       const ease = still || !placed ? 1 : 1 - Math.exp(-dt * 3.6)
       const time = (t - start) / 1000
       const f = focusRef.current
+
+      // zoom starts over whenever a different planet is open, or none
+      if (f !== zoomed) {
+        zoomed = f
+        zoom = zoomTarget = 1
+        fingers.clear()
+        pinch = 0
+      }
+      zoom += (zoomTarget - zoom) * (still ? 1 : 1 - Math.exp(-dt * 9))
 
       for (let i = 0; i < n; i++) {
         const target = targetFor(i)
@@ -342,6 +406,7 @@ export default function Work() {
       stage.removeEventListener('pointermove', onMove)
       stage.removeEventListener('pointerup', onUp)
       stage.removeEventListener('pointercancel', onUp)
+      stage.removeEventListener('wheel', onWheel)
       scene?.dispose()
     }
   }, [])
@@ -367,7 +432,7 @@ export default function Work() {
             </h2>
           </div>
           <p className="max-w-xs text-sm leading-[1.7] text-muted">
-            Every planet is a project. Click one to fly in for a closer look.
+            Every planet is a project. Click one to fly in for a closer look, then drag to spin it or scroll to zoom.
           </p>
         </Reveal>
 
