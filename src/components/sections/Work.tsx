@@ -26,8 +26,8 @@ const PROJECTS: Project[] = [
     image: '/work/starblossom.png',
     planet: {
       kind: 'gas',
-      colors: ['#4a0f3a', '#e0679f', '#ffe0ee'],
-      air: '#ff8fd0',
+      colors: ['#5a1a78', '#ec3d9e', '#ffc8ec'],
+      air: '#b24be6',
       ring: [1.35, 2.15],
       tilt: 0.38,
       seed: 3.1,

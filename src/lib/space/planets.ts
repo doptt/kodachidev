@@ -113,19 +113,85 @@ float ringAt(float d, vec2 ring, float seed) {
   return bands * (0.6 + 0.4 * grain) * gaps * edges;
 }
 
-// Banded gas, warped by noise, with one big storm
-vec3 gas(vec3 s, float seed, vec3 deep, vec3 mid, vec3 light) {
-  float warp = fbm(s * vec3(2.0, 5.0, 2.0) + seed);
-  float flow = fbm(s * vec3(1.2, 9.0, 1.2) + seed * 2.0 + warp);
-  float bands = 0.5 + 0.5 * sin(s.y * 13.0 + warp * 4.5 + flow * 2.5);
-  vec3 col = mix(deep, mid, smoothstep(0.15, 0.7, bands));
-  col = mix(col, light, smoothstep(0.62, 0.98, bands) * (0.5 + 0.6 * flow));
+// Gas bands. Everything is worked out from a bent latitude: big slow
+// meanders, then a smaller warp that curls the edges of the bands where
+// they slide past each other. Sampling noise in latitude-stretched space
+// keeps the detail running along the bands, like it does on a real giant.
+// The accent is the air colour, used as a second hue between the others.
+vec3 gas(vec3 s, float seed, vec3 deep, vec3 mid, vec3 light, vec3 accent) {
+  vec3 p = s + seed;
+  float meander = fbm(p * vec3(1.1, 2.6, 1.1));
+  vec3 q = vec3(fbm(p * vec3(2.2, 6.0, 2.2)), fbm(p * vec3(2.2, 6.0, 2.2) + 5.2), 0.0);
+  float lat = s.y + (meander - 0.5) * 0.32 + (q.x - 0.5) * 0.1;
 
-  vec3 eye = normalize(vec3(0.55, -0.32, 0.77));
-  float storm = distance(s, eye) + (fbm(s * 9.0 + seed) - 0.5) * 0.12;
-  col = mix(col, deep * 0.7, smoothstep(0.24, 0.17, storm) * 0.8);
-  col = mix(col, light, smoothstep(0.15, 0.04, storm) * 0.9);
+  // a few belts churn much harder than the rest
+  float belt = smoothstep(0.5, 0.72, noise(vec3(lat * 7.0, seed, 1.0)));
+
+  // curls along the band edges
+  vec3 along = vec3(s.x * 3.2, lat * 16.0, s.z * 3.2);
+  float curls = fbm(along + vec3(q.xy, q.y) * (3.0 + belt * 3.0));
+  lat += (curls - 0.5) * (0.04 + belt * 0.09);
+
+  float b = lat * 17.0;
+  float v = 0.5 + 0.5 * (0.55 * sin(b + seed) + 0.3 * sin(b * 2.3 + 1.1) + 0.15 * sin(b * 5.3 + 2.0));
+
+  // dark purple, violet, magenta, pale pink
+  vec3 col = mix(deep, accent, smoothstep(0.0, 0.34, v));
+  col = mix(col, mid, smoothstep(0.3, 0.62, v));
+  col = mix(col, light, smoothstep(0.66, 1.0, v) * 0.85);
+
+  // fine streaks running along the bands
+  float streak = fbm(vec3(s.x * 5.0, lat * 70.0, s.z * 5.0) + q * 2.0);
+  col *= 0.82 + 0.36 * streak;
+
+  // thin pale wisps that trace the churning edges
+  float ridge = 1.0 - abs(noise(vec3(s.x * 4.0, lat * 46.0, s.z * 4.0) + q * 4.0) * 2.0 - 1.0);
+  float wisps = pow(ridge, 9.0) * smoothstep(0.42, 0.68, curls) * 0.6;
+  // and broader white swirls in the churning belts
+  float swirl = 1.0 - abs(fbm(along * vec3(1.4, 1.0, 1.4) + q * 6.0) * 2.0 - 1.0);
+  wisps += pow(swirl, 5.0) * belt;
+  // added rather than mixed, so they glow over the dark bands instead of
+  // going grey
+  wisps = clamp(wisps, 0.0, 1.0);
+  col = mix(col, light, wisps * 0.45) + light * wisps * 0.4;
+
+  // violet towards the top, warmer and redder towards the bottom
+  col = mix(col, accent, smoothstep(0.3, 0.95, s.y) * 0.35);
+  col = mix(col, mid * vec3(1.1, 0.45, 0.6), smoothstep(-0.2, -0.95, s.y) * 0.35);
   return col;
+}
+
+// The rings glow like the black hole's disk: clumps of gas and thin
+// filaments, hottest at the inner edge, brighter on the side coming towards
+// us. They turn slowly but stay rigid, nothing ripples.
+vec4 ringGlow(vec3 q, vec3 axis, vec2 ring, float seed) {
+  float r = length(q);
+  float t = (r - ring.x) / (ring.y - ring.x);
+  if (t < -0.05 || t > 1.0) return vec4(0.0);
+
+  vec3 e1 = normalize(vec3(axis.y, -axis.x, 0.0));
+  vec3 e2 = cross(axis, e1);
+  float a = atan(dot(q, e2), dot(q, e1)) + uTime * 0.035;
+  vec2 cs = vec2(cos(a), sin(a));
+
+  float broad = noise(vec3(r * 2.2, cs * 1.4) + seed);
+  float f1 = 1.0 - abs(noise(vec3(r * 9.0, cs * 2.4) + seed + 3.1) * 2.0 - 1.0);
+  float f2 = 1.0 - abs(noise(vec3(r * 26.0, cs * 3.6) + seed + 7.7) * 2.0 - 1.0);
+  float gas = broad * 0.5 + f1 * f1 * f1 * 0.4 + f2 * f2 * f2 * f2 * 0.45;
+  float lanes = 0.5 + 0.5 * sin(r * 22.0 + gas * 6.0);
+
+  float edge = smoothstep(-0.05, 0.06, t) * (1.0 - smoothstep(0.45, 1.0, t));
+  float dens = edge * pow(ring.x / r, 1.6) * mix(0.15, 1.6, gas * gas * 1.5) * mix(0.7, 1.15, lanes);
+
+  // stands in for Doppler beaming, the left side swings towards the camera
+  float side = dot(normalize(q), e1);
+  float beam = mix(0.45, 1.7, 0.5 + 0.5 * side);
+
+  vec3 violet = vec3(0.6, 0.18, 1.0);
+  vec3 magenta = vec3(1.0, 0.28, 0.78);
+  vec3 tint = mix(magenta, violet, smoothstep(0.1, 0.7, t));
+  tint = mix(tint, vec3(1.0, 0.82, 1.0), smoothstep(0.18, 0.0, t) * 0.7);
+  return vec4(tint * dens * beam * 2.4, clamp(dens * 1.1, 0.0, 0.9));
 }
 
 // Seas, land, ice at the poles and a cloud layer that drifts on its own
@@ -184,7 +250,7 @@ void main() {
       float wet = 0.0;
       float cloud = 0.0;
       vec3 surf = look.x < 0.5
-        ? gas(s, seed, uDeep[i], uMid[i], uLight[i])
+        ? gas(s, seed, uDeep[i], uMid[i], uLight[i], uAir[i])
         : ocean(s, seed, uDeep[i], uMid[i], uLight[i], wet, cloud);
 
       float ndl = dot(n, sun);
@@ -201,7 +267,7 @@ void main() {
       float facing = dot(sun, axis);
       if (abs(facing) > 0.001) {
         float t = -dot(n, axis) / facing;
-        if (t > 0.0) lit *= 1.0 - 0.6 * ringAt(length(n + sun * t), ring, seed);
+        if (t > 0.0) lit *= 1.0 - 0.4 * ringAt(length(n + sun * t), ring, seed);
       }
 
       // air thickens towards the edge, and the lit limb glows
@@ -225,13 +291,13 @@ void main() {
     if (ring.y > 0.0) {
       float rz = -(p.x * axis.x + p.y * axis.y) / axis.z;
       vec3 q = vec3(p, rz);
-      float density = ringAt(length(q), ring, seed);
-      if (density > 0.0) {
-        // dark where the planet blocks the sun
+      vec4 glowing = ringGlow(q, axis, ring, seed);
+      if (glowing.a > 0.0) {
+        // dimmer where the planet blocks the sun, but it glows on its own
         float along = dot(q, sun);
-        float shade = along < 0.0 ? smoothstep(0.92, 1.05, length(q - sun * along)) : 1.0;
-        ringCol = mix(uMid[i], uLight[i], 0.6) * (0.08 + 1.0 * shade);
-        ringA = density * 0.85;
+        float shade = along < 0.0 ? smoothstep(0.9, 1.08, length(q - sun * along)) : 1.0;
+        ringCol = glowing.rgb * (0.35 + 0.65 * shade);
+        ringA = glowing.a;
         ringFront = rz > z || d > 1.0;
       }
     }
@@ -240,7 +306,7 @@ void main() {
     vec3 c = vec3(0.0);
     float a = 0.0;
     if (!ringFront) {
-      c = ringCol * ringA;
+      c = ringCol;
       a = ringA;
     }
     c = body * cover + c * (1.0 - cover);
@@ -248,7 +314,7 @@ void main() {
     c += uAir[i] * glow * 0.55;
     a = max(a, glow * 0.45);
     if (ringFront) {
-      c = ringCol * ringA + c * (1.0 - ringA);
+      c = ringCol + c * (1.0 - ringA);
       a = ringA + a * (1.0 - ringA);
     }
 
