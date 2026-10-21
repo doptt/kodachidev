@@ -151,79 +151,149 @@ float craters(vec3 p, float seed, vec3 sun) {
   return bowl + rim;
 }
 
-// A red desert. A slow warp bends everything into one flow, then dust is
-// drawn as fine ridged fibres along it, so it comes out feathered like
-// wind-blown sand. Dark canyons follow the same flow, craters sit on top,
-// and the clouds are long streaks of the same shape, bright and separate.
+// Noise smeared along a direction: the average of a few samples stepped
+// along it. The streaks follow the direction wherever it bends, and the
+// input is already stretched round the planet, so they come out long.
+float smear(vec3 s, vec3 d, float freq, float step, float seed) {
+  float v = 0.0;
+  for (int k = -3; k <= 3; k++) {
+    v += noise((s + d * (float(k) * step)) * freq * vec3(1.0, 2.2, 1.0) + seed);
+  }
+  return (v / 7.0 - 0.5) * 1.9 + 0.5;
+}
+
+// A red desert. A wind runs round the planet, bent by a slow field, and
+// the dust is noise smeared along it at three sizes: broad strokes, hairs
+// and a finer fuzz that only shows up close. Where the wind bends the
+// strokes fan out, which is the feathered look. Darker ground and thin
+// cuts sit under the strokes, craters on top, and the clouds are the same
+// smear thresholded hard, so they tear into wisps at their edges.
 vec3 dust(vec3 s, float seed, float oct, vec3 sun, vec3 deep, vec3 mid, vec3 light, out float cloud) {
-  vec3 p = s * 2.0 + seed;
-  vec3 q = vec3(fbm(p * 0.9, oct - 2.0), fbm(p * 0.9 + 4.3, oct - 2.0), fbm(p * 0.9 + 9.1, oct - 2.0)) - 0.5;
-  vec3 w = p + q * 1.0;
+  vec3 p = s * 1.5 + seed;
+  vec3 bend = vec3(fbm(p * 0.8, 3.0), fbm(p * 0.8 + 4.3, 3.0), fbm(p * 0.8 + 9.1, 3.0)) - 0.5;
+  vec3 d = normalize(cross(s, vec3(0.0, 1.0, 0.0) + bend * 3.5) + vec3(0.001, 0.0, 0.0));
 
-  // broad light and dark regions
-  float base = fbm(w * 1.2, oct - 1.0);
-  // the fibres: noise squashed across the flow and stretched along it
-  vec3 along = w * vec3(1.3, 14.0, 1.3) + q * 2.5;
-  float fibre = fbm(along, oct);
-  float fine = ridge(fbm(along * 2.1 + 3.0, oct));
+  float strokes = smear(s, d, 16.0, 0.03, seed);
+  float hairs = smear(s, d, 55.0, 0.013, seed + 3.0);
+  float hairW = clamp((oct - 5.5) * 0.7, 0.0, 1.0);
+  float fuzzW = clamp((oct - 6.3) * 0.8, 0.0, 1.0);
+  float fuzz = fuzzW > 0.0 ? smear(s, d, 160.0, 0.006, seed + 5.0) : 0.5;
+  float grain = fuzzW > 0.0 ? fbm(p * 14.0, oct) : 0.5;
+  // up close the hairs split into sharp lines
+  float lines = fuzzW > 0.0 ? pow(ridge(fuzz), 3.0) : 0.0;
 
-  vec3 col = mix(deep, mid, smoothstep(0.2, 0.62, base));
-  col = mix(col, light, smoothstep(0.5, 0.85, base) * 0.6);
-  // fibres lighten and darken in turn, the fine ones add a sheen
-  col *= 0.7 + 0.7 * fibre;
-  col = mix(col, light, pow(fine, 3.0) * 0.4);
+  // crimson in the low ground, scarlet over most of it, coral where it rises
+  float ground = fbm(p * 1.1 + 2.0, oct - 2.0);
+  float tone = ground + (strokes - 0.5) * 0.3;
+  vec3 col = mix(deep, mid, smoothstep(0.2, 0.5, tone));
+  col = mix(col, light, smoothstep(0.54, 0.8, tone) * 0.85);
+  // the strokes ease off when the planet is small, so it reads as a
+  // smooth red disc from a distance rather than fur
+  col *= 1.0 + (strokes - 0.5) * mix(0.18, 0.3, clamp((oct - 4.5) * 0.7, 0.0, 1.0));
+  col *= 1.0 + (hairs - 0.5) * 0.4 * hairW;
+  col *= 1.0 + (fuzz - 0.5) * 0.45 * fuzzW + (grain - 0.5) * 0.5 * fuzzW;
+  col = mix(col, light, (smoothstep(0.7, 0.95, hairs) * 0.3 * hairW + lines * 0.25 * fuzzW));
 
-  // canyons: deep red cuts where the warped noise crosses its middle
-  float cut = pow(ridge(fbm(w * 1.7 + 7.0, oct - 1.0)), 7.0);
-  float canyon = cut * smoothstep(0.35, 0.6, fbm(w * 0.8 + 2.0, oct - 3.0));
-  col = mix(col, deep * 0.55, canyon * 0.9);
+  // dark ridges and canyons: broad darker ground, and thin deep cuts
+  float ridges = smoothstep(0.56, 0.72, fbm(p * 1.6 + 13.0, oct - 2.0));
+  float cut = line(fbm(p * 2.5 + 17.0, 2.5), 0.95) * smoothstep(0.4, 0.6, ground);
+  col = mix(col, deep * 0.75, ridges * 0.55);
+  col = mix(col, deep * 0.4, cut * 0.3);
 
   // craters at two sizes, as a lit and shadowed bump on the colour
-  vec3 sl = sun;
-  float crater = craters(w * 6.0, seed, sl) + craters(w * 15.0 + 3.0, seed + 2.0, sl) * 0.7;
+  float crater = craters(p * 4.0, seed, sun) + craters(p * 10.0 + 3.0, seed + 2.0, sun) * 0.7;
   col *= 1.0 + crater * 1.6;
 
-  // clouds: a drifting layer of the same fibres, only the ridges of the
-  // ridges, inside a few long bands
-  vec3 c = spinY(w, uTime * 0.01);
-  float band = smoothstep(0.5, 0.68, fbm(c * vec3(1.0, 2.4, 1.0) + 11.0, oct - 2.0));
-  float wisp = ridge(fbm(c * vec3(1.6, 9.0, 1.6) + q * 3.0 + 20.0, oct));
-  float strand = ridge(fbm(c * vec3(3.5, 22.0, 3.5) + q * 4.0 + 31.0, oct));
-  cloud = band * (pow(wisp, 3.0) * 0.8 + pow(strand, 5.0) * 0.6) * smoothstep(0.3, 0.6, wisp);
-  cloud = clamp(cloud, 0.0, 1.0);
+  // clouds: a few long stretches of sky, and inside them the wind smear
+  // again, cut off high so only the strongest strands make it out to the
+  // edges
+  vec3 c = spinY(s, uTime * 0.01);
+  float sky = fbm(c * vec3(0.9, 1.8, 0.9) + 21.0 + seed, 3.0);
+  float band = smoothstep(0.52, 0.66, sky);
+  float puff = smear(c, d, 22.0, 0.05, seed + 7.0);
+  float wisp = smear(c, d, 70.0, 0.018, seed + 9.0);
+  float thr = mix(0.92, 0.52, band);
+  cloud = smoothstep(thr, thr + 0.18, puff + (wisp - 0.5) * 0.45);
+  cloud *= 0.5 + 0.5 * smoothstep(0.3, 0.8, wisp);
   return col;
 }
 
-// A dark rocky world. Lighter and darker plates, split by veins at three
-// sizes: ridged noise sharpened into thin lines, the big ones cutting
-// deepest. The deepest ones glow faintly, so the night side is not blank.
-vec3 cracked(vec3 s, float seed, float oct, vec3 deep, vec3 mid, vec3 light, out float vein, out float ember) {
+// Cells for the cracked plates: the nearest and second nearest of one
+// jittered point per cell, searching the 2x2x2 block around the sample.
+// The points stay near their cell centres so that block nearly always
+// holds both, and a miss only nudges a crack.
+void cells(vec3 p, float seed, out float edge, out float id, out vec3 toward) {
+  vec3 b = floor(p - 0.5);
+  float f1 = 9.0;
+  float f2 = 9.0;
+  id = 0.0;
+  toward = vec3(0.0, 0.0, 1.0);
+  for (int x = 0; x < 2; x++) {
+    for (int y = 0; y < 2; y++) {
+      for (int z = 0; z < 2; z++) {
+        vec3 c = b + vec3(float(x), float(y), float(z));
+        vec3 pt = c + 0.5 + (vec3(hash(c + seed), hash(c + seed + 1.0), hash(c + seed + 2.0)) - 0.5) * 0.7;
+        vec3 o = pt - p;
+        float d = length(o);
+        if (d < f1) {
+          f2 = f1;
+          f1 = d;
+          id = hash(c + seed + 3.0);
+          toward = o;
+        } else if (d < f2) {
+          f2 = d;
+        }
+      }
+    }
+  }
+  edge = f2 - f1;
+}
+
+// One layer of veins: a hairline along each cell edge with a soft lip
+// beside it, lit on the side that faces the sun and shaded on the other.
+// Lines never go thinner than about a pixel and a half, they fade out
+// instead, so nothing shimmers when the planet is small.
+float veins(vec3 w, float k, float seed, vec3 sun, float px, out float relief, out float id) {
+  float edge;
+  vec3 toward;
+  cells(w * k, seed, edge, id, toward);
+  float wd = max(0.025, px * k * 1.3);
+  float crack = 1.0 - smoothstep(0.0, wd, edge);
+  float lip = (1.0 - smoothstep(wd, wd * 4.5, edge)) * (1.0 - crack);
+  float fade = clamp(0.1 / (px * k), 0.0, 1.0);
+  // the lip slopes down into the crack, so it faces away from its own cell
+  relief = -lip * dot(normalize(toward), sun) * fade;
+  return crack * fade;
+}
+
+// A cracked rocky world: plates of bronze, amber and pale gold, each a
+// slightly different tone, crazed by a web of fine veins at three sizes.
+// The widest ones glow faintly, so the night side is not blank.
+vec3 cracked(vec3 s, float seed, float oct, vec3 sun, float px, vec3 deep, vec3 mid, vec3 light, out float vein, out float ember) {
   vec3 p = s * 2.4 + seed;
-  vec3 q = vec3(fbm(p * 0.7, oct - 2.0), fbm(p * 0.7 + 3.7, oct - 2.0), fbm(p * 0.7 + 8.1, oct - 2.0)) - 0.5;
-  vec3 w = p + q * 0.9;
+  vec2 q = vec2(fbm(p * 0.7, oct - 2.0), fbm(p * 0.7 + 3.7, oct - 2.0)) - 0.5;
+  vec3 w = p + q.xyx * 0.5;
 
   float plates = fbm(w * 1.1, oct - 1.0);
   float grain = fbm(w * 6.0 + 4.0, oct);
 
-  // The lines come from noise with only a couple of octaves, so each one
-  // is a clean curve, and the warp above gives them their kinks. Two
-  // families at each size cross each other, which is what closes the
-  // veins into a web of plates instead of loose contours.
-  float o = min(oct - 2.0, 2.5);
-  float v1 = max(line(fbm(w * 1.3 + 2.0, o), 0.965), line(fbm(w * 1.3 + 17.0, o), 0.965));
-  float v2 = max(line(fbm(w * 3.2 + 5.0, o), 0.955), line(fbm(w * 3.2 + 23.0, o), 0.955));
-  float v3 = max(line(fbm(w * 8.0 + 8.0, o), 0.95), line(fbm(w * 8.0 + 29.0, o), 0.95));
-  float v4 = line(fbm(w * 20.0 + 12.0, o), 0.95) * clamp(oct - 5.0, 0.0, 1.0);
-  vein = clamp(v1 + v2 * 0.8 + v3 * 0.6 + v4 * 0.4, 0.0, 1.0);
+  float r1, r2, r3, id1, id2, id3;
+  float c1 = veins(w, 5.0, seed, sun, px, r1, id1);
+  float c2 = veins(w + 0.3, 13.0, seed + 7.0, sun, px, r2, id2);
+  float c3 = veins(w + 0.7, 34.0, seed + 9.0, sun, px, r3, id3);
+  vein = clamp(c1 + c2 * 0.7 + c3 * 0.45, 0.0, 1.0);
+  float relief = r1 * 0.12 + r2 * 0.08 + r3 * 0.05;
 
-  vec3 col = mix(deep, mid, 0.45 + 0.5 * smoothstep(0.3, 0.7, plates));
-  col = mix(col, light, smoothstep(0.5, 0.85, plates) * 0.6);
-  col *= 0.8 + 0.4 * grain;
-  // a lighter lip along each vein, then the dark crack itself
-  col = mix(col, light, smoothstep(0.0, 0.3, vein) * 0.35);
-  col = mix(col, deep * 0.35, smoothstep(0.2, 0.7, vein) * 0.9);
+  // every plate its own tone, only a little apart from its neighbours
+  float tone = id1 * 0.5 + id2 * 0.5;
+  vec3 col = mix(deep, mid, 0.4 + 0.55 * smoothstep(0.3, 0.7, plates));
+  col = mix(col, light, smoothstep(0.45, 0.85, plates + (tone - 0.5) * 0.15) * 0.75);
+  col = mix(col, light * vec3(1.0, 0.97, 0.9), tone * 0.12);
+  col *= 0.88 + 0.24 * grain;
+  col *= 1.0 + relief;
+  col = mix(col, deep * 0.6, vein * 0.45);
 
-  ember = v1 * smoothstep(0.5, 0.68, fbm(w * 0.6 + 14.0, oct - 3.0));
+  ember = c1 * smoothstep(0.5, 0.68, fbm(w * 0.6 + 14.0, oct - 3.0));
   return col;
 }
 
@@ -309,20 +379,20 @@ void main() {
 
       float ndl = dot(n, sun);
       float day = smoothstep(-0.25, 0.3, ndl);
-      float shine = 0.4 + 0.6 * max(ndl, 0.0);
+      float shine = 0.3 + 0.7 * max(ndl, 0.0);
 
       float cloud = 0.0;
       float vein = 0.0;
       float ember = 0.0;
       vec3 surf = look.x < 0.5
         ? dust(s, seed, o, sunLocal, uDeep[i], uMid[i], uLight[i], cloud)
-        : cracked(s, seed, o, uDeep[i], uMid[i], uLight[i], vein, ember);
+        : cracked(s, seed, o, sunLocal, px, uDeep[i], uMid[i], uLight[i], vein, ember);
 
-      vec3 lit = surf * (0.03 + 1.5 * day * shine);
+      vec3 lit = surf * (0.03 + 1.9 * day * shine);
 
       // clouds: white in the sun, going blue-grey where the light leaves
       vec3 cloudCol = mix(air * 0.5, vec3(1.0, 0.98, 0.96), smoothstep(-0.05, 0.5, ndl));
-      lit = mix(lit, cloudCol * (0.03 + 1.1 * day * shine), cloud * 0.9);
+      lit = mix(lit, cloudCol * (0.03 + 1.5 * day * shine), cloud * 0.9);
 
       // the cracks glow a little, mostly seen on the night side
       lit += vec3(1.0, 0.36, 0.08) * ember * (0.9 - 0.7 * day);
@@ -336,13 +406,17 @@ void main() {
 
       // air: a haze that thickens towards the limb and catches the sun
       // there, plus a little scattered light on the night side
-      float rim = pow(1.0 - z, 1.6);
       float limbLit = smoothstep(-0.5, 0.5, ndl);
-      lit = mix(lit, air * (0.12 + 1.3 * limbLit), rim * haze * 0.9);
-      // thick air scatters some light round onto the night side
+      vec3 limbCol = air * (0.12 + 1.3 * limbLit);
+      // thick air wraps the whole limb, and more of it on the night side
+      // where it is all there is to see
+      float rim = pow(1.0 - z, mix(1.4, 2.4, day));
+      lit = mix(lit, limbCol, rim * haze * 0.85);
       lit += air * (0.07 + 0.3 * pow(1.0 - z, 0.8)) * haze * haze * (1.0 - day);
-      // and a bright line along the lit edge, sharper where the air is thin
-      lit += mix(air, vec3(1.0), 0.5) * pow(1.0 - z, 6.0 - 2.0 * haze) * pow(limbLit, 2.0) * (1.0 - 0.5 * haze);
+      // every planet gets a glow towards the lit edge and a bright line on
+      // it, sharper and whiter where the air is thin
+      lit += limbCol * pow(1.0 - z, 3.0) * limbLit * 0.5;
+      lit += mix(air, vec3(1.0), 0.6) * pow(1.0 - z, 7.0 - 3.0 * haze) * limbLit * limbLit * (1.6 - 0.8 * haze);
 
       body = lit;
       cover = smoothstep(1.0, 1.0 - aa, d);
@@ -371,8 +445,10 @@ void main() {
         float shade = along < 0.0 ? smoothstep(0.92, 1.1, length(q - sun * along)) : 1.0;
         // light scattering forward through the dust, strongest towards the sun
         float toSun = dot(normalize(q), sun);
-        float lamp = 0.7 + 0.6 * abs(dot(sun, axis)) + 1.1 * pow(max(toSun, 0.0), 3.0);
-        vec3 tint = mix(uRingCol[i] * 0.55, mix(uRingCol[i], vec3(1.0, 0.95, 0.85), 0.3) * 1.2, dens);
+        float lamp = 0.9 + 0.6 * abs(dot(sun, axis)) + 1.5 * pow(max(toSun, 0.0), 3.0);
+        vec3 tint = mix(uRingCol[i] * 0.55, mix(uRingCol[i], vec3(1.0, 0.95, 0.85), 0.3) * 1.25, dens);
+        // a pale sheen where the light comes through towards the sun
+        tint = mix(tint, vec3(1.0, 0.93, 0.78) * 1.3, pow(max(toSun, 0.0), 1.5) * 0.4 * dens);
         ringCol = tint * dens * lamp * (0.05 + 0.95 * shade);
         ringA = clamp(dens * 1.15, 0.0, 0.96);
 
@@ -431,8 +507,11 @@ void main() {
     alpha = a + alpha * (1.0 - a);
   }
 
-  // a soft tone curve so the bright side doesn't clip
-  col = col / (1.0 + col * 0.35);
+  // a little extra saturation, then a soft shoulder so the bright side
+  // doesn't clip
+  float lum = dot(col, vec3(0.3, 0.59, 0.11));
+  col = max(mix(vec3(lum), col, 1.1), 0.0);
+  col = col / (1.0 + col * 0.3);
   gl_FragColor = vec4(col, alpha);
 }
 `

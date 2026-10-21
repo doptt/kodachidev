@@ -27,7 +27,7 @@ const PROJECTS: Project[] = [
     // a red desert under a thin blue sky, lit from the right
     planet: {
       kind: 'dust',
-      colors: ['#5a0c10', '#d6301f', '#ff8a5a'],
+      colors: ['#6a1418', '#d8361f', '#ffac86'],
       air: '#9db4c6',
       haze: 0.85,
       sun: [0.7, 0.3, 0.72],
@@ -45,13 +45,13 @@ const PROJECTS: Project[] = [
     // a cracked bronze world in wide amber rings, the sun just past its limb
     planet: {
       kind: 'cracked',
-      colors: ['#4a2c16', '#b07c46', '#f0cc92'],
-      air: '#e0a060',
+      colors: ['#5a3418', '#c89650', '#f8e0ac'],
+      air: '#f0b878',
       haze: 0.3,
       sun: [0.75, 0.5, 0.4],
       flare: 1,
       ring: [1.35, 2.15],
-      ringColor: '#eaa650',
+      ringColor: '#f0b25a',
       rocks: 1,
       tilt: -0.35,
       seed: 11.4,
