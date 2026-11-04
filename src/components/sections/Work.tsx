@@ -18,12 +18,12 @@ type Project = {
 // up to six of them.
 const PROJECTS: Project[] = [
   {
-    name: 'Starblossom',
-    url: 'https://starblossom.org',
+    name: 'Example',
+    url: 'https://example.com',
     kind: 'Website',
     summary: 'Designed and built from scratch, with a layout that holds up on every screen from phones to wide monitors.',
     tags: ['Design', 'Development', 'Responsive'],
-    image: '/work/starblossom.png',
+    image: '/work/example.png',
     // a soft pink desert under a thin lavender sky, lit from the right
     planet: {
       kind: 'dust',
