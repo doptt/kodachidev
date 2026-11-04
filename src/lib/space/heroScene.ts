@@ -37,6 +37,13 @@ export type SceneFrame = {
   ripples: Float32Array
 }
 
+export type SceneOptions = {
+  /** Black hole pixels traced per CSS pixel, lower is cheaper */
+  traceDensity?: number
+  /** Lowest the black hole's resolution drops to when frames run slow */
+  traceFloor?: number
+}
+
 const glsl = (v: number) => v.toFixed(4)
 
 /** How long a speck of exhaust lives, in seconds */
@@ -351,7 +358,7 @@ export class HeroScene {
   private dpr = 1
 
   /** Returns null if WebGL isn't available */
-  static create(canvas: HTMLCanvasElement, data: Formations) {
+  static create(canvas: HTMLCanvasElement, data: Formations, options: SceneOptions = {}) {
     const gl = canvas.getContext('webgl', {
       alpha: true,
       antialias: false,
@@ -362,14 +369,14 @@ export class HeroScene {
     })
     if (!gl) return null
     try {
-      return new HeroScene(gl, data)
+      return new HeroScene(gl, data, options)
     } catch (err) {
       console.warn('Hero scene failed to start', err)
       return null
     }
   }
 
-  private constructor(gl: WebGLRenderingContext, data: Formations) {
+  private constructor(gl: WebGLRenderingContext, data: Formations, options: SceneOptions) {
     this.gl = gl
     this.count = data.count
     this.program = program(gl, VERTEX, FRAGMENT, ATTRIBUTES.map(([name]) => name))
@@ -378,7 +385,7 @@ export class HeroScene {
     // If the ray tracer won't compile on this GPU, carry on with just particles
     let hole: BlackHolePass | null = null
     try {
-      hole = new BlackHolePass(gl)
+      hole = new BlackHolePass(gl, options.traceDensity, options.traceFloor)
     } catch (err) {
       console.warn('Black hole shader failed, showing particles only', err)
     }

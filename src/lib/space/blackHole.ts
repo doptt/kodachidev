@@ -252,7 +252,15 @@ export class BlackHolePass {
   private quality = 1
   private slowFrames = 0
 
-  constructor(private readonly gl: WebGLRenderingContext) {
+  /**
+   * `density` is traced pixels per CSS pixel (~1.3 is plenty for soft,
+   * glowing gas) and `floor` is the lowest quality `adapt` drops to.
+   */
+  constructor(
+    private readonly gl: WebGLRenderingContext,
+    private readonly density = 1.3,
+    private readonly floor = 0.45,
+  ) {
     this.trace = program(gl, QUAD_VERTEX, TRACE, ['aPos'])
     this.composite = program(gl, QUAD_VERTEX, COMPOSITE, ['aPos'])
     this.tu = uniforms(gl, this.trace, TRACE_UNIFORMS)
@@ -266,8 +274,7 @@ export class BlackHolePass {
   resize(width: number, height: number, dpr: number) {
     this.width = width
     this.height = height
-    // ~1.3 traced pixels per CSS pixel is plenty for soft, glowing gas
-    this.quality = Math.min(1, 1.3 / dpr)
+    this.quality = Math.min(1, this.density / dpr)
     this.allocate()
   }
 
@@ -282,7 +289,7 @@ export class BlackHolePass {
   /** Drops the resolution a notch when frames keep running slow */
   adapt(dt: number) {
     this.slowFrames = dt > 1 / 40 ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 1)
-    if (this.slowFrames > 45 && this.quality > 0.45) {
+    if (this.slowFrames > 45 && this.quality > this.floor) {
       this.quality *= 0.85
       this.slowFrames = 0
       this.allocate()
