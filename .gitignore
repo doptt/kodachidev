@@ -1,19 +1,10 @@
-# Dependencies and build output
-node_modules/
-dist/
-
-# Secrets. Only the example file is committed.
-.env
-.env.*
+node_modules
+dist
+.vercel
+.env*
 !.env.example
-
-# Vercel CLI
-.vercel/
-
-# Logs and editor/OS clutter
 *.log
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/*
-!.vscode/extensions.json
+/screenshots
+/test-results
+/playwright-report
+*.tsbuildinfo

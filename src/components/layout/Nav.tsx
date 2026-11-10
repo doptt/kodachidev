@@ -1,126 +1,287 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react'
+import { cn } from '@/lib/cn'
+import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
-const LINKS = [
-  { label: 'Home', hash: '#home' },
-  { label: 'Services', hash: '#services' },
-  { label: 'Work', hash: '#work' },
-  { label: 'About', hash: '#about' },
-  { label: 'Contact', hash: '#contact' },
+/** Horizontal reach of the curve that sweeps each side of the bar up into the top edge. */
+const EAR = { desktop: 88, phone: 36 }
+
+const links = [
+  { label: 'Work', href: '#work' },
+  { label: 'What I build', href: '#build' },
+  { label: 'About', href: '#about' },
+  { label: 'Contact', href: '#contact' },
 ]
 
-type NavProps = {
-  scrolled: boolean
-  onHome?: boolean
+function Monogram({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'grid size-8 shrink-0 place-items-center rounded-full font-display text-[0.8rem] font-medium tracking-tight text-ink',
+        'bg-[linear-gradient(160deg,rgb(142_150_255/0.45),rgb(43_58_168/0.55))] shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_0_0_1px_rgb(255_255_255/0.12)]',
+        className,
+      )}
+    >
+      NW
+    </span>
+  )
 }
 
-export default function Nav({ scrolled, onHome = true }: NavProps) {
-  const [open, setOpen] = useState(false)
+/**
+ * Black notch silhouette that hangs from the top edge: concave shoulders flare
+ * into the screen edge, rounded corners at the bottom, and a glowing rim along
+ * the lower edge. Sized to the nav with a ResizeObserver so it follows the
+ * condense transition frame by frame.
+ */
+function NotchShape({ target }: { target: RefObject<HTMLElement | null> }) {
+  const [size, setSize] = useState({ w: 0, h: 0, e: EAR.desktop })
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
 
-  // Hash links only work on the home page, so prefix them everywhere else
-  const href = (hash: string) => (onHome ? hash : `/${hash}`)
+  useLayoutEffect(() => {
+    const el = target.current
+    if (!el) return
+    const wide = window.matchMedia('(min-width: 768px)')
+    const measure = () =>
+      setSize({ w: el.offsetWidth, h: el.offsetHeight, e: wide.matches ? EAR.desktop : EAR.phone })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    wide.addEventListener('change', measure)
+    return () => {
+      ro.disconnect()
+      wide.removeEventListener('change', measure)
+    }
+  }, [target])
 
-  // Escape closes the mobile menu
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  const { w, h, e } = size
+  if (!w || !h) return null
+
+  const total = w + e * 2
+  const mid = e / 2
+  // Rim: every edge except the top one, which sits flush with the screen.
+  // Each side is one long S-curve: it leaves the top edge flat, then sweeps
+  // down to meet the bottom edge flat.
+  const rim = [
+    `M 0 0`,
+    `C ${mid} 0 ${mid} ${h} ${e} ${h}`,
+    `L ${e + w} ${h}`,
+    `C ${e + w + mid} ${h} ${e + w + mid} 0 ${total} 0`,
+  ].join(' ')
 
   return (
-    <>
-      {/* Only the links sit in the frosted bar, the logo and Terms button float either side */}
-      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4">
-        <nav aria-label="Main" className="mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 lg:gap-4">
-          <a href={onHome ? '#home' : '/'} className="col-start-1 row-start-1 flex items-center gap-2 justify-self-start">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand font-display text-xs font-bold tracking-wider shadow-[0_0_20px_rgb(117_71_255/0.35)]">
-              NW
-            </span>
-            <span className="hidden font-display text-sm font-semibold tracking-tight [text-shadow:0_1px_12px_rgb(7_6_13/0.9)] sm:block">
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute top-0 overflow-visible"
+      style={{ left: -e, width: total, height: h }}
+      viewBox={`0 0 ${total} ${h}`}
+    >
+      <defs>
+        <linearGradient id={`${uid}-rim`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={total} y2="0">
+          <stop offset="0" stopColor="rgb(150 160 255)" stopOpacity="0" />
+          <stop offset="0.12" stopColor="rgb(150 160 255)" stopOpacity="0.35" />
+          <stop offset="0.5" stopColor="rgb(200 206 255)" stopOpacity="0.95" />
+          <stop offset="0.88" stopColor="rgb(150 160 255)" stopOpacity="0.35" />
+          <stop offset="1" stopColor="rgb(150 160 255)" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={`${uid}-body`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#000" />
+          <stop offset="1" stopColor="#07070d" />
+        </linearGradient>
+        <filter id={`${uid}-glow`} filterUnits="userSpaceOnUse" x={-40} y={-40} width={total + 80} height={h + 80}>
+          <feGaussianBlur stdDeviation="9" />
+        </filter>
+      </defs>
+      {/* Soft outer halo */}
+      <path d={rim} fill="none" stroke={`url(#${uid}-rim)`} strokeWidth="16" opacity="0.9" filter={`url(#${uid}-glow)`} />
+      {/* Blacked-out body */}
+      <path d={`${rim} Z`} fill={`url(#${uid}-body)`} fillOpacity="0.94" />
+      {/* Crisp rim line */}
+      <path d={rim} fill="none" stroke={`url(#${uid}-rim)`} strokeWidth="1.25" />
+    </svg>
+  )
+}
+
+export function Nav() {
+  const [condensed, setCondensed] = useState(false)
+  const [open, setOpen] = useState(false)
+  const reduced = usePrefersReducedMotion()
+  const { scrollY } = useScroll()
+  const menuId = useId()
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const firstLinkRef = useRef<HTMLAnchorElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+
+  useMotionValueEvent(scrollY, 'change', (y) => setCondensed(y > 32))
+
+  // Escape closes; focus moves into the menu and back to the trigger
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const t = window.setTimeout(() => firstLinkRef.current?.focus(), 30)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+      window.clearTimeout(t)
+      buttonRef.current?.focus()
+    }
+  }, [open])
+
+  // Close on resize up to desktop
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)')
+    const onChange = () => mql.matches && setOpen(false)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
+
+  const ease = [0.32, 0.72, 0, 1] as const
+
+  return (
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center">
+      <div className="pointer-events-auto relative w-[calc(100%-5rem)] md:w-auto">
+        <nav
+          ref={navRef}
+          aria-label="Main"
+          className={cn(
+            'relative z-10 flex items-center justify-between gap-2 transition-[padding] duration-(--duration-base) ease-(--ease-glass) md:gap-6',
+            condensed ? 'pb-2 pl-2 pr-2 pt-2 md:pl-3' : 'pb-3 pl-2.5 pr-2.5 pt-3.5 md:pl-4',
+          )}
+        >
+          <a
+            href="#top"
+            className="flex min-h-11 items-center gap-2.5 rounded-pill pr-2 text-ink focus-ring"
+          >
+            <Monogram />
+            <span
+              className={cn(
+                'font-nav text-[0.95rem] font-light tracking-tight transition-[opacity,max-width,transform] duration-(--duration-base) ease-(--ease-glass)',
+                condensed ? 'md:max-w-0 md:-translate-x-1 md:opacity-0 overflow-hidden' : 'max-w-40 opacity-100',
+              )}
+            >
               kodachi.dev
             </span>
           </a>
 
-          <ul
-            className={`col-start-2 row-start-1 hidden items-center gap-1 rounded-2xl border border-accent/12 p-1.5 backdrop-blur-xl transition-all duration-300 md:flex ${
-              scrolled ? 'bg-deep/90 shadow-[0_8px_32px_rgb(0_0_0/0.4)]' : 'bg-deep/55'
-            }`}
-          >
-            {LINKS.map((link) => (
-              <li key={link.label}>
+          <ul className={cn('hidden items-center md:flex', condensed && 'md:-ml-3')} role="list">
+            {links.map((l) => (
+              <li key={l.href}>
                 <a
-                  href={href(link.hash)}
-                  className="block rounded-xl px-3 py-1.5 text-sm font-medium lg:px-3.5 text-muted transition-colors duration-200 hover:bg-accent/8 hover:text-ink"
+                  href={l.href}
+                  className={cn(
+                    'inline-flex min-h-11 items-center rounded-pill font-nav text-[0.9rem] font-light text-ink-soft transition-[color,padding,text-shadow] duration-(--duration-base) ease-(--ease-glass) hover:text-ink hover:[text-shadow:0_0_14px_rgb(170_178_255/0.75)] focus-ring',
+                    condensed ? 'px-2.5' : 'px-3.5',
+                  )}
                 >
-                  {link.label}
+                  {l.label}
                 </a>
               </li>
             ))}
           </ul>
 
-          <div className="col-start-3 row-start-1 flex items-center gap-3 justify-self-end">
-            <a href="/terms" className="btn-primary hidden rounded-xl px-4 py-2 text-sm whitespace-nowrap sm:inline-flex">
-              Terms & Conditions
-            </a>
+          <a
+            href="#contact"
+            className={cn(
+              'hidden min-h-10 items-center rounded-pill bg-periwinkle-200 font-nav font-light text-navy-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.6),0_0_18px_rgb(150_160_255/0.45)] transition-[padding,background-color,transform,box-shadow] duration-(--duration-base) ease-(--ease-glass) hover:bg-periwinkle-100 hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.6),0_0_26px_rgb(170_178_255/0.7)] active:scale-[0.98] md:inline-flex focus-ring',
+              condensed ? 'px-3.5 text-[0.85rem]' : 'px-4 text-[0.9rem]',
+            )}
+          >
+            Get in touch
+          </a>
 
-            {/* Hamburger. The outer bars slide in and cross into an X. */}
-            <button
-              type="button"
-              className={`flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-xl border border-accent/12 backdrop-blur-xl transition-colors duration-300 md:hidden ${
-                scrolled ? 'bg-deep/90' : 'bg-deep/55'
-              }`}
-              onClick={() => setOpen(!open)}
-              aria-label={open ? 'Close menu' : 'Open menu'}
-              aria-expanded={open}
-              aria-controls="mobile-menu"
-            >
-              <span className={`block h-px w-5 bg-muted transition-transform duration-300 ${open ? 'translate-y-[7px] rotate-45' : ''}`} />
-              <span className={`block h-px w-5 bg-muted transition-all duration-300 ${open ? 'scale-x-0 opacity-0' : ''}`} />
-              <span className={`block h-px w-5 bg-muted transition-transform duration-300 ${open ? '-translate-y-[7px] -rotate-45' : ''}`} />
-            </button>
-          </div>
+          <button
+            ref={buttonRef}
+            type="button"
+            className="grid size-11 place-items-center rounded-pill text-ink md:hidden focus-ring"
+            aria-expanded={open}
+            aria-controls={menuId}
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            onClick={() => setOpen((o) => !o)}
+          >
+            <span className="relative block h-3.5 w-5" aria-hidden="true">
+              <span
+                className={cn(
+                  'absolute left-0 top-0 h-px w-full bg-current transition-transform duration-(--duration-base) ease-(--ease-glass)',
+                  open && 'translate-y-[6.5px] rotate-45',
+                )}
+              />
+              <span
+                className={cn(
+                  'absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-current transition-opacity duration-(--duration-fast)',
+                  open && 'opacity-0',
+                )}
+              />
+              <span
+                className={cn(
+                  'absolute bottom-0 left-0 h-px w-full bg-current transition-transform duration-(--duration-base) ease-(--ease-glass)',
+                  open && '-translate-y-[6.5px] -rotate-45',
+                )}
+              />
+            </span>
+          </button>
         </nav>
-      </header>
-
-      {/* Mobile menu. `inert` keeps its links out of the tab order while hidden. */}
-      <div
-        id="mobile-menu"
-        inert={!open}
-        className={`fixed inset-0 z-40 bg-night/92 backdrop-blur-xl transition-opacity duration-300 md:hidden ${
-          open ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-      >
-        <div
-          className={`flex h-full flex-col items-center justify-center gap-2 transition-transform duration-300 ${
-            open ? 'translate-y-0' : '-translate-y-4'
-          }`}
-        >
-          {LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={href(link.hash)}
-              onClick={() => setOpen(false)}
-              className="rounded-2xl px-8 py-3 font-display text-2xl font-semibold tracking-tight transition-colors duration-200 hover:text-accent"
-            >
-              {link.label}
-            </a>
-          ))}
-          <a
-            href="/terms"
-            onClick={() => setOpen(false)}
-            className="px-6 py-2 font-mono text-xs uppercase tracking-[0.12em] text-muted transition-colors duration-200 hover:text-accent"
-          >
-            Terms & Conditions
-          </a>
-          <a
-            href={href('#contact')}
-            onClick={() => setOpen(false)}
-            className="btn-primary mt-4 rounded-2xl px-8 py-3 text-base"
-          >
-            Start a Project
-          </a>
-        </div>
+        {/* After the nav so its ref is attached before this measures it; z-index keeps it underneath */}
+        <NotchShape target={navRef} />
       </div>
-    </>
+
+      {/* Full-screen glass menu (phones) */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="menu"
+            id={menuId}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            className="pointer-events-auto fixed inset-0 z-40 flex flex-col px-5 pb-8 pt-24 md:hidden"
+            initial={reduced ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={reduced ? undefined : { opacity: 0 }}
+            transition={{ duration: 0.3, ease }}
+          >
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 bg-navy-950/70 backdrop-blur-2xl backdrop-saturate-150"
+              onClick={() => setOpen(false)}
+            />
+            <motion.ul
+              role="list"
+              className="flex flex-col gap-1"
+              initial={reduced ? false : { y: 12, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.4, ease, delay: 0.05 }}
+            >
+              {links.map((l, i) => (
+                <li key={l.href}>
+                  <a
+                    ref={i === 0 ? firstLinkRef : undefined}
+                    href={l.href}
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-14 items-center rounded-glass-sm px-3 font-nav text-[2rem] font-light tracking-tight text-ink focus-ring"
+                  >
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </motion.ul>
+            <div className="mt-auto flex flex-col gap-4">
+              <a
+                href="#contact"
+                onClick={() => setOpen(false)}
+                className="inline-flex min-h-12 items-center justify-center rounded-pill bg-periwinkle-200 px-6 font-nav font-light text-navy-950 focus-ring"
+              >
+                Get in touch
+              </a>
+              <p className="label-mono text-center">Noah, web developer</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </header>
   )
 }

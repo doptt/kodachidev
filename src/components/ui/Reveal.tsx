@@ -1,45 +1,28 @@
-import type { CSSProperties, ReactNode } from 'react'
-import { useReveal } from '../../hooks/useReveal'
+import type { ReactNode } from 'react'
+import { motion } from 'motion/react'
+import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
-type RevealProps = {
-  children: ReactNode
-  /** ms to wait after the element scrolls into view */
-  delay?: number
-  /** "up" slides in from below, "scale" grows in slightly */
-  variant?: 'up' | 'scale'
-  /** px to slide when variant is "up" */
-  distance?: number
-  duration?: number
-  className?: string
-  style?: CSSProperties
-}
-
-// Fades its children in the first time they scroll into view. The animation
-// is on this wrapper so the child can keep its own hover transforms.
-export default function Reveal({
+/** Fades and rises its children into place the first time they scroll into view. */
+export function Reveal({
   children,
   delay = 0,
-  variant = 'up',
-  distance = 28,
-  duration = 750,
   className,
-  style,
-}: RevealProps) {
-  const { ref, visible } = useReveal<HTMLDivElement>()
-  const hidden = variant === 'scale' ? 'scale(0.9)' : `translate3d(0, ${distance}px, 0)`
-
+}: {
+  children: ReactNode
+  delay?: number
+  className?: string
+}) {
+  const reduced = usePrefersReducedMotion()
+  if (reduced) return <div className={className}>{children}</div>
   return (
-    <div
-      ref={ref}
+    <motion.div
       className={className}
-      style={{
-        ...style,
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'none' : hidden,
-        transition: `opacity ${duration}ms ease ${delay}ms, transform ${duration}ms ease ${delay}ms`,
-      }}
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '0px 0px -12% 0px' }}
+      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay }}
     >
       {children}
-    </div>
+    </motion.div>
   )
 }

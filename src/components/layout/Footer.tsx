@@ -1,26 +1,19 @@
-export default function Footer({ onHome = true }: { onHome?: boolean }) {
-  const linkClass = 'font-mono text-xs tracking-wide text-muted transition-colors duration-200 hover:text-accent'
+import { SITE } from '@/content/site'
 
+const link =
+  'inline-flex min-h-11 items-center font-mono text-[0.75rem] tracking-[0.04em] text-ink-muted transition-colors duration-(--duration-base) hover:text-ink focus-ring'
+
+export function Footer() {
   return (
-    <footer className="relative border-t border-accent/8 px-6 py-10">
-      <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row">
-        <a href={onHome ? '#home' : '/'} className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand font-display text-[9px] font-bold">
-            NW
-          </span>
-          <span className="font-display text-sm font-semibold tracking-tight text-muted">kodachi.dev</span>
+    <footer className="relative border-t border-line bg-navy-950/70">
+      <div className="mx-auto flex max-w-[76rem] flex-col items-center justify-between gap-3 px-5 py-8 sm:flex-row sm:px-8">
+        <p className="font-mono text-[0.75rem] tracking-[0.04em] text-ink-muted">
+          © {new Date().getFullYear()} {SITE.name}
+        </p>
+        <p className="font-mono text-[0.75rem] tracking-[0.04em] text-ink-faint">{SITE.footer}</p>
+        <a href="#top" className={link}>
+          Back to top ↑
         </a>
-
-        <p className="font-mono text-xs tracking-wide text-muted/50">© {new Date().getFullYear()} kodachi.dev</p>
-
-        <div className="flex items-center gap-6">
-          <a href="/terms" className={linkClass}>
-            Terms
-          </a>
-          <a href="#top" className={linkClass}>
-            Back to top ↑
-          </a>
-        </div>
       </div>
     </footer>
   )
