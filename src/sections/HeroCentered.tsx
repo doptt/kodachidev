@@ -117,7 +117,7 @@ export function HeroCentered() {
 
             <motion.p {...rise(0.32)} className="mt-6 max-w-[38rem] text-lead text-pretty text-ink-soft md:mt-7">
               I make <span className="text-indigo">secure</span> and <span className="text-indigo">engaging</span> web
-              experiences.
+              applications.
             </motion.p>
 
             <motion.div {...rise(0.44)} className="mt-8 flex flex-wrap items-center justify-center gap-3 md:mt-9 md:gap-4">
