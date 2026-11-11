@@ -54,14 +54,14 @@ export const BUILD_ITEMS = [
   {
     id: 'payments',
     title: 'Payments & booking',
-    body: 'Checkout and appointment flows with Stripe or Square. Orders go into a secure database and confirmations send themselves.',
+    body: 'Checkout and appointment flows with Stripe or Square. Orders go into a secure database and confirmations are automatic.',
     tags: ['Stripe', 'Square', 'Bookings'],
     icon: 'payments',
   },
   {
     id: 'launch',
     title: 'Launch & deployment',
-    body: 'Hosting, domains and configuration handled end to end, with uptime and DDoS protection in place before anyone visits.',
+    body: 'Hosting, domains and configuration handled. 99.9% uptime and solid DDoS protection.',
     tags: ['Hosting', 'Domains', 'Uptime'],
     icon: 'launch',
   },
