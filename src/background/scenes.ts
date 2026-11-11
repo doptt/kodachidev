@@ -55,6 +55,19 @@ export const SCENES: Record<string, BgScene> = {
     contrast: 1.08,
     hueShift: 0.03,
   },
+  /** Interlude: dark and quiet so the bright statement panel carries the screen. */
+  statement: {
+    waveAmp: 0.024,
+    warpScale: 2.4,
+    flowSpeed: 0.85,
+    zoom: 1.18,
+    highlightAngle: 1.8,
+    highlight: 0.5,
+    stars: 1.0,
+    darkness: 0.52,
+    contrast: 1.04,
+    hueShift: 0,
+  },
   /** The centrepiece: pronounced ridges, stronger sliding light, more stars. */
   work: {
     waveAmp: 0.048,

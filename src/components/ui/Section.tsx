@@ -20,7 +20,7 @@ export function Section({
   children: ReactNode
 }) {
   return (
-    <section id={id} data-bg-scene={scene} aria-labelledby={labelledBy} className={cn('relative py-24 md:py-36', className)}>
+    <section id={id} data-bg-scene={scene} aria-labelledby={labelledBy} className={cn('relative overflow-x-clip py-24 md:py-36', className)}>
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"

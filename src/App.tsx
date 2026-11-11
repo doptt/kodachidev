@@ -1,10 +1,12 @@
 import Background from '@/background/Background'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
+import { ScrollRail } from '@/components/layout/ScrollRail'
 import { CursorCircle } from '@/components/effects/CursorCircle'
 // Hero variants: swap between Hero (split layout) and HeroCentered
 import { HeroCentered as Hero } from '@/sections/HeroCentered'
 import { Build } from '@/sections/Build'
+import { Statement } from '@/sections/Statement'
 import { Work } from '@/sections/Work'
 import { About } from '@/sections/About'
 import { Contact } from '@/sections/Contact'
@@ -14,10 +16,12 @@ export default function App() {
     <>
       <Background />
       <Nav />
+      <ScrollRail />
       <CursorCircle />
       <main>
         <Hero />
         <Build />
+        <Statement />
         <Work />
         <About />
         <Contact />

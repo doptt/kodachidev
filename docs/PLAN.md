@@ -9,10 +9,11 @@ A personal portfolio that shows my work. Liquid-glass design on an animated shad
 | Nav | Floating glass pill, shrinks on scroll. Full-screen glass menu on phones | Glass pill |
 | Hero | Left-aligned, work-first headline ("Websites, built with care."), very little text | Cursor light reveal, flip words used sparingly, liquid-glass refraction on hero-level glass (Chromium) with blur-only fallback |
 | What I build | Split header, 3 columns, middle column offset down | Translucent 3D tilt cards with a cursor-following specular highlight. Touch: gentle auto-tilt plus drag |
+| Statement (interlude) | Pinned for two screens of scroll between What I build and Work | A periwinkle box pops up, opens into a full-width band with one sentence revealed word by word, folds into the pyramid mark and docks into a small full-stack diagram. Laid out statically with reduced motion |
 | Work (centerpiece) | Sticky project text on the left, glass browser frames scrolling past on the right with parallax. Stacked frames on phones | Sticky scroll reveal. Placeholder screenshots for now |
 | About | Dense bento grid with mixed sizes | Bio, traits, tools strip, small stats |
 | Contact | Links only (email, GitHub, Discord), in a glass panel | Moving-border primary link |
-| Footer | Small | — |
+| Footer | Mark, short line, site and contact links, oversized wordmark | — |
 | Desktop extra | Thin scroll progress rail with the current section's label | — |
 
 Dropped: Reviews, Process, /terms, the contact form and `api/contact.ts`.
