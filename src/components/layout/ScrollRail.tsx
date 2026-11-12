@@ -7,8 +7,9 @@ const SECTIONS = [
   { id: 'top', label: 'Intro' },
   { id: 'build', label: 'What I build' },
   { id: 'stack', label: 'Full stack' },
-  { id: 'work', label: 'Work' },
   { id: 'about', label: 'About' },
+  { id: 'work', label: 'Work' },
+  { id: 'approach', label: 'Approach' },
   { id: 'contact', label: 'Contact' },
 ] as const
 
@@ -41,36 +42,37 @@ export function ScrollRail() {
   const current = SECTIONS[active]
 
   return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        'pointer-events-none fixed right-5 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-center gap-4 transition-opacity duration-(--duration-slow) ease-(--ease-glass) xl:flex',
-        shown ? 'opacity-100' : 'opacity-0',
-      )}
-    >
-      <span className="font-mono text-[0.68rem] tracking-[0.08em] text-periwinkle-200 tabular-nums">
-        {String(active + 1).padStart(2, '0')}
-      </span>
-      <span className="relative h-28 w-px overflow-hidden rounded-full bg-ink/15">
-        <motion.span
-          className="absolute inset-0 origin-top bg-periwinkle-200 shadow-[0_0_8px_rgb(142_150_255/0.9)]"
-          style={{ scaleY: reduced ? scrollYProgress : fill }}
-        />
-      </span>
-      <span className="relative h-28 w-4">
-        <AnimatePresence mode="wait" initial={false}>
+    <div aria-hidden="true" data-bh-vars="theme dim" className="nav-vars bh-dims pointer-events-none fixed right-5 top-1/2 z-40 hidden -translate-y-1/2 xl:block">
+      <div
+        className={cn(
+          'flex flex-col items-center gap-4 transition-opacity duration-(--duration-slow) ease-(--ease-glass)',
+          shown ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        <span className="nav-mark font-mono text-[0.68rem] tracking-[0.08em] tabular-nums">
+          {String(active + 1).padStart(2, '0')}
+        </span>
+        <span className="relative h-28 w-px overflow-hidden rounded-full bg-ink/15">
           <motion.span
-            key={current.id}
-            initial={reduced ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduced ? undefined : { opacity: 0, y: -6 }}
-            transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-            className="absolute left-0 top-0 font-mono text-[0.68rem] tracking-[0.12em] whitespace-nowrap text-ink-muted uppercase [writing-mode:vertical-rl]"
-          >
-            {current.label}
-          </motion.span>
-        </AnimatePresence>
-      </span>
+            className="nav-fill absolute inset-0 origin-top"
+            style={{ scaleY: reduced ? scrollYProgress : fill }}
+          />
+        </span>
+        <span className="relative h-28 w-4">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={current.id}
+              initial={reduced ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduced ? undefined : { opacity: 0, y: -6 }}
+              transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+              className="absolute left-0 top-0 font-mono text-[0.68rem] tracking-[0.12em] whitespace-nowrap text-ink-muted uppercase [writing-mode:vertical-rl]"
+            >
+              {current.label}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      </div>
     </div>
   )
 }

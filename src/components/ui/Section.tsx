@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react'
+import { motion } from 'motion/react'
+import { BlurText } from '@/components/effects/BlurText'
+import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
-import { Reveal } from './Reveal'
+import { blurIn } from './Reveal'
 
 /**
  * Page section: registers its background scene, lays a soft scrim over the
@@ -34,7 +37,7 @@ export function Section({
   )
 }
 
-/** Eyebrow, headline and optional lede, left-aligned above a section's content. */
+/** Eyebrow, headline and optional lede, left-aligned above a section's content. Each arrives word by word. */
 export function SectionHeader({
   id,
   eyebrow,
@@ -49,26 +52,26 @@ export function SectionHeader({
   className?: string
 }) {
   return (
-    <Reveal className={cn('mb-12 max-w-[44rem] md:mb-16', className)}>
-      <p className="eyebrow-indigo mb-5">{eyebrow}</p>
-      <h2 id={id} className="font-hero text-display-lg text-balance text-silver">
-        {title}
-      </h2>
-      {lede && <p className="mt-5 max-w-[36rem] text-lead text-pretty text-ink-soft">{lede}</p>}
-    </Reveal>
+    <div className={cn('mb-12 max-w-[44rem] md:mb-16', className)}>
+      <BlurText as="p" className="eyebrow-indigo mb-5" text={eyebrow} />
+      <BlurText as="h2" id={id} className="font-hero text-display-lg text-balance" wordClassName="text-silver" text={title} delay={0.12} />
+      {lede && <BlurText as="p" className="mt-5 max-w-[36rem] text-lead text-pretty text-ink-soft" text={lede} delay={0.3} />}
+    </div>
   )
 }
 
-/** Small outlined tag for stack items, roles and the like. */
+/** Small outlined tag for stack items, roles and the like. Pops into focus when it scrolls into view. */
 export function Chip({ children, className }: { children: ReactNode; className?: string }) {
+  const reduced = usePrefersReducedMotion()
   return (
-    <span
+    <motion.span
+      {...blurIn(reduced, 0, { y: 6, blur: 6, duration: 0.5 })}
       className={cn(
         'inline-flex items-center rounded-pill bg-ink/[0.04] px-2.5 py-1 font-mono text-[0.72rem] tracking-[0.03em] text-ink-muted shadow-[inset_0_0_0_1px_rgb(199_203_255/0.12)]',
         className,
       )}
     >
       {children}
-    </span>
+    </motion.span>
   )
 }

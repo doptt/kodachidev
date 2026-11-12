@@ -81,6 +81,22 @@ export const SCENES: Record<string, BgScene> = {
     contrast: 1.12,
     hueShift: -0.02,
   },
+  /**
+   * On the way into the black hole: the field slows, widens and darkens as it
+   * fades out, and its stars thin away. By the time the hole is up it is black.
+   */
+  blackhole: {
+    waveAmp: 0.02,
+    warpScale: 1.9,
+    flowSpeed: 0.6,
+    zoom: 1.32,
+    highlightAngle: 2.7,
+    highlight: 0.42,
+    stars: 0.15,
+    darkness: 0.6,
+    contrast: 1.02,
+    hueShift: 0.02,
+  },
   /** Wider, quieter; light from the left; a hint more violet. */
   about: {
     waveAmp: 0.03,

@@ -42,6 +42,8 @@ export const ABOUT = {
     { label: 'Vite', category: 'Tooling' },
     { label: 'Git', category: 'Tooling' },
   ],
+  /** Heading of the "how I work" panel further down the page. */
+  approach: { eyebrow: 'Approach', title: 'How I work.' },
   stats: [
     { value: '1–4 wks', label: 'Typical build time' },
     { value: '24h', label: 'Usual reply time' },
@@ -54,5 +56,6 @@ export const ABOUT = {
   body: readonly string[]
   traits: readonly Trait[]
   stack: readonly StackItem[]
+  approach: { eyebrow: string; title: string }
   stats: readonly Stat[]
 }

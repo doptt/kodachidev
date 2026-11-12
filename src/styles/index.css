@@ -65,6 +65,19 @@
 
   --color-focus: #c7cbff;
 
+  /*
+   * Black hole palette. Two chosen colours carry it: Creamy Candle Flame for
+   * the hot parts and Muted Biscuit for the body of the disk. The rest are
+   * darker steps of the biscuit, and the two darkest lean toward the site's
+   * indigo so the scene sits in the same world as the page.
+   */
+  --color-bh-highlight: #ffedc1;
+  --color-bh-accent: #bca68e;
+  --color-bh-glow: #8d7c69;
+  --color-bh-ember: #5b5045;
+  --color-bh-surface: #14131c;
+  --color-bh-ink: #07070f;
+
   /* Radius */
   --radius-glass-sm: 0.875rem;
   --radius-glass: 1.5rem;
@@ -331,6 +344,280 @@
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Black hole sequence (Work intro)                                     */
+/* ------------------------------------------------------------------ */
+/*
+ * Written from scroll by src/blackhole/state.ts, onto the elements marked
+ * `data-bh-vars` (not onto <html>: see the note there). Registered as numbers
+ * so they can be used in calc() and, under reduced motion, transitioned.
+ *   --bh-theme  0 site palette .. 1 the black hole's palette
+ *   --bh-dim    0 .. 1 as the UI fades to black with the scene
+ */
+@property --bh-theme {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+@property --bh-dim {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+/* Reduced motion: the theme swaps at a threshold and crossfades instead of being scrubbed */
+html[data-bh-reduced] [data-bh-vars] {
+  transition: --bh-theme 420ms linear;
+}
+
+@property --bh-arrive {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+/*
+ * The hand-over is the page's background fading to black: it starts most of a
+ * screen before the black hole is in view and is complete before it pins.
+ */
+.bh-veil {
+  opacity: max(var(--bh-theme), var(--bh-dim));
+}
+
+/*
+ * Stars (StarField.tsx). They are part of the page and scroll with it: one
+ * scatter in the lower part of the run-in, thin at the top and filling in
+ * toward the bottom, so stars drift up into view over the second half of the
+ * fade to black; and one in the stage, which carries straight on from it,
+ * comes up behind the black hole and pins with it. Their own drift, shimmer
+ * and sparkle are drawn on the canvas.
+ */
+.bh-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Never over the lit page: they come up as it passes the halfway point of its fade, and go down again with the fall */
+  opacity: calc(clamp(0, (var(--bh-theme) - 0.3) * 3, 1) * (1 - var(--bh-dim)));
+}
+.bh-stars canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* In the run-in: none at the top, the full scatter by the bottom */
+.bh-stars-runin {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 60%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 60%);
+}
+/* In the stage: once pinned, they drift outward from the hole as the camera falls toward it */
+.bh-stars-stage {
+  transform: scale(calc(1 + var(--bh-progress, 0) * 1.15));
+  transform-origin: 56% 44%;
+}
+html[data-bh-reduced] .bh-stars-stage {
+  transform: none;
+}
+
+/*
+ * The scene itself comes up gradually as it scrolls in, and its top edge is
+ * feathered away while it does (the mask closes as --bh-arrive reaches 1), so
+ * there is never a visible line where the canvas starts. The stars behind it
+ * are not masked: they run on unbroken from the run-in above.
+ */
+.bh-scene {
+  opacity: var(--bh-arrive);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 calc((1 - var(--bh-arrive)) * 70%));
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 calc((1 - var(--bh-arrive)) * 70%));
+}
+
+@property --bh-intro {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+/*
+ * Caption over the idle black hole: rises in once the scene has settled, and
+ * leaves as the fall begins. Opacity and position only. A blur here would
+ * mean re-drawing the caption on every frame over a canvas that is itself
+ * drawing every frame, and that stalls both.
+ */
+.bh-intro {
+  opacity: var(--bh-intro);
+  transform: translateY(calc((1 - var(--bh-intro)) * 18px));
+  will-change: opacity, transform;
+}
+
+/*
+ * Big text (AboutSpace): a few enormous words that are their own light source.
+ * Each letter is three fixed pictures stacked up (see Letter): a blurred ghost,
+ * a glow and the sharp letter. Scroll only changes how visible each one is,
+ * so none of it is ever repainted.
+ */
+.bigtext {
+  font-family: var(--font-hero);
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  color: #fff8ea;
+}
+.bigtext-ghost,
+.bigtext-glow,
+.bigtext-sharp {
+  will-change: opacity;
+}
+.bigtext-ghost,
+.bigtext-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bigtext-sharp {
+  position: relative;
+}
+.bigtext-ghost {
+  filter: blur(0.06em);
+}
+/* Only the light around the letter: the letter itself is the sharp copy on top */
+.bigtext-glow {
+  color: transparent;
+}
+.bigtext-glow,
+.bigtext-static {
+  text-shadow:
+    0 0 0.02em rgb(255 248 234 / 0.95),
+    0 0 0.07em rgb(255 237 193 / 0.8),
+    0 0 0.18em rgb(255 237 193 / 0.5);
+}
+/* The wide halo is a plain gradient: a text shadow that large is very slow to draw */
+.bigtext-aura {
+  position: absolute;
+  inset: -45% -6%;
+  pointer-events: none;
+  will-change: opacity;
+  background: radial-gradient(closest-side, rgb(214 190 150 / 0.2), rgb(188 166 142 / 0.09) 55%, transparent);
+}
+/* The numbers beside the bio: the same light, turned down */
+.bigtext-number {
+  color: #fff8ea;
+  text-shadow:
+    0 0 0.08em rgb(255 237 193 / 0.6),
+    0 0 0.4em rgb(255 237 193 / 0.28);
+}
+
+/*
+ * Decoding text (ScrambleText): the paragraph fades up as its first wave
+ * starts. Letters not yet resolved sit back; a word flashes bright and heavy
+ * as it lands, then settles. Monospace only, so the weight and the letters
+ * can change without anything moving.
+ */
+.scramble {
+  opacity: 0;
+  transition: opacity 700ms var(--ease-out-soft);
+}
+.scramble.is-shown {
+  opacity: 1;
+}
+.scramble-todo {
+  opacity: 0.34;
+}
+.scramble-done {
+  transition:
+    color 520ms var(--ease-out-soft),
+    font-weight 520ms var(--ease-out-soft);
+}
+.scramble-word.is-hot .scramble-done {
+  color: var(--color-bh-highlight);
+  font-weight: 650;
+  transition-duration: 50ms;
+}
+
+/*
+ * Navigation accent: the site's periwinkle, turning to the black hole's cream
+ * as it arrives. Mixed in OKLab, where two pale colours of opposite hue meet
+ * in a soft neutral instead of swinging through pink. Defined on the two
+ * elements that use them, so they are recomputed there and nowhere else.
+ */
+.nav-vars {
+  --nav-accent: color-mix(in oklab, var(--color-periwinkle-200), var(--color-bh-highlight) calc(var(--bh-theme) * 100%));
+  --nav-accent-hover: color-mix(in oklab, var(--color-periwinkle-100), #fff6de calc(var(--bh-theme) * 100%));
+  --nav-glow: color-mix(in oklab, rgb(150 160 255), var(--color-bh-accent) calc(var(--bh-theme) * 100%));
+  --nav-rim: color-mix(in oklab, rgb(200 206 255), var(--color-bh-highlight) calc(var(--bh-theme) * 100%));
+}
+.nav-cta {
+  background-color: var(--nav-accent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 0 18px color-mix(in oklab, var(--nav-glow) 45%, transparent);
+}
+.nav-cta:hover {
+  background-color: var(--nav-accent-hover);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 0 26px color-mix(in oklab, var(--nav-rim) 70%, transparent);
+}
+.nav-link:hover {
+  text-shadow: 0 0 14px color-mix(in oklab, var(--nav-rim) 75%, transparent);
+}
+.nav-mark {
+  color: var(--nav-accent);
+}
+/*
+ * The "NW" monogram: a translucent indigo disc that turns into a solid cream
+ * one. Its lettering has to flip from light to dark on the way. It does so
+ * quickly, at the point where the disc is mid-grey and both read about equally
+ * well: a slow drift would leave the letters the same grey as the disc.
+ */
+.nav-monogram {
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, rgb(142 150 255 / 0.45), var(--color-bh-highlight) calc(var(--bh-theme) * 100%)),
+    color-mix(in oklab, rgb(43 58 168 / 0.55), #e2c99a calc(var(--bh-theme) * 100%))
+  );
+  color: color-mix(in oklab, var(--color-ink), var(--color-navy-950) calc(clamp(0, (var(--bh-theme) - 0.37) * 40, 1) * 100%));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 0 0 1px rgb(255 255 255 / 0.12),
+    0 0 14px color-mix(in oklab, var(--nav-glow) calc(var(--bh-theme) * 40%), transparent);
+}
+.nav-fill {
+  background-color: var(--nav-accent);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--nav-glow) 90%, transparent);
+}
+
+/* UI that goes down with the scene. Keyboard focus always brings it back. */
+.bh-dims {
+  opacity: calc(1 - var(--bh-dim));
+}
+.bh-dims:focus-within {
+  opacity: 1;
+}
+
+/* A soft shadow trails the bottom edge of the stage when it leaves, so there is never a visible rectangle */
+[data-bh-stage]::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 45vh;
+  pointer-events: none;
+  background: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 0.6) 35%, rgb(0 0 0 / 0) 100%);
+}
+
+.bh-cue {
+  opacity: var(--bh-cue, 1);
+}
+.bh-cue-line {
+  animation: bh-cue 2.4s var(--ease-in-out-soft) infinite;
+}
+@keyframes bh-cue {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(200%);
+  }
+}
+
 :root {
   /* Fine monochrome grain, inline so nothing is fetched */
   --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.4 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -456,6 +743,8 @@ html.hide-native-cursor * {
     0 0 18px -4px rgb(110 112 255 / 0.45);
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
+  /* Fades with the scene, but never all the way: the native cursor is hidden */
+  opacity: calc(1 - 0.65 * var(--bh-dim));
   transition:
     transform 260ms var(--ease-glass),
     background-color 260ms var(--ease-glass),

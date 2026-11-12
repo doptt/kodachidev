@@ -1,6 +1,9 @@
 import type { ElementType, ReactNode } from 'react'
+import { motion } from 'motion/react'
 import { cn } from '@/lib/cn'
 import { GlassSurface } from '@/components/glass/GlassSurface'
+import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { blurIn } from './Reveal'
 
 /**
  * One dark glass panel divided into cells by hairlines, in place of separate
@@ -36,18 +39,27 @@ export function BentoPanel({
   )
 }
 
+/**
+ * One cell of a bento panel. Cells come into focus one after another as the
+ * panel scrolls into view: pass `index` to place a cell in that sequence.
+ */
 export function BentoCell({
   as,
+  index = 0,
   className,
   children,
 }: {
-  as?: ElementType
+  as?: 'div' | 'li'
+  /** Position in the entrance sequence. */
+  index?: number
   className?: string
   children: ReactNode
 }) {
-  const Tag = (as ?? 'div') as ElementType
+  const reduced = usePrefersReducedMotion()
+  const Tag = as === 'li' ? motion.li : motion.div
   return (
     <Tag
+      {...blurIn(reduced, index * 0.07, { y: 16, blur: 8, duration: 0.7 })}
       className={cn(
         'group/cell relative border-b border-r border-line p-7 transition-colors duration-(--duration-base) ease-(--ease-glass) md:col-span-3 md:p-9',
         className,

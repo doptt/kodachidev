@@ -18,8 +18,8 @@ function Monogram({ className }: { className?: string }) {
     <span
       aria-hidden="true"
       className={cn(
-        'grid size-8 shrink-0 place-items-center rounded-full font-display text-[0.8rem] font-medium tracking-tight text-ink',
-        'bg-[linear-gradient(160deg,rgb(142_150_255/0.45),rgb(43_58_168/0.55))] shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_0_0_1px_rgb(255_255_255/0.12)]',
+        // Colours live in .nav-monogram so they can follow the scroll-driven accent
+        'nav-monogram grid size-8 shrink-0 place-items-center rounded-full font-display text-[0.8rem] font-medium tracking-tight',
         className,
       )}
     >
@@ -78,11 +78,12 @@ function NotchShape({ target }: { target: RefObject<HTMLElement | null> }) {
     >
       <defs>
         <linearGradient id={`${uid}-rim`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={total} y2="0">
-          <stop offset="0" stopColor="rgb(150 160 255)" stopOpacity="0" />
-          <stop offset="0.12" stopColor="rgb(150 160 255)" stopOpacity="0.35" />
-          <stop offset="0.5" stopColor="rgb(200 206 255)" stopOpacity="0.95" />
-          <stop offset="0.88" stopColor="rgb(150 160 255)" stopOpacity="0.35" />
-          <stop offset="1" stopColor="rgb(150 160 255)" stopOpacity="0" />
+          {/* Colours come from CSS so the rim can follow the scroll-driven accent */}
+          <stop offset="0" style={{ stopColor: 'var(--nav-glow)' }} stopOpacity="0" />
+          <stop offset="0.12" style={{ stopColor: 'var(--nav-glow)' }} stopOpacity="0.35" />
+          <stop offset="0.5" style={{ stopColor: 'var(--nav-rim)' }} stopOpacity="0.95" />
+          <stop offset="0.88" style={{ stopColor: 'var(--nav-glow)' }} stopOpacity="0.35" />
+          <stop offset="1" style={{ stopColor: 'var(--nav-glow)' }} stopOpacity="0" />
         </linearGradient>
         <linearGradient id={`${uid}-body`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#000" />
@@ -143,8 +144,8 @@ export function Nav() {
   const ease = [0.32, 0.72, 0, 1] as const
 
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center">
-      <div className="pointer-events-auto relative w-[calc(100%-5rem)] md:w-auto">
+    <header data-bh-vars="theme dim" className="nav-vars pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center">
+      <div className="bh-dims pointer-events-auto relative w-[calc(100%-5rem)] md:w-auto">
         <nav
           ref={navRef}
           aria-label="Main"
@@ -174,7 +175,7 @@ export function Nav() {
                 <a
                   href={l.href}
                   className={cn(
-                    'inline-flex min-h-11 items-center rounded-pill font-nav text-[0.9rem] font-light text-ink-soft transition-[color,padding,text-shadow] duration-(--duration-base) ease-(--ease-glass) hover:text-ink hover:[text-shadow:0_0_14px_rgb(170_178_255/0.75)] focus-ring',
+                    'nav-link inline-flex min-h-11 items-center rounded-pill font-nav text-[0.9rem] font-light text-ink-soft transition-[color,padding,text-shadow] duration-(--duration-base) ease-(--ease-glass) hover:text-ink focus-ring',
                     condensed ? 'px-2.5' : 'px-3.5',
                   )}
                 >
@@ -187,7 +188,7 @@ export function Nav() {
           <a
             href="#contact"
             className={cn(
-              'hidden min-h-10 items-center rounded-pill bg-periwinkle-200 font-nav font-light text-navy-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.6),0_0_18px_rgb(150_160_255/0.45)] transition-[padding,background-color,transform,box-shadow] duration-(--duration-base) ease-(--ease-glass) hover:bg-periwinkle-100 hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.6),0_0_26px_rgb(170_178_255/0.7)] active:scale-[0.98] md:inline-flex focus-ring',
+              'nav-cta hidden min-h-10 items-center rounded-pill font-nav font-light text-navy-950 transition-[padding,background-color,transform,box-shadow] duration-(--duration-base) ease-(--ease-glass) active:scale-[0.98] md:inline-flex focus-ring',
               condensed ? 'px-3.5 text-[0.85rem]' : 'px-4 text-[0.9rem]',
             )}
           >
@@ -273,7 +274,7 @@ export function Nav() {
               <a
                 href="#contact"
                 onClick={() => setOpen(false)}
-                className="inline-flex min-h-12 items-center justify-center rounded-pill bg-periwinkle-200 px-6 font-nav font-light text-navy-950 focus-ring"
+                className="nav-cta inline-flex min-h-12 items-center justify-center rounded-pill px-6 font-nav font-light text-navy-950 focus-ring"
               >
                 Get in touch
               </a>

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView } from 'motion/react'
 import { PROJECTS, WORK_INTRO, type Project } from '@/content/projects'
+import { BlurText } from '@/components/effects/BlurText'
 import { GlassSurface } from '@/components/glass/GlassSurface'
 import { Reveal } from '@/components/ui/Reveal'
 import { Chip, Section, SectionHeader } from '@/components/ui/Section'
 import { cn } from '@/lib/cn'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { WorkIntro } from './WorkIntro'
 
 const projects: readonly Project[] = PROJECTS
 const host = (url: string) => new URL(url).host
@@ -31,10 +33,13 @@ function Details({ project, heading: Heading }: { project: Project; heading: 'h3
         </span>
         <Status project={project} />
       </div>
-      <Heading className="mt-3 font-hero text-[clamp(2rem,1.4rem+2vw,3rem)] leading-[1.05] tracking-[-0.02em] text-ink">
-        {project.name}
-      </Heading>
-      <p className="mt-4 text-[0.98rem] leading-[1.65] text-pretty text-ink-muted">{project.summary}</p>
+      <BlurText
+        as={Heading}
+        className="mt-3 font-hero text-[clamp(2rem,1.4rem+2vw,3rem)] leading-[1.05] tracking-[-0.02em] text-ink"
+        text={project.name}
+        duration={0.7}
+      />
+      <BlurText as="p" className="mt-4 text-[0.98rem] leading-[1.65] text-pretty text-ink-muted" text={project.summary} delay={0.15} />
       <dl className="mt-6 space-y-3">
         <div className="flex gap-4">
           <dt className="w-12 shrink-0 pt-1 font-mono text-[0.72rem] tracking-[0.06em] text-ink-faint">Role</dt>
@@ -133,56 +138,60 @@ export function Work() {
   const current = projects[active]
 
   return (
-    <Section id="work" scene="work" labelledBy="work-title">
-      <SectionHeader id="work-title" eyebrow={WORK_INTRO.eyebrow} title={WORK_INTRO.title} lede={WORK_INTRO.lede} />
+    <>
+      {/* Opening sequence: owns the #work anchor, so "Work" in the nav lands on it */}
+      <WorkIntro />
+      <Section id="work-projects" scene="work" labelledBy="work-title">
+        <SectionHeader id="work-title" eyebrow={WORK_INTRO.eyebrow} title={WORK_INTRO.title} lede={WORK_INTRO.lede} />
 
-      <div className="lg:grid lg:grid-cols-12 lg:gap-14">
-        {/* Pinned details (wide screens). Decorative copy of the per-project text below. */}
-        <div className="hidden lg:col-span-4 lg:block" aria-hidden="true">
-          <div className="sticky top-[22vh] flex gap-6">
-            <ol className="flex flex-col gap-2 pt-1.5">
-              {projects.map((p, i) => (
-                <li
-                  key={p.slug}
-                  className={cn(
-                    'w-px transition-[height,background-color] duration-(--duration-base) ease-(--ease-glass)',
-                    i === active ? 'h-9 bg-periwinkle-200 shadow-[0_0_10px_rgb(142_150_255/0.9)]' : 'h-4 bg-ink/20',
-                  )}
-                />
-              ))}
-            </ol>
-            <div className="min-h-[24rem] flex-1">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={current.slug}
-                  initial={reduced ? false : { opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduced ? undefined : { opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-                >
-                  <p className="mb-5 font-mono text-[0.72rem] tracking-[0.08em] text-ink-faint">
-                    {String(active + 1).padStart(2, '0')} / {String(projects.length).padStart(2, '0')}
-                  </p>
-                  <Details project={current} heading="p" />
-                </motion.div>
-              </AnimatePresence>
+        <div className="lg:grid lg:grid-cols-12 lg:gap-14">
+          {/* Pinned details (wide screens). Decorative copy of the per-project text below. */}
+          <div className="hidden lg:col-span-4 lg:block" aria-hidden="true">
+            <div className="sticky top-[22vh] flex gap-6">
+              <ol className="flex flex-col gap-2 pt-1.5">
+                {projects.map((p, i) => (
+                  <li
+                    key={p.slug}
+                    className={cn(
+                      'w-px transition-[height,background-color] duration-(--duration-base) ease-(--ease-glass)',
+                      i === active ? 'h-9 bg-periwinkle-200 shadow-[0_0_10px_rgb(142_150_255/0.9)]' : 'h-4 bg-ink/20',
+                    )}
+                  />
+                ))}
+              </ol>
+              <div className="min-h-[24rem] flex-1">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={current.slug}
+                    initial={reduced ? false : { opacity: 0, y: 14, filter: 'blur(8px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    exit={reduced ? undefined : { opacity: 0, y: -10, filter: 'blur(8px)' }}
+                    transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+                  >
+                    <p className="mb-5 font-mono text-[0.72rem] tracking-[0.08em] text-ink-faint">
+                      {String(active + 1).padStart(2, '0')} / {String(projects.length).padStart(2, '0')}
+                    </p>
+                    <Details project={current} heading="p" />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
             </div>
           </div>
-        </div>
 
-        <ol role="list" className="flex flex-col gap-16 lg:col-span-8 lg:gap-28">
-          {projects.map((p, i) => (
-            <li key={p.slug}>
-              <Reveal>
-                <Frame project={p} onActive={() => setActive(i)} />
-                <div className="mt-6 lg:sr-only">
-                  <Details project={p} heading="h3" />
-                </div>
-              </Reveal>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </Section>
+          <ol role="list" className="flex flex-col gap-16 lg:col-span-8 lg:gap-28">
+            {projects.map((p, i) => (
+              <li key={p.slug}>
+                <Reveal>
+                  <Frame project={p} onActive={() => setActive(i)} />
+                  <div className="mt-6 lg:sr-only">
+                    <Details project={p} heading="h3" />
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </Section>
+    </>
   )
 }

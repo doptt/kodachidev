@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
-import { motion, useMotionValue, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react'
+import { motion, useMotionTemplate, useMotionValue, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react'
 import { STATEMENT } from '@/content/statement'
 import { GlassSurface } from '@/components/glass/GlassSurface'
 import { PyramidTile } from '@/components/ui/PyramidGlyph'
@@ -99,8 +99,11 @@ function Word({ progress, index, text, accent }: { progress: MotionValue<number>
   const step = (WORDS_TO - WORDS_FROM) / STATEMENT.words.length
   const from = WORDS_FROM + index * step
   const opacity = useTransform(progress, [from, from + step * 1.6], [0.2, 1])
+  // Each word sharpens as the scroll reaches it, like the text everywhere else on the site
+  const blur = useTransform(progress, [from, from + step * 1.6], [5, 0])
+  const filter = useMotionTemplate`blur(${blur}px)`
   return (
-    <motion.span style={{ opacity }} className={accent ? accentClass : undefined}>
+    <motion.span style={{ opacity, filter }} className={cn('inline-block', accent && accentClass)}>
       {text}{' '}
     </motion.span>
   )

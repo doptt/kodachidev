@@ -1,8 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { CONTACT } from '@/content/contact'
+import { motion } from 'motion/react'
+import { BlurText } from '@/components/effects/BlurText'
 import { LiquidGlass } from '@/components/glass/LiquidGlass'
 import { BentoCell, BentoPanel } from '@/components/ui/Bento'
-import { Reveal } from '@/components/ui/Reveal'
+import { Reveal, blurIn } from '@/components/ui/Reveal'
+import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { Section } from '@/components/ui/Section'
 
 const rowClass =
@@ -17,8 +20,8 @@ function RowBody({ label, value, hint, icon }: { label: string; value: string; h
         </svg>
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-mono text-[0.72rem] tracking-[0.08em] text-ink-faint">{label}</span>
-        <span className="mt-1 block truncate text-[1rem] text-ink">{value}</span>
+        <BlurText className="block font-mono text-[0.72rem] tracking-[0.08em] text-ink-faint" text={label} delay={0.2} />
+        <BlurText className="mt-1 block truncate text-[1rem] text-ink" text={value} delay={0.3} />
       </span>
       <span className="shrink-0 text-[0.8rem] text-ink-muted transition-colors duration-(--duration-base) group-hover/row:text-ink">
         {hint}
@@ -36,6 +39,9 @@ const arrow = (
 /** Contact: a short invitation on the left, three ways to reach me on the right. */
 export function Contact() {
   const [copied, setCopied] = useState(false)
+  const reduced = usePrefersReducedMotion()
+  // The three ways to reach me slide into focus one after another
+  const row = (i: number) => blurIn(reduced, 0.15 + i * 0.1, { y: 14, blur: 8, duration: 0.7 })
   useEffect(() => {
     if (!copied) return
     const t = window.setTimeout(() => setCopied(false), 2000)
@@ -55,12 +61,10 @@ export function Contact() {
     <Section id="contact" scene="contact" labelledBy="contact-title">
       <Reveal>
         <BentoPanel>
-          <BentoCell className="flex flex-col md:col-span-3 lg:col-span-6 lg:p-12">
-            <p className="eyebrow-indigo mb-5">{CONTACT.eyebrow}</p>
-            <h2 id="contact-title" className="font-hero text-display-lg text-silver">
-              {CONTACT.title}
-            </h2>
-            <p className="mt-5 max-w-[26rem] text-lead text-pretty text-ink-soft">{CONTACT.lede}</p>
+          <BentoCell index={0} className="flex flex-col md:col-span-3 lg:col-span-6 lg:p-12">
+            <BlurText as="p" className="eyebrow-indigo mb-5" text={CONTACT.eyebrow} />
+            <BlurText as="h2" id="contact-title" className="font-hero text-display-lg" wordClassName="text-silver" text={CONTACT.title} delay={0.12} />
+            <BlurText as="p" className="mt-5 max-w-[26rem] text-lead text-pretty text-ink-soft" text={CONTACT.lede} delay={0.3} />
             <div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3 md:mt-auto md:pt-12">
               <LiquidGlass
                 as="a"
@@ -81,13 +85,13 @@ export function Contact() {
                   </svg>
                 </span>
               </LiquidGlass>
-              <p className="text-[0.85rem] text-ink-muted">{CONTACT.replyTime}</p>
+              <BlurText as="p" className="text-[0.85rem] text-ink-muted" text={CONTACT.replyTime} delay={0.5} />
             </div>
           </BentoCell>
 
-          <BentoCell className="p-0 md:col-span-3 md:p-0 lg:col-span-6">
+          <BentoCell index={1} className="p-0 md:col-span-3 md:p-0 lg:col-span-6">
             <ul role="list" className="flex h-full flex-col">
-              <li className="flex-1 border-b border-line last:border-b-0">
+              <motion.li {...row(0)} className="flex-1 border-b border-line last:border-b-0">
                 <a href={`mailto:${CONTACT.email}`} className={rowClass}>
                   <RowBody
                     label="Email"
@@ -96,8 +100,8 @@ export function Contact() {
                     icon={<path d="M2.5 4.5h13v9h-13zM2.5 5l6.5 5 6.5-5" />}
                   />
                 </a>
-              </li>
-              <li className="flex-1 border-b border-line last:border-b-0">
+              </motion.li>
+              <motion.li {...row(1)} className="flex-1 border-b border-line last:border-b-0">
                 <a href={CONTACT.github.url} target="_blank" rel="noreferrer" className={rowClass}>
                   <RowBody
                     label="GitHub"
@@ -106,8 +110,8 @@ export function Contact() {
                     icon={<path d="M6.5 5 2.5 9l4 4M11.5 5l4 4-4 4" />}
                   />
                 </a>
-              </li>
-              <li className="flex-1 border-b border-line last:border-b-0">
+              </motion.li>
+              <motion.li {...row(2)} className="flex-1 border-b border-line last:border-b-0">
                 <button type="button" onClick={copyDiscord} className={rowClass}>
                   <RowBody
                     label="Discord"
@@ -116,7 +120,7 @@ export function Contact() {
                     icon={<path d="M3 4.5h12v8H8.5L5.5 15v-2.5H3z" />}
                   />
                 </button>
-              </li>
+              </motion.li>
             </ul>
           </BentoCell>
         </BentoPanel>

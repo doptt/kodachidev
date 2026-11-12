@@ -1,4 +1,5 @@
 import { BUILD_INTRO, BUILD_ITEMS } from '@/content/build'
+import { BlurText } from '@/components/effects/BlurText'
 import { BentoCell, BentoPanel } from '@/components/ui/Bento'
 import { Reveal } from '@/components/ui/Reveal'
 import { Section, SectionHeader } from '@/components/ui/Section'
@@ -27,6 +28,7 @@ export function Build() {
           {BUILD_ITEMS.map((item, i) => (
             <BentoCell
               as="li"
+              index={i}
               key={item.id}
               className={`flex flex-col hover:bg-periwinkle-300/[0.035] ${spans[i]}`}
             >
@@ -36,8 +38,13 @@ export function Build() {
               <div className="flex justify-center py-4 md:py-6">
                 <IsoArt boxes={art[item.id]} floatDelay={i * 1.3} />
               </div>
-              <h3 className="text-[1.05rem] font-medium tracking-[-0.01em] text-ink">{item.title}</h3>
-              <p className="mt-2 max-w-[26rem] text-[0.9rem] leading-[1.6] text-pretty text-ink-muted">{item.body}</p>
+              <BlurText as="h3" className="text-[1.05rem] font-medium tracking-[-0.01em] text-ink" text={item.title} delay={0.15 + i * 0.07} />
+              <BlurText
+                as="p"
+                className="mt-2 max-w-[26rem] text-[0.9rem] leading-[1.6] text-pretty text-ink-muted"
+                text={item.body}
+                delay={0.3 + i * 0.07}
+              />
             </BentoCell>
           ))}
         </BentoPanel>

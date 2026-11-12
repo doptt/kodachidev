@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { BackgroundRenderer } from './renderer'
 import { BackgroundController } from './controller'
+import { blackHole } from '@/blackhole/state'
 
 export type BackgroundProps = {
   /** Force one scene regardless of the sections on the page (handy for tests/dev). */
@@ -115,6 +116,8 @@ export default function Background({ scene, still, className }: BackgroundProps)
       lastFrame = now
       lastTime = now
       const u = controller.update(dt)
+      // Fully blacked out by the black hole sequence: nothing to draw
+      if (Math.max(blackHole.theme, blackHole.dim) >= 0.999 && firstFrameDrawn) return
       if (!renderer.ready) return
       renderer.render(u)
       if (!firstFrameDrawn) {
@@ -174,7 +177,7 @@ export default function Background({ scene, still, className }: BackgroundProps)
   }, [useStill, coarsePointer, forcedScene])
 
   return (
-    <div className={className} style={rootStyle} aria-hidden="true" data-bg-mode={mode}>
+    <div className={className} style={rootStyle} aria-hidden="true" data-bg-mode={mode} data-bh-vars="theme dim">
       <img src={stillSrc} alt="" decoding="async" fetchPriority="high" style={imgStyle} draggable={false} />
       <div style={stillShadeStyle} />
       {!useStill && (
@@ -183,6 +186,8 @@ export default function Background({ scene, still, className }: BackgroundProps)
           style={{ ...canvasStyle, opacity: mode === 'live' ? 1 : 0 }}
         />
       )}
+      {/* Fades the field to black as the black hole sequence arrives (see .bh-veil) */}
+      <div className="bh-veil" style={veilStyle} />
     </div>
   )
 }
@@ -232,6 +237,12 @@ const stillShadeStyle: CSSProperties = {
   inset: 0,
   background:
     'radial-gradient(ellipse 85% 80% at 50% 50%, rgba(5,6,26,0.10) 0%, rgba(5,6,26,0.28) 60%, rgba(5,6,26,0.55) 100%)',
+}
+
+const veilStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: '#000',
 }
 
 const canvasStyle: CSSProperties = {

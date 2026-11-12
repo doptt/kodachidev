@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { LiquidGlass } from '@/components/glass/LiquidGlass'
 import { GlassSurface } from '@/components/glass/GlassSurface'
 import { PyramidMark } from '@/components/hero/PyramidMark'
+import { BlurText } from '@/components/effects/BlurText'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
 const icon = {
@@ -23,12 +24,15 @@ function HeroCard({
   children,
   href,
   label,
+  delay = 0,
 }: {
   glyph: ReactNode
   title: string
-  children: ReactNode
+  children: string
   href?: string
   label?: string
+  /** When the card itself starts to appear, so its text can follow it in. */
+  delay?: number
 }) {
   return (
     <GlassSurface
@@ -44,8 +48,8 @@ function HeroCard({
         </svg>
       </span>
       <div className="min-w-0 pt-0.5">
-        <p className="text-[0.9rem] font-medium text-ink">{title}</p>
-        <div className="mt-1 text-[0.82rem] leading-snug text-ink-muted">{children}</div>
+        <BlurText as="p" className="text-[0.9rem] font-medium text-ink" text={title} delay={delay + 0.15} />
+        <BlurText as="p" className="mt-1 text-[0.82rem] leading-snug text-ink-muted" text={children} delay={delay + 0.3} />
       </div>
     </GlassSurface>
   )
@@ -57,14 +61,16 @@ function HeroCard({
  */
 export function HeroCentered() {
   const reduced = usePrefersReducedMotion()
+  // Everything in the hero rises out of a blur, in order down the page
   const rise = (delay: number) =>
     reduced
       ? {}
       : {
-          initial: { opacity: 0, y: 18 },
-          animate: { opacity: 1, y: 0 },
+          initial: { opacity: 0, y: 18, filter: 'blur(10px)' },
+          animate: { opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none' } },
           transition: { duration: 0.9, ease: [0.22, 1, 0.36, 1] as const, delay },
         }
+  const cardsAt = 0.95
 
   return (
     <section id="top" data-bg-scene="hero" aria-labelledby="hero-title" className="relative">
@@ -93,34 +99,39 @@ export function HeroCentered() {
                 aria-hidden="true"
                 className="hidden h-px w-8 bg-linear-to-r from-transparent to-[#7b80ff]/70 sm:block md:w-14"
               />
-              <span className="mr-[calc(var(--eyebrow-track)*-1)]">
-                Fullstack Web Developer
-                <span aria-hidden="true" className="mx-[0.6em] opacity-70">
-                  /
-                </span>
-                2026
-              </span>
+              <BlurText
+                className="mr-[calc(var(--eyebrow-track)*-1)]"
+                text={['Fullstack Web Developer ', { text: '/', className: 'opacity-70' }, ' 2026']}
+                delay={0.15}
+              />
               <span
                 aria-hidden="true"
                 className="hidden h-px w-8 bg-linear-to-l from-transparent to-[#7b80ff]/70 sm:block md:w-14"
               />
             </motion.p>
 
-            <motion.h1
+            <BlurText
+              as="h1"
               id="hero-title"
-              {...rise(0.2)}
               className="font-hero whitespace-nowrap text-ink text-[clamp(2.75rem,1rem+6vw,6rem)] leading-[1.02] tracking-[-0.03em]"
-            >
-              <span className="text-silver">Hey, I’m</span> <span className="text-indigo-glow">Noah</span>
-              <span className="text-silver">.</span>
-            </motion.h1>
+              text={[
+                { text: 'Hey, I’m ', className: 'text-silver' },
+                { text: 'Noah', className: 'text-indigo-glow' },
+                { text: '.', className: 'text-silver' },
+              ]}
+              delay={0.3}
+              stagger={0.14}
+              duration={0.8}
+            />
 
-            <motion.p {...rise(0.32)} className="mt-6 max-w-[38rem] text-lead text-pretty text-ink-soft md:mt-7">
-              I make <span className="text-indigo">secure</span> and <span className="text-indigo">engaging</span> web
-              applications.
-            </motion.p>
+            <BlurText
+              as="p"
+              className="mt-6 max-w-[38rem] text-lead text-pretty text-ink-soft md:mt-7"
+              text={['I make ', { text: 'secure', className: 'text-indigo' }, ' and ', { text: 'engaging', className: 'text-indigo' }, ' web applications.']}
+              delay={0.6}
+            />
 
-            <motion.div {...rise(0.44)} className="mt-8 flex flex-wrap items-center justify-center gap-3 md:mt-9 md:gap-4">
+            <motion.div {...rise(0.8)} className="mt-8 flex flex-wrap items-center justify-center gap-3 md:mt-9 md:gap-4">
               <LiquidGlass
                 as="a"
                 href="#work"
@@ -150,27 +161,23 @@ export function HeroCentered() {
           </div>
 
           {/* Three cards along the bottom of the hero */}
-          <motion.ul
-            {...rise(0.6)}
-            role="list"
-            className="mt-12 grid w-full max-w-[64rem] grid-cols-1 gap-2.5 sm:grid-cols-3 md:mt-14 md:gap-4"
-          >
-            <li>
-              <HeroCard glyph={icon.code} title="Modern Development" href="#work" label="See my work">
+          <ul role="list" className="mt-12 grid w-full max-w-[64rem] grid-cols-1 gap-2.5 sm:grid-cols-3 md:mt-14 md:gap-4">
+            <motion.li {...rise(cardsAt)}>
+              <HeroCard glyph={icon.code} title="Modern Development" href="#work" label="See my work" delay={cardsAt}>
                 Clean, scalable, and visually engaging design.
               </HeroCard>
-            </li>
-            <li>
-              <HeroCard glyph={icon.bolt} title="Performance Focus">
+            </motion.li>
+            <motion.li {...rise(cardsAt + 0.12)}>
+              <HeroCard glyph={icon.bolt} title="Performance Focus" delay={cardsAt + 0.12}>
                 Optimized for speed, built for the future.
               </HeroCard>
-            </li>
-            <li>
-              <HeroCard glyph={icon.shield} title="Secure by Design">
+            </motion.li>
+            <motion.li {...rise(cardsAt + 0.24)}>
+              <HeroCard glyph={icon.shield} title="Secure by Design" delay={cardsAt + 0.24}>
                 Secure backend and a production-ready page is my priority.
               </HeroCard>
-            </li>
-          </motion.ul>
+            </motion.li>
+          </ul>
         </div>
       </div>
     </section>

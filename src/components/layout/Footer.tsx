@@ -1,6 +1,8 @@
 import { CONTACT } from '@/content/contact'
 import { SITE } from '@/content/site'
 import { PyramidTile } from '@/components/ui/PyramidGlyph'
+import { BlurText } from '@/components/effects/BlurText'
+import { Reveal } from '@/components/ui/Reveal'
 
 const link =
   'inline-flex min-h-11 items-center text-[0.9rem] text-ink-muted transition-colors duration-(--duration-base) hover:text-ink focus-ring md:min-h-8'
@@ -12,17 +14,21 @@ export function Footer() {
     <footer className="relative overflow-hidden border-t border-line bg-navy-950/80">
       <div className="mx-auto max-w-[76rem] px-5 pt-14 sm:px-8 md:pt-16">
         <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-12">
-          <div className="sm:col-span-2 md:col-span-6">
+          <Reveal className="sm:col-span-2 md:col-span-6">
             <a href="#top" className="inline-flex items-center gap-3 rounded-glass-sm text-ink focus-ring">
               <PyramidTile size={40} />
               <span className="font-nav text-[1.05rem] font-light tracking-tight">{SITE.name}</span>
             </a>
-            <p className="mt-5 max-w-[24rem] text-[0.95rem] leading-[1.6] text-pretty text-ink-muted">
-              {SITE.role}. Websites designed, built and launched by one person, start to finish.
-            </p>
-          </div>
+            <BlurText
+              as="p"
+              className="mt-5 max-w-[24rem] text-[0.95rem] leading-[1.6] text-pretty text-ink-muted"
+              text={`${SITE.role}. Websites designed, built and launched by one person, start to finish.`}
+              delay={0.2}
+            />
+          </Reveal>
 
-          <nav aria-label="Footer" className="md:col-span-3">
+          <Reveal delay={0.1} className="md:col-span-3">
+           <nav aria-label="Footer">
             <p className={heading}>Site</p>
             <ul role="list">
               {SITE.nav.map((l) => (
@@ -33,9 +39,10 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-          </nav>
+           </nav>
+          </Reveal>
 
-          <div className="md:col-span-3">
+          <Reveal delay={0.2} className="md:col-span-3">
             <p className={heading}>Elsewhere</p>
             <ul role="list">
               <li>
@@ -50,7 +57,7 @@ export function Footer() {
                 </a>
               </li>
             </ul>
-          </div>
+          </Reveal>
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-line py-6 sm:flex-row">
