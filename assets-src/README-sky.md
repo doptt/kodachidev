@@ -37,7 +37,7 @@ What the script does, in order:
 
 | Set | Download | GPU memory with mips | Used by |
 | --- | --- | --- | --- |
-| 512 | 0.22 MB | 8 MB | lensed sky on the `low` tier (phones); the moon on small tiers |
+| 512 | 0.22 MB | 8 MB | the moon on small tiers (the lensed sky took it on the `low` tier until it was seen to come out in blocks on a phone; every tier now takes 1024 or more) |
 | 1024 | 1.13 MB | 32 MB | lensed sky on `medium`; the moon |
 | 2048 | 4.20 MB | 128 MB | lensed sky on `high` and `ultra` (desktop) |
 

@@ -26,7 +26,7 @@ const SWING_Y = (1.2 * Math.PI) / 180
 /** The six faces of the star map, in the order WebGL numbers them. */
 const FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const
 /** Which size of star map each quality tier takes (the edge of one face, in pixels). */
-const SKY_SIZE: Record<Quality['name'], number> = { ultra: 2048, high: 2048, medium: 1024, low: 512 }
+const SKY_SIZE: Record<Quality['name'], number> = { ultra: 2048, high: 2048, medium: 1024, low: 1024 }
 /** Seconds the sky takes to come up once its map has arrived. */
 const SKY_FADE = 1.2
 /**
@@ -36,7 +36,7 @@ const SKY_FADE = 1.2
  */
 const GALAXY_RISE = (6 * Math.PI) / 180
 /** How fast the stars drift round the sky on their own, radians per second. */
-const STAR_DRIFT = 0.004
+const STAR_DRIFT = 0.007
 
 export type LensInput = {
   /** Scene clock, seconds. */
@@ -448,6 +448,11 @@ export class LensRenderer {
     gl.uniform1f(P.lens.u('uPix'), pix)
     gl.uniformMatrix3fv(P.lens.u('uSky'), false, sky)
     gl.uniform1f(P.lens.u('uSkyOn'), this.skyLevel)
+    // Wrapped, so the shader's sines keep their precision however long the page is left open
+    gl.uniform1f(P.lens.u('uTime'), input.alive ? input.time % 3600 : 0)
+    gl.uniform1f(P.lens.u('uAlive'), input.alive ? 1 : 0)
+    // The drift is about the scene's vertical, which on the map is this
+    gl.uniform3f(P.lens.u('uDriftAxis'), sg, cg, 0)
     gl.uniform3fv(P.lens.u('uSrcCentre[0]'), centres)
     gl.uniform3fv(P.lens.u('uSrcUp[0]'), ups)
     gl.uniform2fv(P.lens.u('uSrcLayer[0]'), layers)
