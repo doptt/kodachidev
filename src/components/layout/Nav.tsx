@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } f
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react'
 import { cn } from '@/lib/cn'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { SoundToggle } from '@/sound/SoundToggle'
 
 /** Horizontal reach of the curve that sweeps each side of the bar up into the top edge. */
 const EAR = { desktop: 88, phone: 36 }
@@ -185,46 +186,49 @@ export function Nav() {
             ))}
           </ul>
 
-          <a
-            href="#contact"
-            className={cn(
-              'nav-cta hidden min-h-10 items-center rounded-pill font-nav font-light text-navy-950 transition-[padding,background-color,transform,box-shadow] duration-(--duration-base) ease-(--ease-glass) active:scale-[0.98] md:inline-flex focus-ring',
-              condensed ? 'px-3.5 text-[0.85rem]' : 'px-4 text-[0.9rem]',
-            )}
-          >
-            Get in touch
-          </a>
+          <div className="flex items-center gap-1 md:gap-3">
+            <SoundToggle />
+            <a
+              href="#contact"
+              className={cn(
+                'nav-cta hidden min-h-10 items-center rounded-pill font-nav font-light text-navy-950 transition-[padding,background-color,transform,box-shadow] duration-(--duration-base) ease-(--ease-glass) active:scale-[0.98] md:inline-flex focus-ring',
+                condensed ? 'px-3.5 text-[0.85rem]' : 'px-4 text-[0.9rem]',
+              )}
+            >
+              Get in touch
+            </a>
 
-          <button
-            ref={buttonRef}
-            type="button"
-            className="grid size-11 place-items-center rounded-pill text-ink md:hidden focus-ring"
-            aria-expanded={open}
-            aria-controls={menuId}
-            aria-label={open ? 'Close menu' : 'Open menu'}
-            onClick={() => setOpen((o) => !o)}
-          >
-            <span className="relative block h-3.5 w-5" aria-hidden="true">
-              <span
-                className={cn(
-                  'absolute left-0 top-0 h-px w-full bg-current transition-transform duration-(--duration-base) ease-(--ease-glass)',
-                  open && 'translate-y-[6.5px] rotate-45',
-                )}
-              />
-              <span
-                className={cn(
-                  'absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-current transition-opacity duration-(--duration-fast)',
-                  open && 'opacity-0',
-                )}
-              />
-              <span
-                className={cn(
-                  'absolute bottom-0 left-0 h-px w-full bg-current transition-transform duration-(--duration-base) ease-(--ease-glass)',
-                  open && '-translate-y-[6.5px] -rotate-45',
-                )}
-              />
-            </span>
-          </button>
+            <button
+              ref={buttonRef}
+              type="button"
+              className="grid size-11 place-items-center rounded-pill text-ink md:hidden focus-ring"
+              aria-expanded={open}
+              aria-controls={menuId}
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              onClick={() => setOpen((o) => !o)}
+            >
+              <span className="relative block h-3.5 w-5" aria-hidden="true">
+                <span
+                  className={cn(
+                    'absolute left-0 top-0 h-px w-full bg-current transition-transform duration-(--duration-base) ease-(--ease-glass)',
+                    open && 'translate-y-[6.5px] rotate-45',
+                  )}
+                />
+                <span
+                  className={cn(
+                    'absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-current transition-opacity duration-(--duration-fast)',
+                    open && 'opacity-0',
+                  )}
+                />
+                <span
+                  className={cn(
+                    'absolute bottom-0 left-0 h-px w-full bg-current transition-transform duration-(--duration-base) ease-(--ease-glass)',
+                    open && '-translate-y-[6.5px] -rotate-45',
+                  )}
+                />
+              </span>
+            </button>
+          </div>
         </nav>
         {/* After the nav so its ref is attached before this measures it; z-index keeps it underneath */}
         <NotchShape target={navRef} />

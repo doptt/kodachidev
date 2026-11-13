@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { BlurText } from '@/components/effects/BlurText'
+import { RevealText } from '@/components/effects/RevealText'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { blurIn } from './Reveal'
@@ -53,9 +53,9 @@ export function SectionHeader({
 }) {
   return (
     <div className={cn('mb-12 max-w-[44rem] md:mb-16', className)}>
-      <BlurText as="p" className="eyebrow-indigo mb-5" text={eyebrow} />
-      <BlurText as="h2" id={id} className="font-hero text-display-lg text-balance" wordClassName="text-silver" text={title} delay={0.12} />
-      {lede && <BlurText as="p" className="mt-5 max-w-[36rem] text-lead text-pretty text-ink-soft" text={lede} delay={0.3} />}
+      <RevealText as="p" className="eyebrow-indigo mb-5" text={eyebrow} />
+      <RevealText as="h2" id={id} className="font-hero text-display-lg text-balance" wordClassName="text-silver" text={title} delay={0.12} />
+      {lede && <RevealText as="p" className="mt-5 max-w-[36rem] text-lead text-pretty text-ink-soft" text={lede} delay={0.3} />}
     </div>
   )
 }

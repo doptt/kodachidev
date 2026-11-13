@@ -2,23 +2,28 @@
 //
 //   node scripts/bh-scrolltrace.mjs ["css to inject"]
 //   URL=http://localhost:4173/ SETTLE=8000 node scripts/bh-scrolltrace.mjs
+//   FROM="[data-lens-stage]" LEAD=0.5 TICKS=900 node scripts/bh-scrolltrace.mjs    (the lensed sky instead)
 //
 // Prints the share of frames over 20ms, overall and per half-screen of scroll (positions are in
-// viewport heights relative to the top of #about). The optional CSS is injected before scrolling:
+// viewport heights relative to the top of #about, or of FROM). It starts LEAD screens above that and
+// sends TICKS wheel steps of 11px. The optional CSS is injected before scrolling:
 // hide one thing at a time (".bh-intro{display:none!important}") to see what it costs.
 // A page at rest says nothing about this; measure the production build (vite preview) for real
 // numbers, since dev mode is roughly twice as slow. Expect run-to-run noise of several points.
 import { chromium } from 'playwright'
 const css = process.argv[2] ?? ''
+const from = process.env.FROM ?? '#about'
+const lead = Number(process.env.LEAD ?? 2.4)
+const ticks = Number(process.env.TICKS ?? 470)
 const b = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--force_high_performance_gpu'] })
 const p = await b.newPage({ viewport: { width: 1440, height: 900 } })
 await p.goto(process.env.URL ?? 'http://localhost:5173/', { waitUntil: 'networkidle' })
 if (css) await p.addStyleTag({ content: css })
-await p.evaluate(() => {
-  const about = document.getElementById('about')
+await p.evaluate(([from, lead]) => {
+  const about = document.querySelector(from)
   window.__aboutTop = about.getBoundingClientRect().top + scrollY
-  scrollTo({ top: window.__aboutTop - innerHeight * 2.4, behavior: 'instant' })
-})
+  scrollTo({ top: window.__aboutTop - innerHeight * lead, behavior: 'instant' })
+}, [from, lead])
 await p.waitForTimeout(Number(process.env.SETTLE ?? 6500))
 await p.evaluate(() => {
   window.__f = []
@@ -26,12 +31,12 @@ await p.evaluate(() => {
   const tick = (now) => {
     if (last) window.__f.push([(scrollY - window.__aboutTop) / innerHeight, now - last])
     last = now
-    if (window.__f.length < 3000) requestAnimationFrame(tick)
+    if (window.__f.length < 9000) requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)
 })
 await p.mouse.move(700, 450)
-for (let i = 0; i < 470; i++) {
+for (let i = 0; i < ticks; i++) {
   await p.mouse.wheel(0, 11)
   await p.waitForTimeout(16)
 }

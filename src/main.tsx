@@ -5,6 +5,7 @@ import '@fontsource-variable/geist'
 import '@fontsource-variable/geist-mono'
 import '@fontsource-variable/montserrat'
 import '@fontsource-variable/outfit'
+import 'lenis/dist/lenis.css'
 import './styles/index.css'
 import App from './App'
 

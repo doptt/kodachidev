@@ -82,8 +82,9 @@ function Caption({ reduced }: { reduced: boolean }) {
  *   3. the black hole: the page pins on it, with a short caption and a button
  *      while it idles, and scrolling falls into it until the screen is black.
  *
- * Nothing is built past the black screen; `onEntered` (or `blackHole` from
- * '@/blackhole/state') is where the next scene picks up. The black hole itself
+ * What follows the black screen is the lensed sky (LensedWork), which pins the
+ * moment this stage lets go. `onEntered` (or `blackHole` from
+ * '@/blackhole/state') still reports the moment of black. The black hole itself
  * is decoration and hidden from assistive tech; the caption and button are
  * not. Without WebGL, or on a device that can't run it, a still stands in and
  * fades to black over the same scroll.

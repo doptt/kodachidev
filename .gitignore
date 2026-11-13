@@ -8,3 +8,10 @@ dist
 /test-results
 /playwright-report
 *.tsbuildinfo
+
+# Asset pipeline: raw downloads, intermediates and portable tools (see assets-src/README.md)
+/assets-src/raw
+/assets-src/tools
+
+# Windows folder settings
+desktop.ini

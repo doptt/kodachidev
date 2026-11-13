@@ -99,13 +99,17 @@ function Word({ progress, index, text, accent }: { progress: MotionValue<number>
   const step = (WORDS_TO - WORDS_FROM) / STATEMENT.words.length
   const from = WORDS_FROM + index * step
   const opacity = useTransform(progress, [from, from + step * 1.6], [0.2, 1])
-  // Each word sharpens as the scroll reaches it, like the text everywhere else on the site
+  // Each word sharpens as the scroll reaches it
   const blur = useTransform(progress, [from, from + step * 1.6], [5, 0])
   const filter = useMotionTemplate`blur(${blur}px)`
+  // The space goes after the word's box, not inside it: a space at the end of an inline-block is
+  // collapsed away, and the words would touch
   return (
-    <motion.span style={{ opacity, filter }} className={cn('inline-block', accent && accentClass)}>
-      {text}{' '}
-    </motion.span>
+    <>
+      <motion.span style={{ opacity, filter }} className={cn('inline-block', accent && accentClass)}>
+        {text}
+      </motion.span>{' '}
+    </>
   )
 }
 

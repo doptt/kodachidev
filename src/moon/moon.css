@@ -1,0 +1,441 @@
+/*
+ * The moon (Contact): everything laid over its canvas, the fallback picture,
+ * and where the footer sits.
+ *
+ * The canvas behind is drawing every frame, so nothing large here animates
+ * anything but opacity and transform, and nothing follows scroll through a
+ * custom property: the pins' targets and cards are moved by transform from
+ * MoonOverlay.tsx.
+ */
+
+.moon-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.moon-overlay {
+  position: absolute;
+  inset: 0;
+  color: var(--color-bh-highlight, #ffedc1);
+  /* A finger moving up or down scrolls the page; sideways, it swings the view */
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.moon-overlay[data-interactive='true'][data-still='false'] {
+  cursor: grab;
+}
+.moon-overlay[data-dragging='true'] {
+  cursor: grabbing;
+}
+
+/* Focus that reads on black: cream, standing off its control */
+.moon-overlay :focus-visible,
+.moon-flat :focus-visible {
+  outline: 2px solid var(--color-bh-highlight, #ffedc1);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgb(0 0 0 / 0.85);
+  border-radius: inherit;
+}
+
+.moon-pins {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+/* The pointer's target over a pin: three quarters of an inch across, centred on the pin's head */
+.moon-pin-hit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 3.25rem;
+  height: 3.25rem;
+  margin: -1.625rem 0 0 -1.625rem;
+  border-radius: 50%;
+  pointer-events: none;
+  cursor: pointer;
+}
+.moon-pin[data-visible='true'] .moon-pin-hit {
+  pointer-events: auto;
+}
+/* A fine ring closes round the head of the pin whose label is open */
+.moon-pin-hit::after {
+  content: '';
+  position: absolute;
+  inset: 0.8rem;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(255 237 193 / 0.7);
+  opacity: 0;
+  transform: scale(1.7);
+  transition:
+    opacity var(--duration-base, 320ms) var(--ease-out-soft, ease-out),
+    transform var(--duration-slow, 640ms) var(--ease-out-soft, ease-out);
+}
+.moon-pin[data-open='true'][data-visible='true'] .moon-pin-hit::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/*
+ * The badge floating over a pin: a small dark disc with the mark of where the
+ * pin leads, so the three can be told apart at a glance. It bobs slowly, each
+ * out of step with the others; it goes when the pin is hidden behind the moon,
+ * and steps aside for the label when that is open.
+ */
+.moon-pin-badge {
+  position: absolute;
+  bottom: calc(100% - 0.55rem);
+  left: 50%;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-left: -1.125rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-bh-highlight, #ffedc1);
+  background: rgb(12 10 8 / 0.74);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 237 193 / 0.5),
+    0 0 18px -2px rgb(255 237 193 / 0.45),
+    0 6px 14px -6px rgb(0 0 0 / 0.8);
+  opacity: 0;
+  transition:
+    opacity var(--duration-base, 320ms) var(--ease-out-soft, ease-out),
+    scale var(--duration-base, 320ms) var(--ease-glass, ease-out);
+  animation: moon-badge-float 3.4s var(--ease-in-out-soft, ease-in-out) infinite alternate;
+}
+.moon-pin-badge svg {
+  display: block;
+  width: 1.2rem;
+  height: 1.2rem;
+}
+.moon-pin[data-visible='true'] .moon-pin-badge {
+  opacity: 1;
+}
+.moon-pin[data-visible='true'] .moon-pin-hit:hover .moon-pin-badge {
+  scale: 1.1;
+}
+.moon-pin[data-open='true'] .moon-pin-badge {
+  opacity: 0;
+  scale: 0.85;
+}
+@keyframes moon-badge-float {
+  from {
+    translate: 0 0.2rem;
+  }
+  to {
+    translate: 0 -0.3rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .moon-pin-badge {
+    animation: none;
+  }
+}
+
+/* The leader from a pin's head to its label */
+.moon-pin-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgb(255 237 193 / 0) 0, rgb(255 237 193 / 0) 0.6rem, rgb(255 237 193 / 0.6) 1.4rem);
+  opacity: 0;
+  transition: opacity var(--duration-fast, 160ms) linear;
+  pointer-events: none;
+}
+.moon-pin[data-open='true'] .moon-pin-line {
+  opacity: 1;
+  transition-duration: var(--duration-slow, 640ms);
+}
+
+/*
+ * A pin's label. The outer box is placed over the pin by transform; the body
+ * inside is what is seen, and what fades. A closed label is invisible but
+ * still there: its link is what the keyboard lands on to open it.
+ */
+.moon-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: max-content;
+  min-width: 15rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+  /* Where a label opens if it is reached before the scene has said where its pin is */
+  transform: translate3d(1rem, 6rem, 0);
+  pointer-events: none;
+}
+.moon-card-body {
+  position: relative;
+  padding: 0.95rem 1.1rem 1rem;
+  border-radius: var(--radius-glass-sm, 0.875rem);
+  background: rgb(10 9 7 / 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 237 193 / 0.18),
+    inset 0 1px 0 rgb(255 237 193 / 0.16),
+    0 24px 60px -24px rgb(0 0 0 / 0.95);
+  opacity: 0;
+  transform: translate3d(0, 0.4rem, 0);
+  transition:
+    opacity var(--duration-fast, 160ms) var(--ease-out-soft, ease-out),
+    transform var(--duration-fast, 160ms) var(--ease-out-soft, ease-out);
+}
+.moon-pin[data-open='true'] .moon-card {
+  pointer-events: auto;
+}
+.moon-pin[data-open='true'] .moon-card-body {
+  opacity: 1;
+  transform: none;
+  transition-duration: var(--duration-base, 320ms), var(--duration-slow, 640ms);
+}
+
+.moon-card-label {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  color: var(--color-bh-accent, #bca68e);
+}
+.moon-card-value {
+  margin: 0.55rem 0 0;
+  font-family: var(--font-hero, system-ui, sans-serif);
+  font-size: 1.4rem;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--color-bh-highlight, #ffedc1);
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+.moon-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+.moon-card-action {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: var(--radius-pill, 9999px);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgb(188 166 142 / 0.4);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 0.84rem;
+  line-height: 1;
+  color: #eadfc9;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-base, 320ms) var(--ease-glass, ease),
+    box-shadow var(--duration-base, 320ms) var(--ease-glass, ease),
+    color var(--duration-base, 320ms) var(--ease-glass, ease);
+}
+.moon-card-action:hover {
+  background: rgb(255 237 193 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 237 193 / 0.7);
+  color: var(--color-bh-highlight, #ffedc1);
+}
+/* The first thing a label offers is the thing to do */
+.moon-card-action:first-child {
+  background: linear-gradient(to bottom, #fff6de, var(--color-bh-highlight, #ffedc1));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7);
+  color: #14110b;
+}
+.moon-card-action:first-child:hover {
+  background: linear-gradient(to bottom, #fffaf0, #fff3d4);
+  color: #14110b;
+}
+.moon-card-action[data-done='true'] {
+  box-shadow: inset 0 0 0 1px rgb(255 237 193 / 0.7);
+  color: var(--color-bh-highlight, #ffedc1);
+}
+.moon-card-action:first-child[data-done='true'] {
+  color: #14110b;
+}
+
+/* Only a sheet needs closing by hand */
+.moon-card-close {
+  display: none;
+}
+
+/* The line of help, once the moon is the visitor's, until they have used it */
+.moon-hint {
+  position: absolute;
+  top: 6.5rem;
+  right: 1rem;
+  left: 1rem;
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: var(--color-bh-accent, #bca68e);
+  opacity: 0;
+  transition: opacity var(--duration-slow, 640ms) var(--ease-out-soft, ease-out);
+  pointer-events: none;
+}
+.moon-overlay[data-interactive='true'][data-touched='false'] .moon-hint {
+  opacity: 1;
+  transition-delay: 0.6s;
+}
+
+.moon-loading {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  left: 1rem;
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: var(--color-bh-glow, #8d7c69);
+  animation: moon-wait 2.4s var(--ease-in-out-soft, ease-in-out) infinite alternate;
+  pointer-events: none;
+}
+@keyframes moon-wait {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Narrow screens: the open label is a sheet along the bottom, not a card over its pin */
+@media (max-width: 40rem) {
+  .moon-card {
+    top: auto;
+    right: 0.75rem;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: 0.75rem;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    transform: none;
+  }
+  .moon-card-body {
+    padding: 1.1rem 1.15rem 1.15rem;
+    border-radius: 1.25rem;
+    background: rgb(10 9 7 / 0.97);
+    transform: translate3d(0, calc(100% + 1.5rem), 0);
+    transition-duration: var(--duration-base, 320ms);
+  }
+  .moon-card-value {
+    font-size: 1.55rem;
+  }
+  .moon-card-action {
+    min-height: 2.875rem;
+    padding: 0 1.15rem;
+    font-size: 0.92rem;
+  }
+  .moon-card-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-bh-accent, #bca68e);
+    cursor: pointer;
+  }
+  .moon-card-label {
+    padding-right: 2.5rem;
+  }
+  .moon-pin-line {
+    display: none;
+  }
+  /* Under the navigation, on the left: the Earth has the right of the sky */
+  .moon-hint {
+    top: 5.5rem;
+    right: 42%;
+    left: 1.25rem;
+    text-align: left;
+    line-height: 1.6;
+  }
+}
+
+/*
+ * The footer. Under the fallback picture it simply follows, on black. When the
+ * pinned moon is there it is laid over the bottom of the screen for the whole
+ * of the moon section: it comes up as soon as the page has moved onto the moon
+ * (html[data-moon-in], set by Contact.tsx) and stays, on a shade that keeps
+ * small type readable over lit ground. It is the last thing in the page and
+ * sticks to the bottom of the screen, so it is in place however far through
+ * the section the visitor is.
+ */
+.moon-footer {
+  position: relative;
+  z-index: 10;
+  background: #000;
+}
+main:has([data-moon-stage]) + .moon-footer {
+  --moon-footer: 13rem;
+  display: flex;
+  position: sticky;
+  bottom: 0;
+  min-height: var(--moon-footer);
+  margin-top: calc(var(--moon-footer) * -1);
+  align-items: flex-end;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.92) 0, rgb(0 0 0 / 0.78) 45%, rgb(0 0 0 / 0) 100%);
+  /* The shade is not in the way of the moon: only the footer's own contents take the pointer */
+  pointer-events: none;
+  /* Away until the page is on the moon (and out of the tab order with it) */
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duration-slow, 640ms) var(--ease-out-soft, ease-out),
+    visibility 0s var(--duration-slow, 640ms);
+}
+html[data-moon-in] main:has([data-moon-stage]) + .moon-footer {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--duration-slow, 640ms) var(--ease-out-soft, ease-out),
+    visibility 0s;
+}
+main:has([data-moon-stage]) + .moon-footer > * {
+  pointer-events: auto;
+}
+@media (min-width: 64rem) {
+  main:has([data-moon-stage]) + .moon-footer {
+    --moon-footer: 7.5rem;
+  }
+}
+/* A sheet opened by a tap has the bottom of the screen to itself */
+@media (max-width: 40rem) {
+  html[data-moon-in] main:has(.moon-overlay[data-sheet='true']) + .moon-footer {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--duration-base, 320ms) var(--ease-out-soft, ease-out),
+      visibility 0s var(--duration-base, 320ms);
+  }
+}

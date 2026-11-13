@@ -1,0 +1,91 @@
+{
+  "rootName": "alien",
+  "meshName": "body",
+  "rig": "assets-src/raw/r2/rig/rig.glb",
+  "mesh": "assets-src/raw/r2/mesh/baked.glb",
+  "bakeFacts": "assets-src/raw/r2/bake.facts.json",
+  "textureFormat": "ktx2",
+  "textureSize": 2048,
+  "webpQuality": 90,
+  "ktxTool": "assets-src/tools/ktx/unpacked/bin/ktx.exe",
+  "ktxQuality": 255,
+  "hipsAnchor": [0, 0.39, 0],
+  "mouthHeight": 0.981,
+  "mugHand": "left",
+  "fingersPerHand": 5,
+  "toesPerFoot": 5,
+  "antennae": { "parent": "Head", "segments": 3 },
+  "fit": {
+    "recline": 25,
+    "reclineLimit": 33,
+    "forwardGain": 0.35,
+    "headPitch": 0,
+    "restingBelow": 0.08,
+    "raisedAbove": 0.26,
+    "sipReach": 0.16,
+    "palmFromMouth": [0, -0.035, 0.075]
+  },
+  "clips": [
+    {
+      "name": "sip",
+      "file": "assets-src/raw/rig/sip_343.glb",
+      "source": "Sit_and_Drink",
+      "id": 343,
+      "role": "sip",
+      "mirror": true,
+      "handToMouth": "Left",
+      "description": "Reaches down and forward with the left hand (about 1 to 3 s), raises it to the mouth and drinks (about 4 to 7 s), puts it back and settles (to 11 s). Mirrored from the library clip so the drinking hand is the left, as in the reference picture, and the hand is steered to this head's mouth."
+    },
+    {
+      "name": "crossLegged",
+      "file": "assets-src/raw/rig/crosslegged_362.glb",
+      "source": "Sit_Cross_Legged",
+      "id": 362,
+      "role": "ambient",
+      "description": "The library's calmest seated loop: right leg crossed over the left, both hands resting on the raised knee, small shifts of weight. A whole alternative idle rather than a beat."
+    },
+    {
+      "name": "ponder",
+      "file": "assets-src/raw/rig/chairidle_32.glb",
+      "source": "Chair_Sit_Idle_F",
+      "id": 32,
+      "role": "ambient",
+      "description": "Sits back with the knees together and the hands on them (0 to 4.5 s), comes forward off the chair back to rest the chin on the right hand and think (5 to 9.5 s), sits back again."
+    },
+    {
+      "name": "stretch",
+      "file": "assets-src/raw/rig/stretch_356.glb",
+      "source": "Sit_Hands_on_Head_Lean_Back",
+      "id": 356,
+      "role": "ambient",
+      "description": "Puts both hands behind the head and presses back into the chair (peak about 1.7 to 2.7 s), then comes back to the idle pose, where it also starts."
+    },
+    {
+      "name": "cheers",
+      "file": "assets-src/raw/rig/thumbsup_357.glb",
+      "source": "Sit_Thumbs_Up_Right",
+      "id": 357,
+      "role": "ambient",
+      "mirror": true,
+      "description": "Raises the left hand, the mug hand, to shoulder height towards the viewer and holds it a beat (about 1 to 2.5 s), then lowers it: a toast. Mirrored from the library's right-handed thumbs-up."
+    },
+    {
+      "name": "doze",
+      "file": "assets-src/raw/rig/doze_268.glb",
+      "source": "Sit_and_Doze_Off",
+      "id": 268,
+      "role": "ambient",
+      "levelHead": false,
+      "description": "Lies back with the head sunk forward, nodding slowly: dozing off. Long (17 s) and almost still."
+    }
+  ],
+  "authored": [
+    {
+      "name": "idle",
+      "poseFrom": "stretch",
+      "duration": 8,
+      "role": "idle",
+      "description": "Reclined at ease, legs apart, breathing (4 s cycle) with a slow drift of the head. Not a library clip: it is the first key of the stretch clip held still with a breathing cycle on top, because the library's own seated idles either cross the legs (crossLegged) or act (ponder). Loops exactly."
+    }
+  ]
+}

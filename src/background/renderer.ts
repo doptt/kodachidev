@@ -1,5 +1,6 @@
 import vertSrc from './shaders/bg.vert.glsl?raw'
 import fragSrc from './shaders/bg.frag.glsl?raw'
+import { finishProgram, retirePending, startProgram, type PendingProgram } from '@/blackhole/gl'
 
 /** Everything the shader needs for one frame. Produced by the controller. */
 export type FrameUniforms = {
@@ -25,16 +26,21 @@ export type FrameUniforms = {
 const UNIFORM_NAMES = [
   'uTex', 'uBloom', 'uBloomOn', 'uRes', 'uTexSize', 'uCells', 'uTime', 'uFlow', 'uCam', 'uCamRot', 'uZoom', 'uParallax',
   'uTexAspect', 'uWaveAmp', 'uWarpScale', 'uLightAngle', 'uLightStr', 'uStars', 'uDarkness',
-  'uContrast', 'uHue', 'uRipple',
+  'uContrast', 'uHue', 'uRipple', 'uVeil',
 ] as const
 
 /** The field texture is a quilt of this many cells; the hero still is the top-left cell. */
 export const FIELD_CELLS = { cols: 2, rows: 3 }
 type UniformName = (typeof UNIFORM_NAMES)[number]
 
+/**
+ * Draws the purple field. It is one of the stage's scenes (see scene.ts): it
+ * is handed the stage's GL context, and binds everything it uses each frame,
+ * because other scenes draw with the same context in between.
+ */
 export class BackgroundRenderer {
-  private gl: WebGL2RenderingContext | null = null
   private program: WebGLProgram | null = null
+  private pending: PendingProgram | null = null
   private vao: WebGLVertexArrayObject | null = null
   private texture: WebGLTexture | null = null
   private texAspect = 16 / 9
@@ -47,57 +53,41 @@ export class BackgroundRenderer {
   private bloomReady = false
   private pendingBloom: { src: string; bitmap: TexImageSource | null } | null = null
 
-  constructor(private canvas: HTMLCanvasElement) {}
+  private gl: WebGL2RenderingContext | null
+  private parallel: KHR_parallel_shader_compile | null
 
-  /** Creates the context and compiles the program. Returns false if WebGL2 or the shader is unavailable. */
-  init(): boolean {
-    const gl = this.canvas.getContext('webgl2', {
-      alpha: false,
-      antialias: false,
-      depth: false,
-      stencil: false,
-      premultipliedAlpha: false,
-      preserveDrawingBuffer: false,
-      powerPreference: 'high-performance',
-    })
-    if (!gl) return false
+  constructor(gl: WebGL2RenderingContext, parallel: KHR_parallel_shader_compile | null) {
     this.gl = gl
-    return this.createResources()
+    this.parallel = parallel
   }
 
-  /** Re-creates GL resources after a context restore. */
-  restore(): boolean {
-    if (!this.gl) return false
-    this.program = null
-    this.vao = null
-    this.texture = null
-    this.textureReady = false
-    this.bloomTexture = null
-    this.bloomReady = false
-    const ok = this.createResources()
-    if (ok && this.pendingImage?.bitmap) this.uploadTexture(this.pendingImage.bitmap)
-    if (ok && this.pendingBloom?.bitmap) this.uploadBloom(this.pendingBloom.bitmap)
-    return ok
+  /** Hands the shader to the driver to compile in the background. False if it could not even be started. */
+  init(): boolean {
+    this.pending = startProgram(this.gl!, vertSrc, fragSrc, 'bg')
+    return !!this.pending
   }
 
-  private createResources(): boolean {
-    const gl = this.gl!
-    const vs = compile(gl, gl.VERTEX_SHADER, vertSrc)
-    const fs = compile(gl, gl.FRAGMENT_SHADER, fragSrc)
-    if (!vs || !fs) return false
-    const program = gl.createProgram()
-    if (!program) return false
-    gl.attachShader(program, vs)
-    gl.attachShader(program, fs)
-    gl.linkProgram(program)
-    gl.deleteShader(vs)
-    gl.deleteShader(fs)
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      if (import.meta.env.DEV) console.error('[bg] link failed', gl.getProgramInfoLog(program))
-      gl.deleteProgram(program)
-      return false
+  /** 'pending' while the shader compiles or the field image loads; 'ready' once both are in. */
+  prepare(): 'pending' | 'ready' | 'failed' {
+    const gl = this.gl
+    if (!gl) return 'failed'
+    if (this.pending) {
+      if (this.parallel && !gl.getProgramParameter(this.pending.program, this.parallel.COMPLETION_STATUS_KHR)) return 'pending'
+      const made = finishProgram(gl, this.pending)
+      this.pending = null
+      if (!made) return 'failed'
+      this.program = made.program
+      this.createResources()
+      if (this.pendingImage?.bitmap) this.uploadTexture(this.pendingImage.bitmap)
+      if (this.pendingBloom?.bitmap) this.uploadBloom(this.pendingBloom.bitmap)
     }
-    this.program = program
+    if (!this.program) return 'failed'
+    return this.textureReady ? 'ready' : 'pending'
+  }
+
+  private createResources() {
+    const gl = this.gl!
+    const program = this.program!
     gl.useProgram(program)
     for (const name of UNIFORM_NAMES) this.loc[name] = gl.getUniformLocation(program, name)
     gl.uniform1i(this.loc.uTex ?? null, 0)
@@ -114,7 +104,6 @@ export class BackgroundRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 
     this.vao = gl.createVertexArray()
-    gl.bindVertexArray(this.vao)
 
     this.texture = gl.createTexture()
     gl.activeTexture(gl.TEXTURE0)
@@ -124,9 +113,6 @@ export class BackgroundRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.disable(gl.DEPTH_TEST)
-    gl.disable(gl.BLEND)
-    return true
   }
 
   /** Loads (or swaps) the still image. Resolves when the texture is on the GPU. */
@@ -156,6 +142,7 @@ export class BackgroundRenderer {
 
   private uploadBloom(source: TexImageSource) {
     const gl = this.gl
+    // Before the shader is in there is no texture to fill: `prepare` uploads the kept image then
     if (!gl || !this.bloomTexture || gl.isContextLost()) return
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.bloomTexture)
@@ -163,6 +150,7 @@ export class BackgroundRenderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, gl.RGB, gl.UNSIGNED_BYTE, source)
     gl.generateMipmap(gl.TEXTURE_2D)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     gl.activeTexture(gl.TEXTURE0)
     this.bloomReady = true
   }
@@ -180,34 +168,32 @@ export class BackgroundRenderer {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, !(typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap))
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, gl.RGB, gl.UNSIGNED_BYTE, source)
     gl.generateMipmap(gl.TEXTURE_2D)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     this.textureReady = true
   }
 
-  get ready(): boolean {
-    return !!this.gl && !!this.program && this.textureReady && !this.gl.isContextLost()
-  }
-
-  resize(width: number, height: number) {
-    const w = Math.max(1, Math.round(width))
-    const h = Math.max(1, Math.round(height))
-    if (this.canvas.width !== w) this.canvas.width = w
-    if (this.canvas.height !== h) this.canvas.height = h
-  }
-
-  render(u: FrameUniforms) {
+  /** Draws one frame into the default framebuffer. `veil` (0..1) fades it to black. */
+  render(u: FrameUniforms, width: number, height: number, veil: number) {
     const gl = this.gl
     if (!gl || !this.program || !this.textureReady || gl.isContextLost()) return
     const l = this.loc
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.viewport(0, 0, width, height)
+    gl.disable(gl.DEPTH_TEST)
+    gl.disable(gl.BLEND)
+    gl.disable(gl.CULL_FACE)
+    gl.disable(gl.SCISSOR_TEST)
+    gl.colorMask(true, true, true, true)
     gl.useProgram(this.program)
     gl.bindVertexArray(this.vao)
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.bloomTexture)
     gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.texture)
+    gl.uniform1i(l.uTex ?? null, 0)
+    gl.uniform1i(l.uBloom ?? null, 1)
     gl.uniform1f(l.uBloomOn!, this.bloomReady ? 1 : 0)
-    gl.uniform2f(l.uRes!, this.canvas.width, this.canvas.height)
+    gl.uniform2f(l.uRes!, width, height)
     gl.uniform2f(l.uTexSize!, this.texSize.w, this.texSize.h)
     gl.uniform2f(l.uCells!, FIELD_CELLS.cols, FIELD_CELLS.rows)
     gl.uniform1f(l.uTime!, u.time)
@@ -226,7 +212,9 @@ export class BackgroundRenderer {
     gl.uniform1f(l.uContrast!, u.contrast)
     gl.uniform1f(l.uHue!, u.hue)
     gl.uniform1f(l.uRipple!, u.ripple)
+    gl.uniform1f(l.uVeil!, veil)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindVertexArray(null)
   }
 
   dispose() {
@@ -237,8 +225,7 @@ export class BackgroundRenderer {
       if (this.bloomTexture) gl.deleteTexture(this.bloomTexture)
       if (this.vao) gl.deleteVertexArray(this.vao)
       if (this.program) gl.deleteProgram(this.program)
-      // Don't loseContext() here: React StrictMode re-mounts onto the same canvas and
-      // getContext() would hand back the dead context. The context goes with the element.
+      if (this.pending) retirePending(gl, this.parallel, [this.pending])
       gl.bindVertexArray(null)
       gl.bindTexture(gl.TEXTURE_2D, null)
       gl.useProgram(null)
@@ -253,21 +240,9 @@ export class BackgroundRenderer {
     this.texture = null
     this.vao = null
     this.program = null
+    this.pending = null
     this.gl = null
   }
-}
-
-function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader | null {
-  const shader = gl.createShader(type)
-  if (!shader) return null
-  gl.shaderSource(shader, src)
-  gl.compileShader(shader)
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    if (import.meta.env.DEV) console.error('[bg] shader compile failed', gl.getShaderInfoLog(shader))
-    gl.deleteShader(shader)
-    return null
-  }
-  return shader
 }
 
 /** Fetches and decodes an image, flipped for GL when the browser can do that at decode time. */

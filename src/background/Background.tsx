@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { BackgroundRenderer } from './renderer'
-import { BackgroundController } from './controller'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { blackHole } from '@/blackhole/state'
+import { stage } from '@/stage/stage'
+import { useSceneStatus, useStageDrawn } from '@/stage/react'
+import { createFieldScene } from './scene'
 
 export type BackgroundProps = {
   /** Force one scene regardless of the sections on the page (handy for tests/dev). */
   scene?: string
-  /** Skip WebGL and show the still image (also forced by `?nogl` in the URL). */
+  /** Skip the animated field and show the still image (also forced by `?nogl` in the URL). */
   still?: boolean
   /** Extra class on the root element. */
   className?: string
@@ -14,15 +15,7 @@ export type BackgroundProps = {
 
 const STILL_WIDE = '/bg/still.webp'
 const STILL_NARROW = '/bg/still-1280.webp'
-/** Seamlessly tileable 2x3 quilt of video frames; the hero still is its top-left cell. */
-const FIELD = '/bg/field.webp'
-/** Baked glow of the field's bright specks; optional extra for the shader. */
-const BLOOM = '/bg/bloom.webp'
 const FADE_MS = 600
-const MAX_DPR = 2 // full retina: quality over power draw
-/** Ceiling on canvas pixels (about 2560x1600 at DPR 2) so a 4K retina display does not ask for 33 MP per frame. */
-const MAX_PIXELS = 8.4e6
-const FRAME_MIN_MS = 1000 / 60 - 1.5 // cap at 60fps (skip frames on 120Hz displays)
 
 function pickStill(width: number) {
   return width < 1280 ? STILL_NARROW : STILL_WIDE
@@ -45,17 +38,19 @@ function useMediaQuery(q: string): boolean {
   return match
 }
 
-type Mode = 'loading' | 'live' | 'still'
-
 /**
- * Fixed, full-viewport animated background. The still image paints immediately
- * (it's preloaded in index.html); the WebGL canvas fades in over it once the
- * first frame is drawn. Falls back to the still when WebGL2 is unavailable,
- * the shader fails, the context is lost, or the user prefers reduced motion.
+ * The fixed layer behind the whole page, and the home of the stage: the one
+ * canvas every 3D scene on the site draws into (see src/stage). From the back:
+ * a still image, which paints at once (it is preloaded in index.html); a veil
+ * that fades it to black as the page goes dark for the black hole; and the
+ * stage's canvas, which is visible whenever a scene is being drawn.
+ *
+ * This component's own scene is the purple field behind the first sections.
+ * It shows while the page is lit, and falls back to the still when WebGL2 is
+ * unavailable or the user prefers reduced motion.
  */
 export default function Background({ scene, still, className }: BackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [mode, setMode] = useState<Mode>('loading')
   const [stillSrc, setStillSrc] = useState(() => pickStill(typeof window !== 'undefined' ? window.innerWidth : 1920))
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   const coarsePointer = useMediaQuery('(hover: none), (pointer: coarse)')
@@ -69,125 +64,54 @@ export default function Background({ scene, still, className }: BackgroundProps)
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  // The stage lives on this canvas for as long as the page does
   useEffect(() => {
     const canvas = canvasRef.current
-    if (useStill || !canvas) {
-      setMode('still')
-      return
-    }
-    setMode('loading')
+    if (!canvas) return
+    return stage.mount(canvas, { reducedMotion })
+  }, [reducedMotion])
 
-    const renderer = new BackgroundRenderer(canvas)
-    if (!renderer.init()) {
-      setMode('still')
-      renderer.dispose()
-      return
-    }
-
-    const controller = new BackgroundController({ mouse: !coarsePointer, forcedScene })
-    controller.start()
-
-    let raf = 0
-    let lastFrame = 0
-    let lastTime = 0
-    let disposed = false
-    let firstFrameDrawn = false
-    let fieldRequested = false
-    let lost = false
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect()
-      const area = Math.max(1, rect.width * rect.height)
-      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR, Math.sqrt(MAX_PIXELS / area))
-      renderer.resize(rect.width * dpr, rect.height * dpr)
-      if (!fieldRequested) {
-        fieldRequested = true
-        void renderer.loadImage(FIELD).then((ok) => {
-          if (!ok && !disposed && !firstFrameDrawn) setMode('still')
-        })
-        void renderer.loadBloom(BLOOM)
+  // The field: on screen while the page is lit, withdrawn once it has gone fully dark
+  useEffect(() => {
+    if (useStill) return
+    stage.define('field', createFieldScene({ mouse: !coarsePointer, forcedScene, veil: () => Math.max(blackHole.theme, blackHole.dim) }), { priority: 0, keep: 60000 })
+    let hide: (() => void) | null = null
+    const sync = () => {
+      const dark = Math.max(blackHole.theme, blackHole.dim) >= 0.999
+      if (!dark && !hide) hide = stage.show('field')
+      else if (dark && hide) {
+        hide()
+        hide = null
       }
     }
-
-    const frame = (now: number) => {
-      raf = requestAnimationFrame(frame)
-      if (now - lastFrame < FRAME_MIN_MS) return
-      const dt = lastTime ? (now - lastTime) / 1000 : 1 / 60
-      lastFrame = now
-      lastTime = now
-      const u = controller.update(dt)
-      // Fully blacked out by the black hole sequence: nothing to draw
-      if (Math.max(blackHole.theme, blackHole.dim) >= 0.999 && firstFrameDrawn) return
-      if (!renderer.ready) return
-      renderer.render(u)
-      if (!firstFrameDrawn) {
-        firstFrameDrawn = true
-        setMode('live')
-      }
-    }
-
-    const startLoop = () => {
-      if (raf || disposed || lost) return
-      lastTime = 0
-      controller.settle()
-      raf = requestAnimationFrame(frame)
-    }
-    const stopLoop = () => {
-      if (raf) cancelAnimationFrame(raf)
-      raf = 0
-    }
-
-    const onVisibility = () => (document.hidden ? stopLoop() : startLoop())
-    const onLost = (e: Event) => {
-      e.preventDefault()
-      lost = true
-      stopLoop()
-      setMode('loading') // hides the canvas; still image shows underneath
-    }
-    const onRestored = () => {
-      lost = false
-      if (renderer.restore()) {
-        firstFrameDrawn = false
-        fieldRequested = false
-        resize()
-        startLoop()
-      } else {
-        setMode('still')
-      }
-    }
-
-    const ro = new ResizeObserver(resize)
-    ro.observe(canvas)
-    resize()
-    document.addEventListener('visibilitychange', onVisibility)
-    canvas.addEventListener('webglcontextlost', onLost)
-    canvas.addEventListener('webglcontextrestored', onRestored)
-    if (!document.hidden) startLoop()
-
+    sync()
+    const off = blackHole.subscribe(sync)
     return () => {
-      disposed = true
-      stopLoop()
-      ro.disconnect()
-      document.removeEventListener('visibilitychange', onVisibility)
-      canvas.removeEventListener('webglcontextlost', onLost)
-      canvas.removeEventListener('webglcontextrestored', onRestored)
-      controller.stop()
-      renderer.dispose()
+      off()
+      hide?.()
     }
   }, [useStill, coarsePointer, forcedScene])
+
+  // The canvas is opaque. Once it has a picture it stays up, going black between scenes like the page
+  // behind it; where the field is not running (reduced motion) it shows only while another scene draws,
+  // so that the still image is not hidden behind a black canvas.
+  const drawing = useSyncExternalStore(
+    stage.subscribe,
+    () => stage.active !== null,
+    () => false,
+  )
+  const drawn = useStageDrawn()
+  const visible = useStill ? drawing : drawn
+  const field = useSceneStatus('field')
+  const mode = useStill || field === 'failed' ? 'still' : field === 'ready' ? 'live' : 'loading'
 
   return (
     <div className={className} style={rootStyle} aria-hidden="true" data-bg-mode={mode} data-bh-vars="theme dim">
       <img src={stillSrc} alt="" decoding="async" fetchPriority="high" style={imgStyle} draggable={false} />
       <div style={stillShadeStyle} />
-      {!useStill && (
-        <canvas
-          ref={canvasRef}
-          style={{ ...canvasStyle, opacity: mode === 'live' ? 1 : 0 }}
-        />
-      )}
-      {/* Fades the field to black as the black hole sequence arrives (see .bh-veil) */}
+      {/* Fades the still to black as the black hole sequence arrives (see .bh-veil). The field does the same for itself. */}
       <div className="bh-veil" style={veilStyle} />
+      <canvas ref={canvasRef} data-stage style={{ ...canvasStyle, opacity: visible ? 1 : 0 }} />
     </div>
   )
 }

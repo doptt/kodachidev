@@ -184,20 +184,29 @@ export type Published = {
   cue: number
 }
 
+/** Which of the page-level values let go again as the section scrolls away. */
+export type Release = {
+  /** The black page. Held when what follows is also set in the dark. */
+  theme: boolean
+  /** The dimmed UI. Released so the navigation comes back once the fall is over. */
+  dim: boolean
+}
+
 /**
- * The page-level values for a scroll position. With `release`, theme and dim
- * let go again as the section scrolls away; without it they are held.
+ * The page-level values for a scroll position. `release` says which of theme
+ * and dim let go again as the section scrolls away (true or false for both).
  */
-export function derive(pos: ScrollPosition, release: boolean): Published {
-  const hold = release ? 1 - smoothstep(0, 0.85, pos.exit) : 1
+export function derive(pos: ScrollPosition, release: boolean | Release): Published {
+  const lets = typeof release === 'boolean' ? { theme: release, dim: release } : release
+  const letGo = 1 - smoothstep(0, 0.85, pos.exit)
   // The scene comes up out of the dark as the stage scrolls into view, and finishes just after it pins
   const arrive = 0.82 * smoothstep(1 - ARRIVE_FROM / LEAD, 1, pos.enter) + 0.18 * smoothstep(0, 0.02, pos.pin)
   return {
     progress: pos.pin,
     // The page fades to black over the run-in, and stays black through everything after it
-    theme: smoothstep(0, 1, pos.fade) * hold,
+    theme: smoothstep(0, 1, pos.fade) * (lets.theme ? letGo : 1),
     // The UI goes down with the scene and is gone just before the screen is black
-    dim: smoothstep(0.42, BLACK_AT - 0.03, pos.pin) * hold,
+    dim: smoothstep(0.42, BLACK_AT - 0.03, pos.pin) * (lets.dim ? letGo : 1),
     arrive,
     // Up as the scene settles, held through the idle, and gone a little way into the fall
     intro: smoothstep(0.84, 1, arrive) * (1 - smoothstep(IDLE_END * 0.9, IDLE_END * 1.5, pos.pin)),

@@ -34,6 +34,7 @@ uniform float uDarkness;   // 0..1
 uniform float uContrast;   // ~1
 uniform float uHue;        // tiny hue rotation (radians)
 uniform float uRipple;     // 0..1 scroll-velocity ripple
+uniform float uVeil;       // 0..1 fade to black, as the page goes dark for the black hole
 
 out vec4 fragColor;
 
@@ -327,5 +328,5 @@ void main() {
   float dither = (hash12(dp) + hash12(dp + 17.3) - 1.0) / 255.0;
   col += dither;
 
-  fragColor = vec4(max(col, 0.0), 1.0);
+  fragColor = vec4(max(col, 0.0) * (1.0 - uVeil), 1.0);
 }

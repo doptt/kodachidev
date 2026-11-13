@@ -3,7 +3,7 @@
   python dev/background.build-field.py
 
 Outputs
-  public/bg/still.webp, still-1280.webp, still.jpg   the hero frame (t=5.0s), for the <img> fallback
+  public/bg/still.webp, still-1280.webp   the hero frame (t=5.0s), for the <img> fallback
   public/bg/field.webp                                3840x3240 seamlessly tileable "field" for the shader
   public/bg/bloom.webp                                960x810 glow of the field's bright specks, added by the shader
 
@@ -307,8 +307,6 @@ def main():
     save_webp(hero, OUT / 'still.webp', 95)
     small = np.asarray(Image.fromarray(hero.astype(np.uint8)).resize((1280, 720), Image.LANCZOS)).astype(np.float32)
     save_webp(small, OUT / 'still-1280.webp', 92)
-    Image.fromarray(hero.astype(np.uint8)).save(OUT / 'still.jpg', 'JPEG', quality=90, optimize=True, progressive=True)
-    print(f"public/bg/still.jpg  {(OUT / 'still.jpg').stat().st_size / 1024:.0f} KB")
 
     canvas = Torus(COLS * CELL_W, ROWS * CELL_H)
     canvas.put(0, 0, hero, np.ones((CELL_H, CELL_W), np.float32))

@@ -4,6 +4,8 @@
 //     [--p 0,0.25,0.5,0.75,1] [--sizes 1440x900,390x844@2] [--out screenshots/bh]
 //     [--name shot] [--tier ultra] [--frames 48] [--software] [--reduced-motion] [--back]
 //     [--query nogl]   extra query string for site mode (nogl shows the still-image fallback)
+//     [--page lens]    dev mode: the harness to load, /dev/<page>.html (default blackhole)
+//     [--stage "[data-lens-stage]"]   site mode: the pinned stage to scroll through (default the black hole's)
 //
 // dev   loads /dev/blackhole.html?p=… (the isolated scene)
 // site  loads the real page and scrolls the pinned Work intro to each progress
@@ -38,6 +40,9 @@ const desktop = flag('desktop', false) === true
 // dev mode: frame overrides, e.g. --set smear:0,iris:0
 const set = flag('set', null)
 const query = flag('query', null)
+// dev mode: which harness to load (blackhole or lens). site mode: which pinned stage to scroll through
+const devPage = flag('page', 'blackhole')
+const stage = flag('stage', '[data-bh-stage]')
 
 mkdirSync(out, { recursive: true })
 
@@ -52,8 +57,13 @@ async function settle(page) {
   await page
     .waitForFunction(
       (n) => {
-        const c = document.querySelector('canvas[data-bh-tier]')
-        return !c || Number(c.dataset.bhFrames ?? 0) >= n
+        // Only a canvas that is on screen keeps drawing: the black hole's and the lensed sky's take turns
+        // (a scene on a canvas of its own marks it data-bh-*; the site's shared stage and the harness pages, data-stage-*)
+        const onScreen = [...document.querySelectorAll('canvas[data-bh-tier], canvas[data-stage-tier]')].filter((c) => {
+          const r = c.getBoundingClientRect()
+          return r.bottom > 0 && r.top < innerHeight
+        })
+        return onScreen.every((c) => c.dataset.stageState === 'failed' || Number(c.dataset.bhFrames ?? c.dataset.stageFrames ?? 0) >= n)
       },
       frames,
       { timeout: 20000 },
@@ -86,15 +96,16 @@ for (const size of sizes) {
     const file = path.join(out, `${name}-${tag}-${label}.png`)
     await page.screenshot({ path: file })
     const info = await page.evaluate(() => {
-      const c = document.querySelector('canvas[data-bh-tier]')
+      const c = document.querySelector('canvas[data-stage-tier]') ?? document.querySelector('canvas[data-bh-tier]')
       const root = getComputedStyle(document.querySelector('header[data-bh-vars]') ?? document.documentElement)
       const mode = document.querySelector('[data-bh-stage]')?.dataset.bhMode
       return {
         mode,
-        tier: c?.dataset.bhTier,
-        fps: c?.dataset.bhFps,
+        scene: c?.dataset.stageActive,
+        tier: c?.dataset.stageTier ?? c?.dataset.bhTier,
+        fps: c?.dataset.stageFps ?? c?.dataset.bhFps,
         canvas: c ? `${c.width}x${c.height}` : 'none',
-        gpu: c?.dataset.bhGpu?.replace(/^ANGLE \((.*)\)$/, '$1').slice(0, 60),
+        gpu: (c?.dataset.stageGpu ?? c?.dataset.bhGpu)?.replace(/^ANGLE \((.*)\)$/, '$1').slice(0, 60),
         theme: root.getPropertyValue('--bh-theme').trim(),
         dim: root.getPropertyValue('--bh-dim').trim(),
         entered: document.documentElement.dataset.bhEntered,
@@ -109,22 +120,22 @@ for (const size of sizes) {
       if (tier) q.set('bhtier', tier)
       if (reduced) q.set('still', '1')
       if (set) q.set('set', set)
-      await page.goto(`${url}/dev/blackhole.html?${q}`, { waitUntil: 'networkidle' })
+      await page.goto(`${url}/dev/${devPage}.html?${q}`, { waitUntil: 'networkidle' })
       await shoot(`p${String(p).replace('.', '_')}`)
     }
   } else {
     const qs = [tier && `bhtier=${tier}`, query].filter(Boolean).join('&')
     await page.goto(`${url}/${qs ? `?${qs}` : ''}`, { waitUntil: 'networkidle' })
     const scrollTo = async (p) => {
-      await page.evaluate((p) => {
-        const el = document.querySelector('[data-bh-stage]')
+      await page.evaluate(([p, selector]) => {
+        const el = document.querySelector(selector)
         const top = el.getBoundingClientRect().top + window.scrollY
         const stage = el.firstElementChild.offsetHeight
         const span = el.offsetHeight - stage
         // Below 0 and above 1 are in viewport heights: -0.5 is the section half scrolled in, 1.5 half scrolled out
         const y = p < 0 ? top + stage * p : p > 1 ? top + span + stage * (p - 1) : top + span * p
         window.scrollTo({ top: y, behavior: 'instant' })
-      }, p)
+      }, [p, stage])
       // Let the smoothed progress catch up with the scroll position
       await page.waitForTimeout(1600)
     }

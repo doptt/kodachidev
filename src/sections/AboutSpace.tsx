@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { motion, useScroll, useTransform, type MotionValue } from 'motion/react'
 import { ABOUT } from '@/content/about'
 import { StarField } from '@/blackhole/StarField'
-import { BlurText } from '@/components/effects/BlurText'
+import { RevealText } from '@/components/effects/RevealText'
 import { ScrambleText } from '@/components/effects/ScrambleText'
 import { Reveal } from '@/components/ui/Reveal'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
@@ -70,7 +70,7 @@ export function AboutSpace() {
 
       <div className="relative mx-auto max-w-[110rem] px-5 sm:px-8 lg:px-12">
         <h2 id="about-title" ref={headline} aria-label={`${LEAD_IN} ${BIG}.`} className="relative">
-          <BlurText
+          <RevealText
             className="mb-[0.6vw] block pl-[0.4vw] font-hero text-[clamp(1rem,0.55rem+1.25vw,1.75rem)] font-medium uppercase tracking-[0.01em] text-bh-accent"
             text={`${LEAD_IN},`}
           />
@@ -92,7 +92,7 @@ export function AboutSpace() {
         <div className="mt-[clamp(3.5rem,7vw,7rem)] grid gap-y-14 lg:grid-cols-12 lg:gap-x-10">
           {/* Numbers */}
           <div className="lg:col-span-4">
-            <BlurText as="p" className={label} text="////// In numbers" />
+            <RevealText as="p" className={label} text="////// In numbers" />
             <dl className="mt-7 space-y-7">
               {ABOUT.stats.map((s, i) => (
                 // One <div> per pair, directly inside the <dl>: the only grouping a description list allows
@@ -108,7 +108,7 @@ export function AboutSpace() {
 
           {/* Bio */}
           <div className="lg:col-span-7 lg:col-start-6">
-            <BlurText as="p" className={label} text="////// Bio" />
+            <RevealText as="p" className={label} text="////// Bio" />
             <ScrambleText
               className="mt-7 font-mono text-[clamp(1rem,0.9rem+0.45vw,1.3rem)] leading-[1.55] text-[#eadfc9]"
               text={ABOUT.intro}
@@ -118,7 +118,7 @@ export function AboutSpace() {
                 <ScrambleText key={p} className="max-w-[46rem] font-mono text-[0.9rem] leading-[1.8] text-[#b3a792]" text={p} />
               ))}
             </div>
-            <BlurText as="p" className={`${label} mt-12`} text="/// The work is further down" delay={0.2} />
+            <RevealText as="p" className={`${label} mt-12`} text="/// The work is further down" delay={0.2} />
           </div>
         </div>
       </div>

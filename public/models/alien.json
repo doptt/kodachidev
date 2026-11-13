@@ -1,0 +1,393 @@
+{
+  "version": 2,
+  "stage": "final",
+  "file": "alien.glb",
+  "units": "metres",
+  "up": "+Y",
+  "forward": "+Z",
+  "height": 1.2,
+  "box": {
+    "min": [
+      -0.3332,
+      0,
+      -0.1382
+    ],
+    "max": [
+      0.3332,
+      1.2,
+      0.1382
+    ]
+  },
+  "triangles": 50000,
+  "vertices": 35550,
+  "textureFormat": "ktx2",
+  "textures": [
+    "baseColor",
+    "normal",
+    "metallicRoughness"
+  ],
+  "extensions": [
+    "EXT_meshopt_compression",
+    "KHR_mesh_quantization",
+    "KHR_texture_basisu"
+  ],
+  "rootNode": "alien",
+  "skinnedMesh": "body",
+  "clips": {
+    "idle": "idle",
+    "sip": "sip",
+    "ambient": [
+      "crossLegged",
+      "ponder",
+      "stretch",
+      "cheers",
+      "doze"
+    ]
+  },
+  "clipInfo": {
+    "sip": {
+      "duration": 11.1667,
+      "loops": true,
+      "seated": true,
+      "source": "Sit_and_Drink (library id 343), mirrored left for right, refitted: reclined, head levelled, arms re-posed",
+      "handAtMouth": {
+        "hold": [
+          3.47,
+          7.53
+        ],
+        "hand": "left"
+      },
+      "description": "Reaches down and forward with the left hand (about 1 to 3 s), raises it to the mouth and drinks (about 4 to 7 s), puts it back and settles (to 11 s). Mirrored from the library clip so the drinking hand is the left, as in the reference picture, and the hand is steered to this head's mouth."
+    },
+    "crossLegged": {
+      "duration": 9.5333,
+      "loops": true,
+      "seated": true,
+      "source": "Sit_Cross_Legged (library id 362), refitted: reclined, head levelled, arms re-posed",
+      "description": "The library's calmest seated loop: right leg crossed over the left, both hands resting on the raised knee, small shifts of weight. A whole alternative idle rather than a beat."
+    },
+    "ponder": {
+      "duration": 11.3333,
+      "loops": true,
+      "seated": true,
+      "source": "Chair_Sit_Idle_F (library id 32), refitted: reclined, head levelled, arms re-posed",
+      "description": "Sits back with the knees together and the hands on them (0 to 4.5 s), comes forward off the chair back to rest the chin on the right hand and think (5 to 9.5 s), sits back again."
+    },
+    "stretch": {
+      "duration": 4.8,
+      "loops": true,
+      "seated": true,
+      "source": "Sit_Hands_on_Head_Lean_Back (library id 356), refitted: reclined, head levelled, arms re-posed",
+      "description": "Puts both hands behind the head and presses back into the chair (peak about 1.7 to 2.7 s), then comes back to the idle pose, where it also starts."
+    },
+    "cheers": {
+      "duration": 3.8333,
+      "loops": true,
+      "seated": true,
+      "source": "Sit_Thumbs_Up_Right (library id 357), mirrored left for right, refitted: reclined, head levelled, arms re-posed",
+      "description": "Raises the left hand, the mug hand, to shoulder height towards the viewer and holds it a beat (about 1 to 2.5 s), then lowers it: a toast. Mirrored from the library's right-handed thumbs-up."
+    },
+    "doze": {
+      "duration": 17.3,
+      "loops": true,
+      "seated": true,
+      "source": "Sit_and_Doze_Off (library id 268), refitted: reclined, head levelled, arms re-posed",
+      "description": "Lies back with the head sunk forward, nodding slowly: dozing off. Long (17 s) and almost still."
+    },
+    "idle": {
+      "duration": 8,
+      "loops": true,
+      "seated": true,
+      "source": "authored: first key of \"stretch\" held, with a breathing cycle",
+      "description": "Reclined at ease, legs apart, breathing (4 s cycle) with a slow drift of the head. Not a library clip: it is the first key of the stretch clip held still with a breathing cycle on top, because the library's own seated idles either cross the legs (crossLegged) or act (ponder). Loops exactly."
+    }
+  },
+  "hipsAnchor": [
+    0,
+    0.39,
+    0
+  ],
+  "recline": {
+    "degrees": 25,
+    "limit": 33
+  },
+  "mugHand": "left",
+  "bones": {
+    "hips": "Hips",
+    "spine": "Spine02",
+    "spineMid": "Spine01",
+    "chest": "Spine",
+    "neck": "neck",
+    "head": "Head",
+    "headEnd": "head_end",
+    "headFront": "headfront",
+    "leftShoulder": "LeftShoulder",
+    "leftUpperArm": "LeftArm",
+    "leftForeArm": "LeftForeArm",
+    "leftHand": "LeftHand",
+    "rightShoulder": "RightShoulder",
+    "rightUpperArm": "RightArm",
+    "rightForeArm": "RightForeArm",
+    "rightHand": "RightHand",
+    "leftUpLeg": "LeftUpLeg",
+    "leftLeg": "LeftLeg",
+    "leftFoot": "LeftFoot",
+    "leftToe": "LeftToeBase",
+    "rightUpLeg": "RightUpLeg",
+    "rightLeg": "RightLeg",
+    "rightFoot": "RightFoot",
+    "rightToe": "RightToeBase"
+  },
+  "antennaBones": {
+    "left": [
+      "LeftAntenna1",
+      "LeftAntenna2",
+      "LeftAntenna3"
+    ],
+    "right": [
+      "RightAntenna1",
+      "RightAntenna2",
+      "RightAntenna3"
+    ]
+  },
+  "bind": {
+    "bonePositions": {
+      "Hips": [
+        -0.0026,
+        0.6223,
+        0.0003
+      ],
+      "Spine02": [
+        -0.0022,
+        0.6964,
+        0.0016
+      ],
+      "Spine01": [
+        -0.0017,
+        0.7705,
+        0.0028
+      ],
+      "Spine": [
+        -0.0013,
+        0.8469,
+        0.004
+      ],
+      "neck": [
+        -0.0008,
+        0.8855,
+        0.0047
+      ],
+      "Head": [
+        0,
+        0.9562,
+        0.0058
+      ],
+      "head_end": [
+        0.0123,
+        1.1604,
+        0.0223
+      ],
+      "headfront": [
+        0,
+        0.9562,
+        0.1208
+      ],
+      "LeftShoulder": [
+        0.0206,
+        0.8589,
+        0.0042
+      ],
+      "LeftArm": [
+        0.1061,
+        0.8589,
+        -0.0148
+      ],
+      "LeftForeArm": [
+        0.1838,
+        0.7165,
+        -0.0139
+      ],
+      "LeftHand": [
+        0.2718,
+        0.5871,
+        0.0122
+      ],
+      "RightShoulder": [
+        -0.0224,
+        0.8563,
+        0.0042
+      ],
+      "RightArm": [
+        -0.1087,
+        0.8563,
+        -0.0149
+      ],
+      "RightForeArm": [
+        -0.1968,
+        0.7113,
+        -0.0131
+      ],
+      "RightHand": [
+        -0.277,
+        0.5845,
+        0.0132
+      ],
+      "LeftUpLeg": [
+        0.0481,
+        0.5629,
+        0.0003
+      ],
+      "LeftLeg": [
+        0.0699,
+        0.3256,
+        0.0091
+      ],
+      "LeftFoot": [
+        0.0725,
+        0.0926,
+        -0.0191
+      ],
+      "LeftToeBase": [
+        0.0925,
+        0.0254,
+        0.0552
+      ],
+      "RightUpLeg": [
+        -0.0533,
+        0.5629,
+        0.0003
+      ],
+      "RightLeg": [
+        -0.0751,
+        0.3256,
+        0.0091
+      ],
+      "RightFoot": [
+        -0.0803,
+        0.0926,
+        -0.02
+      ],
+      "RightToeBase": [
+        -0.0962,
+        0.0247,
+        0.0548
+      ],
+      "LeftAntenna1": [
+        0.0451,
+        1.1532,
+        0.0415
+      ],
+      "LeftAntenna2": [
+        0.0562,
+        1.1646,
+        0.0559
+      ],
+      "LeftAntenna3": [
+        0.0674,
+        1.176,
+        0.0704
+      ],
+      "RightAntenna1": [
+        -0.0397,
+        1.1553,
+        0.0412
+      ],
+      "RightAntenna2": [
+        -0.0524,
+        1.1665,
+        0.0556
+      ],
+      "RightAntenna3": [
+        -0.0651,
+        1.1776,
+        0.0699
+      ]
+    },
+    "eyes": {
+      "left": {
+        "center": [
+          0.056,
+          1.041,
+          0.0866
+        ],
+        "radii": [
+          0.0319,
+          0.0206,
+          0.0167
+        ],
+        "forward": [
+          0.438,
+          -0.334,
+          0.835
+        ]
+      },
+      "right": {
+        "center": [
+          -0.0544,
+          1.0401,
+          0.0874
+        ],
+        "radii": [
+          0.0328,
+          0.0209,
+          0.0158
+        ],
+        "forward": [
+          -0.441,
+          -0.239,
+          0.865
+        ]
+      }
+    },
+    "mouth": [
+      0,
+      0.981,
+      0.1163
+    ],
+    "antennae": [
+      {
+        "side": "left",
+        "base": [
+          0.0451,
+          1.1532,
+          0.0415
+        ],
+        "tip": [
+          0.0785,
+          1.1873,
+          0.0848
+        ],
+        "ballRadius": 0.0138,
+        "stalkRadius": 0.0064,
+        "bones": [
+          "LeftAntenna1",
+          "LeftAntenna2",
+          "LeftAntenna3"
+        ]
+      },
+      {
+        "side": "right",
+        "base": [
+          -0.0397,
+          1.1553,
+          0.0412
+        ],
+        "tip": [
+          -0.0778,
+          1.1887,
+          0.0843
+        ],
+        "ballRadius": 0.0136,
+        "stalkRadius": 0.0065,
+        "bones": [
+          "RightAntenna1",
+          "RightAntenna2",
+          "RightAntenna3"
+        ]
+      }
+    ],
+    "fingersPerHand": 5,
+    "toesPerFoot": 5
+  },
+  "notes": "One skinned mesh (\"body\") under the root node \"alien\", one material (\"alien\") with base colour, normal and metal-roughness textures, one skeleton. His clothes (hooded sweatshirt, shorts) are part of the mesh and move with the bones; there is no cloth simulation. Left and right are the character's own: his left is +X. Spine chain: Hips > Spine02 > Spine01 > Spine > neck > Head (head_end and headfront are leaf markers). The shoulders hang off Spine, the legs off Hips. Bone translations are in metres and no node is scaled. The mesh has no tangents: the normal map was baked for the tangent frame three.js derives in the shader, which is what GLTFLoader sets up by default. Do not compute tangents for it. There are no finger or toe bones: each hand is rigid, modelled open with four fingers and a thumb (fingersPerHand counts the thumb). A mug has to be parented to the hand bone and posed against the palm; the palm is about 6 cm past the wrist along the forearm. The mug hand is his left, as in the reference picture: \"sip\" and \"cheers\" are mirrored from the library so the left hand does the drinking and the toasting. In \"sip\" the palm is steered to stop 7.5 cm in front of and 3.5 cm below bind.mouth (as the head carries it) during clipInfo.sip.handAtMouth.hold; before that the clip reaches down and forward for a drink that he is already holding, so play it from about 3 s to 8 s, or blend past the reach. Antennae: three bones each (antennaBones), children of Head, at equal steps from bind.antennae[i].base to .tip (the centre of the ball). At rest they have no local rotation, so their axes are the head's; rotate them to spring the antenna. The ball rides the last bone. Eyes: center and radii are the axis-aligned centre and half-extents of the black of each eye in model space; the eye bulges out of the head along forward (a unit vector). The eyes are already near-black and glossy (roughness 0.08) in the mesh's own material. Every clip is seated and loops. Each was refitted for a lawn chair: at its first key the line from hips to neck leans recline.degrees behind vertical and the head looks level, and the torso never leans further back than recline.limit. The legs keep the library poses (knees bent, feet down), so the legs stretched out and crossed at the ankle in the reference picture are for the actor to pose. Every clip's first key puts the Hips at hipsAnchor in model space (each library clip was captured at its own seat height, so they were moved onto one), which means the feet are not planted on y = 0: seat him by the hips. The Hips still travel a little within a clip. idle is authored, not from the library (see its source). crossLegged is the library's calmest seated loop and can stand in as the idle, but blending it with the other clips passes the shins through each other. bind.* is measured on the bind pose (the A-pose the file opens in), not on any clip."
+}

@@ -124,13 +124,19 @@ test('theme, arrive and dim rise monotonically, so scrolling back retraces the s
   }
 })
 
-test('handoff: with the bridge off, the theme and the dim are held past the end', () => {
+test('handoff: theme and dim are held or released past the end, together or separately', () => {
   const held = derive(at({ enter: 1, pin: 1, exit: 1 }), false)
   assert.equal(held.theme, 1)
   assert.equal(held.dim, 1)
   const released = derive(at({ enter: 1, pin: 1, exit: 1 }), true)
   assert.equal(released.theme, 0)
   assert.equal(released.dim, 0)
+  // What the page uses: the dark stays for the scenes that follow, the UI comes back
+  const dark = derive(at({ enter: 1, pin: 1, exit: 1 }), { theme: false, dim: true })
+  assert.equal(dark.theme, 1)
+  assert.equal(dark.dim, 0)
+  // ...and not before the stage has started to leave
+  assert.equal(derive(at({ enter: 1, pin: 1, exit: 0 }), { theme: false, dim: true }).dim, 1)
 })
 
 test('entered has hysteresis: on at ENTER_AT, off only below EXIT_AT', () => {

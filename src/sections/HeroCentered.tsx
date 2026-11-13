@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { LiquidGlass } from '@/components/glass/LiquidGlass'
 import { GlassSurface } from '@/components/glass/GlassSurface'
 import { PyramidMark } from '@/components/hero/PyramidMark'
-import { BlurText } from '@/components/effects/BlurText'
+import { RevealText } from '@/components/effects/RevealText'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
 const icon = {
@@ -48,8 +48,8 @@ function HeroCard({
         </svg>
       </span>
       <div className="min-w-0 pt-0.5">
-        <BlurText as="p" className="text-[0.9rem] font-medium text-ink" text={title} delay={delay + 0.15} />
-        <BlurText as="p" className="mt-1 text-[0.82rem] leading-snug text-ink-muted" text={children} delay={delay + 0.3} />
+        <RevealText as="p" className="text-[0.9rem] font-medium text-ink" text={title} delay={delay + 0.15} />
+        <RevealText as="p" className="mt-1 text-[0.82rem] leading-snug text-ink-muted" text={children} delay={delay + 0.3} />
       </div>
     </GlassSurface>
   )
@@ -99,7 +99,7 @@ export function HeroCentered() {
                 aria-hidden="true"
                 className="hidden h-px w-8 bg-linear-to-r from-transparent to-[#7b80ff]/70 sm:block md:w-14"
               />
-              <BlurText
+              <RevealText
                 className="mr-[calc(var(--eyebrow-track)*-1)]"
                 text={['Fullstack Web Developer ', { text: '/', className: 'opacity-70' }, ' 2026']}
                 delay={0.15}
@@ -110,7 +110,7 @@ export function HeroCentered() {
               />
             </motion.p>
 
-            <BlurText
+            <RevealText
               as="h1"
               id="hero-title"
               className="font-hero whitespace-nowrap text-ink text-[clamp(2.75rem,1rem+6vw,6rem)] leading-[1.02] tracking-[-0.03em]"
@@ -124,7 +124,7 @@ export function HeroCentered() {
               duration={0.8}
             />
 
-            <BlurText
+            <RevealText
               as="p"
               className="mt-6 max-w-[38rem] text-lead text-pretty text-ink-soft md:mt-7"
               text={['I make ', { text: 'secure', className: 'text-indigo' }, ' and ', { text: 'engaging', className: 'text-indigo' }, ' web applications.']}

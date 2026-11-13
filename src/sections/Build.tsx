@@ -1,5 +1,5 @@
 import { BUILD_INTRO, BUILD_ITEMS } from '@/content/build'
-import { BlurText } from '@/components/effects/BlurText'
+import { RevealText } from '@/components/effects/RevealText'
 import { BentoCell, BentoPanel } from '@/components/ui/Bento'
 import { Reveal } from '@/components/ui/Reveal'
 import { Section, SectionHeader } from '@/components/ui/Section'
@@ -38,8 +38,8 @@ export function Build() {
               <div className="flex justify-center py-4 md:py-6">
                 <IsoArt boxes={art[item.id]} floatDelay={i * 1.3} />
               </div>
-              <BlurText as="h3" className="text-[1.05rem] font-medium tracking-[-0.01em] text-ink" text={item.title} delay={0.15 + i * 0.07} />
-              <BlurText
+              <RevealText as="h3" className="text-[1.05rem] font-medium tracking-[-0.01em] text-ink" text={item.title} delay={0.15 + i * 0.07} />
+              <RevealText
                 as="p"
                 className="mt-2 max-w-[26rem] text-[0.9rem] leading-[1.6] text-pretty text-ink-muted"
                 text={item.body}
