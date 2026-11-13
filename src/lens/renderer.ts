@@ -17,8 +17,10 @@ import {
   type TargetOptions,
 } from '@/blackhole/gl'
 import type { Quality } from '@/blackhole/quality'
-import { LENS_FLOOR, TABLE_SIZE, deflectionTable, shadowAngle, skyAngle } from './geodesic'
-import { MAX_SOURCES, R_HOVER, THETA_STEP, composition, sources, type LensFrame } from './timeline'
+import { TABLE_SIZE, deflectionTable, shadowAngle } from './geodesic'
+import { INVERSE_SIZE, cameraBasis, rest, type Rest } from './picture'
+import { skyMatrix } from './sky'
+import { MAX_SOURCES, R_HOVER, sources, type LensFrame, type Tune } from './timeline'
 
 /** How far the pointer swings the camera, radians. */
 const SWING_X = (2.2 * Math.PI) / 180
@@ -29,14 +31,10 @@ const FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const
 const SKY_SIZE: Record<Quality['name'], number> = { ultra: 2048, high: 2048, medium: 1024, low: 1024 }
 /** Seconds the sky takes to come up once its map has arrived. */
 const SKY_FADE = 1.2
-/**
- * How the Milky Way lies in the scene when the first project is settled: the
- * galaxy's centre straight ahead and this far above level, radians, with the
- * band running across the view behind the picture. The sky turns from there.
- */
-const GALAXY_RISE = (6 * Math.PI) / 180
 /** How fast the stars drift round the sky on their own, radians per second. */
 const STAR_DRIFT = 0.007
+/** Shooting stars start this far above the middle of a settled picture, radians, and fall across the sky round it. */
+const METEOR_ABOVE = (8 * Math.PI) / 180
 
 export type LensInput = {
   /** Scene clock, seconds. */
@@ -83,9 +81,13 @@ export class LensRenderer {
   /** The deflection table in use, and the radius it was worked out for. */
   private tableData = new Float32Array(TABLE_SIZE)
   private tableRadius = -1
-  /** The same for the height the camera hovers at, which the layout is worked out from. */
-  private hoverTable = deflectionTable(R_HOVER)
-
+  /** The lens run backwards for the height the camera rests at: what the pictures are painted with. */
+  private inverse: WebGLTexture | null = null
+  /** The resting view the pictures are painted for, and what it was worked out from. */
+  private resting: Rest | null = null
+  private restingKey = ''
+  /** The dev page tries other resting heights and framings through this. Empty on the site. */
+  tune: { radius?: number } & Tune = {}
 
   private images: readonly string[]
   private shotSize: { w: number; h: number }
@@ -157,6 +159,18 @@ export class LensRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+    // The same lens run backwards, kept beside it. Made here with the table, so that whatever
+    // brings the one back (a restored context) brings back the other.
+    this.inverse = gl.createTexture()
+    if (!this.inverse) return false
+    gl.bindTexture(gl.TEXTURE_2D, this.inverse)
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R32F, INVERSE_SIZE, 1)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    this.restingKey = ''
 
     // The screenshots: one layer each, stored as sRGB so they are read back as linear light
     const { w, h } = this.shotSize
@@ -334,7 +348,30 @@ export class LensRenderer {
 
   get ready(): boolean {
     const gl = this.gl
-    return !!gl && !gl.isContextLost() && !this.pending && !!this.vao && !!this.table && !!this.shots
+    return !!gl && !gl.isContextLost() && !this.pending && !!this.vao && !!this.table && !!this.inverse && !!this.shots
+  }
+
+  /**
+   * The resting view for a screen of this shape. Worked out again only when
+   * the shape (or the dev page's tuning) changes, and the backwards lens goes
+   * to the GPU with it: a stale one would leave a settled picture bent.
+   */
+  private restFor(aspect: number): Rest {
+    const { gap, high, top, shift, ceiling, shadow } = this.tune
+    // The dev page hands over whatever was in the address bar: anything that is not a height is ignored
+    const radius = Number.isFinite(this.tune.radius) && this.tune.radius! > 1.5 ? this.tune.radius! : R_HOVER
+    const key = [aspect.toFixed(5), radius, gap, high, top, shift, ceiling, shadow].join('|')
+    if (!this.resting || key !== this.restingKey) {
+      const gl = this.gl!
+      this.resting = rest(aspect, radius, { gap, high, top, shift, ceiling, shadow })
+      this.restingKey = key
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, this.inverse)
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, INVERSE_SIZE, 1, gl.RED, gl.FLOAT, this.resting.inverse)
+    }
+    return this.resting
   }
 
   /**
@@ -369,7 +406,7 @@ export class LensRenderer {
       return
     }
 
-    // The deflection table follows the camera down
+    // The deflection table follows the camera, up through the climb and down through the fall
     if (Math.abs(frame.radius - this.tableRadius) > 1e-5) {
       this.tableRadius = frame.radius
       deflectionTable(frame.radius, this.tableData)
@@ -380,87 +417,67 @@ export class LensRenderer {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, TABLE_SIZE, 1, gl.RED, gl.FLOAT, this.tableData)
     }
 
-    // Framing is worked out for the height the camera hovers at, and kept through the fall
+    // Framing, and the shape the pictures are painted in, are worked out for the height the
+    // camera rests at, and kept through the climb and the fall
     const aspect = cw / ch
-    const comp = composition(aspect, shadowAngle(R_HOVER))
-    const thetaRead = skyAngle(this.hoverTable, R_HOVER, Math.PI / 2 + comp.centre, comp.reach)
-    const lit = sources(frame.phase, this.images.length, thetaRead, frame.lift)
+    const resting = this.restFor(aspect)
+    const comp = resting.framing
+    const thetaRead = resting.thetaRead
+    const lit = sources(frame.phase, this.images.length, thetaRead, resting.step, frame.lift)
 
-    // Camera: level with the horizon at rest, tipping back to the zenith during the fall
+    // Camera: looking down past the limb at rest, tipping back to the zenith during the fall
     const sway = input.alive ? 1 : 0
     const yaw = input.pointer[0] * SWING_X * sway
     const tip = frame.pitch / (Math.PI / 2)
     const pitch = comp.pitch + (Math.PI / 2 - comp.pitch) * tip + input.pointer[1] * SWING_Y * sway * (1 - tip)
-    const cy = Math.cos(yaw)
-    const sy = Math.sin(yaw)
-    const cp = Math.cos(pitch)
-    const sp = Math.sin(pitch)
-    const basis = new Float32Array([cy, 0, -sy, -sy * sp, cp, -cy * sp, sy * cp, sp, cy * cp])
+    const basis = cameraBasis(yaw, pitch)
     const tanY = comp.tanHalfFov
     const pix = (2 * tanY) / scene.h
 
     // The stars turn with the projects (about the axis across the view), and drift a little on their own
-    const turn = frame.phase * THETA_STEP + frame.lift * thetaRead
-    const ct = Math.cos(turn)
-    const st = Math.sin(turn)
+    const turn = frame.phase * resting.step + frame.lift * thetaRead
     const drift = input.alive ? input.time * STAR_DRIFT : 0
-    const cd = Math.cos(drift)
-    const sd = Math.sin(drift)
-    // Scene direction to star-map direction: first the turn about x, then the drift about y, then
-    // onto the map's own axes (x the galaxy's centre, y its pole, z along the band).
-    // The scene's axes are x right, y up, z ahead; with the galaxy's centre ahead and GALAXY_RISE up,
-    // its pole lies up and behind, and the band runs left to right.
-    const cg = Math.cos(GALAXY_RISE)
-    const sg = Math.sin(GALAXY_RISE)
-    // Rows of the turn-and-drift matrix (r0, r1, r2), then the rows of the map's axes applied to them
-    const r0 = [cd, sd * st, sd * ct]
-    const r1 = [0, ct, -st]
-    const r2 = [-sd, cd * st, cd * ct]
-    const gx = [0, 1, 2].map((i) => sg * r1[i] + cg * r2[i])
-    const gy = [0, 1, 2].map((i) => cg * r1[i] - sg * r2[i])
-    const gz = r0
-    // Column-major
-    const sky = new Float32Array([gx[0], gy[0], gz[0], gx[1], gy[1], gz[1], gx[2], gy[2], gz[2]])
+    // The Milky Way lies with its centre behind the first settled picture and its band across the
+    // view; the sky turns from there (see sky.ts)
+    const sky = skyMatrix(turn, drift, Math.PI / 2 - thetaRead)
 
-    const centres = new Float32Array(MAX_SOURCES * 3)
-    const ups = new Float32Array(MAX_SOURCES * 3)
-    const layers = new Float32Array(MAX_SOURCES * 2)
+    // How far each lit project is from where it rests, as the cosine and sine of the turn.
+    // Unused slots are left at no turn and no brightness.
+    const turns = new Float32Array(MAX_SOURCES * 2)
+    const layers = new Float32Array(MAX_SOURCES * 3)
+    for (let n = 0; n < MAX_SOURCES; n++) turns[n * 2] = 1
     lit.forEach((s, n) => {
-      centres.set([0, Math.cos(s.theta), Math.sin(s.theta)], n * 3)
-      ups.set([0, Math.sin(s.theta), -Math.cos(s.theta)], n * 3)
-      layers.set([s.index, s.gain * (this.loaded[s.index] ?? 0)], n * 2)
+      turns.set([Math.cos(s.theta - thetaRead), Math.sin(s.theta - thetaRead)], n * 2)
+      layers.set([s.index, s.gain * (this.loaded[s.index] ?? 0), s.light], n * 3)
     })
-    // Unused slots still need a direction, or the shader divides by nothing
-    for (let n = lit.length; n < MAX_SOURCES; n++) {
-      centres.set([0, 1, 0], n * 3)
-      ups.set([0, 0, -1], n * 3)
-    }
 
     // 1. The sky
     gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fbo)
     gl.viewport(0, 0, scene.w, scene.h)
     gl.useProgram(P.lens.program)
     gl.uniform2f(P.lens.u('uTan'), tanY * aspect, tanY)
+    // The scene stands right of centre at rest, and comes back to the middle as the camera tips up for the fall
+    gl.uniform1f(P.lens.u('uShift'), comp.shift * (1 - tip))
     gl.uniformMatrix3fv(P.lens.u('uCam'), false, basis)
     gl.uniform1f(P.lens.u('uEdge'), shadowAngle(frame.radius))
-    gl.uniform1f(P.lens.u('uReach'), comp.reach)
-    gl.uniform1f(P.lens.u('uFloor'), LENS_FLOOR + (0.85 - LENS_FLOOR) * frame.squeeze)
     gl.uniform1f(P.lens.u('uPix'), pix)
-    gl.uniformMatrix3fv(P.lens.u('uSky'), false, sky)
+    gl.uniformMatrix3fv(P.lens.u('uSky'), false, sky.matrix)
     gl.uniform1f(P.lens.u('uSkyOn'), this.skyLevel)
     // Wrapped, so the shader's sines keep their precision however long the page is left open
     gl.uniform1f(P.lens.u('uTime'), input.alive ? input.time % 3600 : 0)
     gl.uniform1f(P.lens.u('uAlive'), input.alive ? 1 : 0)
-    // The drift is about the scene's vertical, which on the map is this
-    gl.uniform3f(P.lens.u('uDriftAxis'), sg, cg, 0)
-    gl.uniform3fv(P.lens.u('uSrcCentre[0]'), centres)
-    gl.uniform3fv(P.lens.u('uSrcUp[0]'), ups)
-    gl.uniform2fv(P.lens.u('uSrcLayer[0]'), layers)
+    gl.uniform3f(P.lens.u('uDriftAxis'), sky.axis[0], sky.axis[1], sky.axis[2])
+    gl.uniform1f(P.lens.u('uMeteorAim'), thetaRead - METEOR_ABOVE)
+    gl.uniform2fv(P.lens.u('uSrcTurn[0]'), turns)
+    gl.uniform3fv(P.lens.u('uSrcLayer[0]'), layers)
+    gl.uniformMatrix3fv(P.lens.u('uRest'), false, resting.basis)
+    gl.uniform1f(P.lens.u('uRestCentre'), comp.centreY)
     gl.uniform2f(P.lens.u('uHalf'), comp.half[0], comp.half[1])
     gl.uniform1f(P.lens.u('uFade'), frame.fade)
     gl.uniform1f(P.lens.u('uStars'), frame.stars)
     gl.uniform1f(P.lens.u('uRim'), frame.rim)
     bindTexture(gl, P.lens, 'uTable', 0, this.table)
+    bindTexture(gl, P.lens, 'uInverse', 3, this.inverse)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.shots)
     gl.uniform1i(P.lens.u('uShots'), 1)
@@ -525,6 +542,7 @@ export class LensRenderer {
     if (gl && !gl.isContextLost()) {
       for (const t of [this.scene, ...this.bloom]) deleteTarget(gl, t)
       gl.deleteTexture(this.table)
+      gl.deleteTexture(this.inverse)
       gl.deleteTexture(this.shots)
       gl.deleteTexture(this.sky)
       for (const p of Object.values(this.programs)) gl.deleteProgram(p.program)
@@ -538,7 +556,8 @@ export class LensRenderer {
     this.pending = null
     this.scene = null
     this.bloom = []
-    this.table = this.shots = this.sky = null
+    this.table = this.inverse = this.shots = this.sky = null
+    this.resting = null
     if (this.skyFaces) for (const bitmap of this.skyFaces) bitmap.close()
     this.skyFaces = null
     this.vao = null

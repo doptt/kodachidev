@@ -89,23 +89,26 @@ function tableAngle(r0: number, i: number) {
 }
 
 /**
- * Entries below this one are not integrated. They lie within a thousandth of
- * the way from the edge of the shadow, where light winds round the hole many
- * times (the slowest rays to follow) and where the deflection has settled into
- * its logarithm: a straight line on the table's scale. They are continued
- * along that line instead. On screen they cover a pixel or two.
+ * Entries below this one are not integrated. They lie within a ten-thousandth
+ * of the way from the edge of the shadow, where light winds round the hole
+ * many times (the slowest rays to follow) and where the deflection has settled
+ * into its logarithm: a straight line on the table's scale. They are continued
+ * along that line instead. On screen they cover a fraction of a pixel.
  */
-const FIRST_INTEGRATED = Math.round((1 - Math.log(1000) / TABLE_LOG) * (TABLE_SIZE - 1))
+const FIRST_INTEGRATED = Math.round((1 - Math.log(10000) / TABLE_LOG) * (TABLE_SIZE - 1))
 
 /**
  * The deflection of every table entry for an observer at `r0`. Written into
- * `out` when given. It is worked out afresh on every frame of the last fall,
- * so it has to be cheap: well under a millisecond on a laptop.
+ * `out` when given. It is worked out afresh on every frame of the climb at the
+ * start and of the last fall (about a fifth of the stretch), so it has to be
+ * cheap: a little under a millisecond on a laptop.
  */
 export function deflectionTable(r0: number, out = new Float32Array(TABLE_SIZE)) {
   for (let i = FIRST_INTEGRATED; i < TABLE_SIZE; i++) out[i] = deflection(r0, tableAngle(r0, i))
-  const run = 12
-  const slope = (out[FIRST_INTEGRATED] - out[FIRST_INTEGRATED + run]) / run
+  // This close to the edge the deflection grows by one radian for every e-fold nearer, whatever the
+  // observer's height, and an entry is TABLE_LOG / (TABLE_SIZE - 1) of an e-fold. (Measuring the
+  // slope off the last integrated entries instead undershoots it, more so the higher the observer.)
+  const slope = TABLE_LOG / (TABLE_SIZE - 1)
   for (let i = FIRST_INTEGRATED - 1; i >= 0; i--) out[i] = Math.min(PHI_MAX, out[FIRST_INTEGRATED] + slope * (FIRST_INTEGRATED - i))
   return out
 }
@@ -135,23 +138,4 @@ export function imageAngle(table: Float32Array, r0: number, phi: number) {
     else hi = mid
   }
   return 0.5 * (lo + hi)
-}
-
-/**
- * The lens as the scene draws it. A real hole this close bends the whole sky:
- * nothing in view would be free of it, and a project's picture has to be
- * readable. So the true deflection is used in full at the edge of the shadow,
- * where the rings are, and eased toward flat space within `reach` radians
- * above it; LENS_FLOOR of it is kept everywhere, enough to bow a picture a
- * little. (During the last fall the floor is raised toward the real thing, and
- * the whole sky is squeezed into the closing window as it should be.) The shader does the same sum (lens.frag.glsl).
- */
-export const LENS_FLOOR = 0.07
-
-/** The part of the sky seen at `psi`, radians round from the zenith, through the eased lens. */
-export function skyAngle(table: Float32Array, r0: number, psi: number, reach: number, floor = LENS_FLOOR) {
-  const edge = shadowAngle(r0)
-  const t = Math.min(1, Math.max(0, (psi - edge) / reach))
-  const w = floor + (1 - floor) * (1 - t * t * (3 - 2 * t))
-  return w * lookup(table, r0, psi) + (1 - w) * (Math.PI - psi)
 }

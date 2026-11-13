@@ -1,8 +1,8 @@
 #version 300 es
-// The sky as seen from just above a black hole, in linear HDR.
+// The sky as seen from a little way above a black hole, in linear HDR.
 //
-// The hole is straight down. Its shadow fills the bottom of the view like a
-// horizon; everything above the edge of the shadow is sky, bent by the hole.
+// The hole is straight down. Its shadow is the dark dome at the bottom of the
+// view; everything above the edge of the shadow is sky, bent by the hole.
 // Each pixel's ray stays in the plane through the hole that contains it, so
 // the lens is one number per ray: how far round the hole it has swung by the
 // time it is out among the stars. That comes from a table worked out on the
@@ -10,36 +10,44 @@
 //
 // What is in the sky: the real night sky (NASA's Deep Star Map: every star
 // Gaia has measured, and the Milky Way), and the projects, each a lit picture
-// hung on it. Every ray looks up the map in the direction it ends up pointing,
-// so the sky is truly lensed: squeezed toward the horizon, mirrored in the
-// band just above the edge of the shadow, and smeared into arcs along it.
-// Right at that edge the deflection runs away, and the same sky comes round
-// again and again in thinner and thinner bands: those are the rings, and they
-// are made of the projects' own light and the galaxy's.
+// painted on it. Every ray looks up the sky in the direction it ends up
+// pointing, and nothing eases the lens off anywhere, so the sky is truly
+// lensed. What lies exactly behind the hole is seen as a ring some way above
+// the edge of the shadow (the Einstein ring). Above the ring the sky is seen
+// directly; in the band between the ring and the shadow it is seen a second
+// time, mirrored and squeezed. Right at the edge the deflection runs away, and
+// the same sky comes round again and again in thinner and thinner bands.
+//
+// A lens this strong would bend a screenshot out of shape, so the pictures
+// are painted for it: each is put on the sky already stretched, in the shape
+// the lens bends back into a flat rectangle when the project is settled (see
+// picture.ts, which does the same sum as the loop below).
 precision highp float;
 precision highp sampler2D;
 precision highp sampler2DArray;
 precision highp samplerCube;
 
 uniform vec2 uTan;          // tan(half fov) * (aspect, 1)
+uniform float uShift;       // how far right of the middle of the screen the scene stands, in NDC
 uniform mat3 uCam;          // columns: right, up, forward
 uniform float uEdge;        // angle from straight down to the edge of the shadow
-uniform float uReach;       // how far above that edge the lens is felt, radians
-uniform float uFloor;       // how much of the lens is kept above that (see LENS_FLOOR in geodesic.ts)
 uniform float uPix;         // angle covered by one pixel, radians
 uniform sampler2D uTable;   // deflection by angle (see geodesic.ts)
+uniform sampler2D uInverse; // the same lens run backwards, for the height the camera rests at (see picture.ts)
 uniform samplerCube uSkyMap; // the star map, stored through a cube root (see assets-src/README-sky.md)
 uniform mat3 uSky;          // turns a direction in the scene into a direction on the star map
 uniform float uSkyOn;       // 0 until the star map has loaded, then fading up to 1
 uniform float uTime;        // seconds; held at 0 under reduced motion, so nothing twinkles or drifts
 uniform float uAlive;       // 0 under reduced motion: no shooting stars
 uniform vec3 uDriftAxis;    // the axis the stars drift round, as a direction on the star map
+uniform float uMeteorAim;   // where on the sky shooting stars start: radians from the zenith, straight ahead
 
 uniform sampler2DArray uShots;
-uniform vec3 uSrcCentre[4]; // where each lit project is on the sky
-uniform vec3 uSrcUp[4];     // which way is up in its picture
-uniform vec2 uSrcLayer[4];  // x: layer in uShots, y: brightness (0 switches it off)
-uniform vec2 uHalf;         // half-size of a picture, as tangents
+uniform vec2 uSrcTurn[4];   // how far each lit project is from where it rests: cos and sin of the turn about x
+uniform vec3 uSrcLayer[4];  // x: layer in uShots, y: how much of it is there (0 switches it off), z: how brightly it is lit
+uniform mat3 uRest;         // the camera as it is at rest; columns: right, up, forward
+uniform float uRestCentre;  // middle of a settled picture, as a tangent above the resting camera's axis
+uniform vec2 uHalf;         // half-size of a settled picture on the resting screen, as tangents
 
 uniform float uFade;        // brightness of the pictures and the rings
 uniform float uStars;       // brightness of the stars
@@ -52,11 +60,21 @@ const float PI = 3.14159265359;
 // These two match geodesic.ts
 const float TABLE_SIZE = 384.0;
 const float TABLE_LOG = 13.0;
+// This one matches picture.ts
+const float INVERSE_SIZE = 256.0;
 // The palette's cream (#FFEDC1), in linear light
 const vec3 CREAM = vec3(1.0, 0.85, 0.53);
 // How bright the star map is drawn. It is a photograph of a dark sky: most of
 // it is far below anything a screen can show beside a lit picture.
 const float SKY_GAIN = 9.0;
+// A lens does not change how bright a surface looks, only how big: the
+// pictures and the galaxy are drawn as bright as they are. A star is a point,
+// and a point is brighter by as much as the lens enlarges the sky round it.
+// That runs away on the ring, so it is capped here.
+const float MAG_MAX = 12.0;
+// How bright the hairline round a picture is. The same everywhere, and enough
+// to bloom, so the line of the ring glows and a settled picture's frame with it.
+const float HAIRLINE = 1.8;
 
 // How far each layer of drawn stars turns ahead of the map, radians a second:
 // the nearer the layer, the faster, which is what gives the sky its depth.
@@ -105,8 +123,9 @@ vec3 starTint(float c) {
 //
 // dir is where on the sky this pixel's ray ends up, dirDx and dirDy how that
 // changes to the next pixel across and up, foot how much sky the pixel
-// covers, and radius the star's size in pixels.
-vec3 starLayer(vec3 dir, vec3 dirDx, vec3 dirDy, float foot, float n, float seed, float density, float radius, float gain) {
+// covers, grow how much the lens enlarges the sky here, and radius the star's
+// size in pixels.
+vec3 starLayer(vec3 dir, vec3 dirDx, vec3 dirDy, float foot, float grow, float n, float seed, float density, float radius, float gain) {
   vec3 a = abs(dir);
   vec2 uv;
   float face;
@@ -136,10 +155,11 @@ vec3 starLayer(vec3 dir, vec3 dirDx, vec3 dirDy, float foot, float n, float seed
   vec2 rhs = vec2(dot(dirDx, off), dot(dirDy, off));
   vec2 px = vec2(bb * rhs.x - ab * rhs.y, aa * rhs.y - ab * rhs.x) / max(aa * bb - ab * ab, 1e-24);
   float core = exp(-dot(px, px) / (r * r));
-  // A star has to stay inside its cell, so where the lens squeezes a great
-  // deal of sky into each pixel the stars dim and then melt away
+  // The lens brightens a star by as much as it enlarges the sky, and dims it
+  // where it squeezes the sky. And a star has to stay inside its cell, so
+  // where a great deal of sky is squeezed into each pixel the stars melt away.
   float limit = 0.1 / n;
-  float keep = min(1.0, uPix / foot) * (1.0 - smoothstep(0.6 * limit, limit, r * foot));
+  float keep = grow * (1.0 - smoothstep(0.6 * limit, limit, r * foot));
 
   // Twinkle: two slow beats out of step, and for some stars a brief glint now and then
   float tw = 1.0 + 0.36 * sin(uTime * (1.2 + 3.0 * k.x) + k.y * 6.2832) + 0.2 * sin(uTime * (3.8 + 4.6 * k.z) + k.w * 6.2832);
@@ -152,7 +172,7 @@ vec3 starLayer(vec3 dir, vec3 dirDx, vec3 dirDy, float foot, float n, float seed
 // A shooting star now and then: a short streak along a great circle of the
 // sky, bright at the head and fading down the tail. One may fall in each
 // stretch of `period` seconds; `seed` tells the streams apart.
-vec3 meteor(vec3 dir, float foot, float period, float seed) {
+vec3 meteor(vec3 dir, float foot, float grow, float period, float seed) {
   float slot = floor(uTime / period);
   vec4 h = hash43(vec3(slot, seed, 4.0));
   vec4 k = hash43(vec3(seed, slot, 9.0));
@@ -162,9 +182,15 @@ vec3 meteor(vec3 dir, float foot, float period, float seed) {
   float u = (uTime - slot * period - h.x * (period - LIFE)) / LIFE;
   if (u <= 0.0 || u >= 1.0) return vec3(0.0);
 
-  // Where it starts (up in the sky ahead) and which way it falls (across and down)
+  // Where it starts and which way it falls (across and down). Both are laid
+  // out round the level sky straight ahead, 1.22 radians from the zenith, and
+  // then turned about x to where the camera is looking.
+  float aim = uMeteorAim - 1.22;
+  vec2 cs = vec2(cos(aim), sin(aim));
   vec3 s = normalize(vec3(h.y * 1.8 - 0.9, 0.12 + 0.5 * h.z, 1.0));
   vec3 w = vec3(h.w < 0.5 ? 1.0 : -1.0, -0.25 - 0.5 * k.y, 0.3 * (k.z - 0.5));
+  s = vec3(s.x, s.y * cs.x - s.z * cs.y, s.y * cs.y + s.z * cs.x);
+  w = vec3(w.x, w.y * cs.x - w.z * cs.y, w.y * cs.y + w.z * cs.x);
   vec3 v = normalize(w - s * dot(w, s));
   vec3 nrm = cross(s, v);
 
@@ -178,13 +204,13 @@ vec3 meteor(vec3 dir, float foot, float period, float seed) {
   float back = head - along;
   float body = back > 0.0 && back < tail ? (1.0 - back / tail) : 0.0;
   float width = max(uPix * 0.9, foot * 0.75);
-  float across = exp(-off * off / (width * width)) * min(1.0, uPix / width);
+  float across = exp(-off * off / (width * width)) * grow;
   float life = sin(PI * u);
   return mix(CREAM, vec3(1.0), body) * (body * body * across * life * life * 5.0);
 }
 
 void main() {
-  vec3 d = normalize(uCam * vec3((vUv * 2.0 - 1.0) * uTan, 1.0));
+  vec3 d = normalize(uCam * vec3((vUv * 2.0 - 1.0 - vec2(uShift, 0.0)) * uTan, 1.0));
   // Angle from straight down
   float psi = acos(clamp(-d.y, -1.0, 1.0));
   float above = psi - uEdge;
@@ -195,11 +221,7 @@ void main() {
   float i = min(floor(s), TABLE_SIZE - 2.0);
   float phi = mix(texelFetch(uTable, ivec2(int(i), 0), 0).r, texelFetch(uTable, ivec2(int(i) + 1, 0), 0).r, s - i);
 
-  // The lens is felt in full at the edge and eased off above it, so that a
-  // picture standing clear of the horizon can be read (see geodesic.ts)
-  float t = clamp(above / uReach, 0.0, 1.0);
-  float w = uFloor + (1.0 - uFloor) * (1.0 - t * t * (3.0 - 2.0 * t));
-  float theta = w * phi + (1.0 - w) * (PI - psi);
+  float theta = phi;
 
   // The part of the sky this ray ends up pointing at
   vec2 flat2 = d.xz;
@@ -208,8 +230,9 @@ void main() {
   vec3 skyDx = dFdx(sky);
   vec3 skyDy = dFdy(sky);
 
-  // Light that has been round the hole comes back brighter: the rings glow
-  float bent = smoothstep(1.75, 2.9, theta);
+  // How much the lens enlarges the sky here: the solid angle this pixel covers
+  // on the screen, over the solid angle of sky it sees
+  float mag = min(length(cross(dFdx(d), dFdy(d))) / max(length(cross(skyDx, skyDy)), 1e-12), MAG_MAX);
 
   vec3 col = vec3(0.0);
 
@@ -236,29 +259,43 @@ void main() {
   // There are more of them where the galaxy is thick.
   float foot = max(length(skyDx), length(skyDy));
   float thick = 0.55 + 0.45 * smoothstep(0.0, 0.035, dot(glow, vec3(0.333)));
-  vec3 drawn = starLayer(spin(m, uDriftAxis, uTime * LAYER_DRIFT.x), spin(mDx, uDriftAxis, uTime * LAYER_DRIFT.x), spin(mDy, uDriftAxis, uTime * LAYER_DRIFT.x), foot, 64.0, 1.0, 0.85 * thick, 0.95, 0.75);
-  drawn += starLayer(spin(m, uDriftAxis, uTime * LAYER_DRIFT.y), spin(mDx, uDriftAxis, uTime * LAYER_DRIFT.y), spin(mDy, uDriftAxis, uTime * LAYER_DRIFT.y), foot, 38.0, 2.0, 0.6 * thick, 1.15, 1.5);
-  drawn += starLayer(spin(m, uDriftAxis, uTime * LAYER_DRIFT.z), spin(mDx, uDriftAxis, uTime * LAYER_DRIFT.z), spin(mDy, uDriftAxis, uTime * LAYER_DRIFT.z), foot, 17.0, 3.0, 0.42, 1.45, 3.4);
-  drawn += (meteor(sky, foot, 6.5, 1.0) + meteor(sky, foot, 11.0, 2.0)) * uAlive;
+  vec3 drawn = starLayer(spin(m, uDriftAxis, uTime * LAYER_DRIFT.x), spin(mDx, uDriftAxis, uTime * LAYER_DRIFT.x), spin(mDy, uDriftAxis, uTime * LAYER_DRIFT.x), foot, mag, 64.0, 1.0, 0.85 * thick, 0.95, 0.75);
+  drawn += starLayer(spin(m, uDriftAxis, uTime * LAYER_DRIFT.y), spin(mDx, uDriftAxis, uTime * LAYER_DRIFT.y), spin(mDy, uDriftAxis, uTime * LAYER_DRIFT.y), foot, mag, 38.0, 2.0, 0.6 * thick, 1.15, 1.5);
+  drawn += starLayer(spin(m, uDriftAxis, uTime * LAYER_DRIFT.z), spin(mDx, uDriftAxis, uTime * LAYER_DRIFT.z), spin(mDy, uDriftAxis, uTime * LAYER_DRIFT.z), foot, mag, 17.0, 3.0, 0.42, 1.45, 3.4);
+  drawn += (meteor(sky, foot, mag, 6.5, 1.0) + meteor(sky, foot, mag, 11.0, 2.0)) * uAlive;
 
-  col += (starlight * uSkyOn + drawn) * uStars * (1.0 + 1.6 * bent);
+  col += (starlight * uSkyOn + drawn) * uStars;
 
   // Projects. Slot 0 is the one nearest to settled, and is drawn last, on top.
   for (int n = 3; n >= 0; n--) {
-    vec3 c = uSrcCentre[n];
-    float z = dot(sky, c);
-    float zs = max(z, 0.02);
-    // Position on the picture's own plane: x across, y up
-    vec2 p = vec2(sky.x, dot(sky, uSrcUp[n])) / zs;
-    vec2 px = vec2(skyDx.x, dot(skyDx, uSrcUp[n])) / zs - p * dot(skyDx, c) / zs;
-    vec2 py = vec2(skyDy.x, dot(skyDy, uSrcUp[n])) / zs - p * dot(skyDy, c) / zs;
+    // Turn this part of the sky back to where the project rests
+    vec2 cs = uSrcTurn[n];
+    vec3 r = vec3(sky.x, sky.y * cs.x + sky.z * cs.y, -sky.y * cs.y + sky.z * cs.x);
+    // Where the resting camera sees it directly: the lens run backwards. A ray
+    // stays in its plane through the hole, so the direction round the hole is
+    // kept and only the angle from straight down changes.
+    float v = acos(clamp(r.y, -1.0, 1.0)) / PI * (INVERSE_SIZE - 1.0);
+    float j = min(floor(v), INVERSE_SIZE - 2.0);
+    float back = mix(texelFetch(uInverse, ivec2(int(j), 0), 0).r, texelFetch(uInverse, ivec2(int(j) + 1, 0), 0).r, v - j);
+    vec2 side = r.xz / max(length(r.xz), 1e-5);
+    vec3 e = vec3(sin(back) * side.x, -cos(back), sin(back) * side.y);
+    // Onto the resting screen: x across, y up, from the middle of the picture
+    vec3 at = e * uRest;
+    vec2 p = at.xy / max(at.z, 0.02) - vec2(0.0, uRestCentre);
+    // How the picture changes from one pixel to the next. Across the ring it
+    // jumps, so the change is capped: a seam there would sparkle.
+    float cap = 0.25 * uHalf.y;
+    vec2 px = dFdx(p);
+    vec2 py = dFdy(p);
+    px *= min(1.0, cap / max(length(px), 1e-9));
+    py *= min(1.0, cap / max(length(py), 1e-9));
 
     // Rounded rectangle
     float corner = 0.07 * uHalf.y;
     vec2 q = abs(p) - (uHalf - corner);
     float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - corner;
     float soft = max(length(vec2(length(px), length(py))) * 0.75, 1e-6);
-    float inside = (1.0 - smoothstep(-soft, soft, sd)) * step(0.02, z);
+    float inside = (1.0 - smoothstep(-soft, soft, sd)) * step(0.02, at.z);
 
     vec2 uv = p / uHalf * 0.5 + 0.5;
     vec2 scale = 0.5 / uHalf;
@@ -266,10 +303,11 @@ void main() {
 
     // A hairline of light round the picture. Squeezed into a ring it becomes the bright line of the ring.
     float line = 0.012 * uHalf.y;
-    float rim = exp(-pow((sd + line) / max(line, soft), 2.0)) * min(1.0, line / soft);
+    float across = (sd + line) / max(line, soft);
+    float rim = exp(-across * across) * min(1.0, line / soft);
 
     float gain = uSrcLayer[n].y;
-    vec3 lit = shot * (1.0 + 1.5 * bent) + CREAM * rim * (0.55 + 3.2 * bent);
+    vec3 lit = shot * uSrcLayer[n].z + CREAM * rim * HAIRLINE;
     col = mix(col, lit * uFade, inside * gain);
   }
 

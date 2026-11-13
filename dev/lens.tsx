@@ -4,6 +4,11 @@
 //   &bhtier=ultra|high|medium|low    force a quality tier
 //   &nohud                           hide the slider (for screenshots)
 //   &set=phase:1.5,fade:1            override fields of the frame, to isolate an effect
+//   &r=2.5                           the height the camera rests at (the horizon is 1)
+//   &gap=4                           degrees between the ring and the bottom of the picture
+//   &high=0.44                       height of the picture, as a share of the screen
+//   &top=0.8                         top edge of the picture, in NDC (-1 bottom .. 1 top)
+//   &shift=0.3                       how far right of the middle the scene stands, in NDC
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import LensScene from '../src/lens/LensScene'
@@ -18,6 +23,9 @@ const overrides = Object.fromEntries(
     .map(([k, v]) => [k, Number(v)]),
 )
 const images = PROJECTS.map((p) => p.image)
+const number = (name: string) => (params.has(name) ? Number(params.get(name)) : undefined)
+const gap = number('gap')
+const tune = { radius: number('r'), gap: gap === undefined ? undefined : (gap * Math.PI) / 180, high: number('high'), top: number('top'), shift: number('shift') }
 
 function Page() {
   const [p, setP] = useState(() => Number(params.get('p') ?? 0.2))
@@ -43,6 +51,7 @@ function Page() {
         progress={() => progress.current}
         images={images}
         tweak={(f) => ({ ...f, ...overrides })}
+        tune={tune}
       />
       {!params.has('nohud') && (
         <div className="hud">

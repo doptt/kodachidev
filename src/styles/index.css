@@ -626,10 +626,11 @@ html[data-bh-entered] [data-bh-stage]::after {
 }
 
 /*
- * Lensed sky (LensedWork): the words for each project, under the horizon.
- * They are all stacked in one place; the one whose picture has settled comes
- * up, column by column, and goes again as the sky moves on. Opacity and
- * position only, as with the caption above.
+ * Lensed sky (LensedWork): the words for each project, beside its picture on
+ * a wide screen and in the shadow under it on a narrow one. They are all
+ * stacked in one place; the one whose picture has settled comes up, a block
+ * at a time, and goes again as the sky moves on. Opacity and position only,
+ * as with the caption above.
  */
 .lens-caption > * {
   opacity: 0;
