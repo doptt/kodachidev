@@ -66,7 +66,7 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
   let uploads: THREE.Texture[] = []
   let disposed = false
 
-  loadAssets(renderer, { moon: small ? '2k' : '4k', site: small ? '1k' : '2k', earth: small ? '1k' : '2k', sky: small ? 512 : 1024 }, (done, total) => {
+  loadAssets(renderer, { moon: small ? '2k' : '4k', site: small ? '1k' : '2k', craters: small ? '512' : '1k', earth: small ? '1k' : '2k', sky: small ? 512 : 1024 }, (done, total) => {
     // The files are most of the wait; the actor and the shaders are the rest
     state.loaded = (done / total) * 0.8
     state.emit()
@@ -179,7 +179,7 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
     scene.add(rocks.mesh)
 
     post = new Post(quality.samples, loaded.sky)
-    uploads = [loaded.color, loaded.normal, loaded.detail, loaded.site, loaded.earth, ...(loaded.sky ? [loaded.sky] : [])]
+    uploads = [loaded.color, loaded.normal, loaded.detail, loaded.craters, loaded.site, loaded.earth, ...(loaded.sky ? [loaded.sky] : [])]
 
     // The actor draws its reflections with the renderer as soon as it is called: inside this frame, on a clean state
     const restore = borrow()

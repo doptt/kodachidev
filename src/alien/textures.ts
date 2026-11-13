@@ -67,7 +67,7 @@ function texture(source: HTMLCanvasElement, opts: { srgb?: boolean; repeatS?: bo
 // ---------------------------------------------------------------- webbing ----
 
 /** The two straps of the chair, as columns of one atlas. */
-const STRAP_STYLES = ['green', 'white'] as const
+const STRAP_STYLES = ['tan', 'white'] as const
 export type StrapStyle = (typeof STRAP_STYLES)[number]
 
 /** Threads across one strap's width. The colour atlas and the normal tile agree on it. */
@@ -75,12 +75,34 @@ const THREADS = 40
 /** Threads in one tile of the weave's normal map. */
 const NORMAL_THREADS = 8
 
+/**
+ * The coloured strap is the site's own tan, as it is seen: on screen, in the
+ * moon's sun, it should be the tan the page draws its small type in
+ * (`--color-bh-accent`, #bca68e, in src/styles/index.css). The sun is five
+ * times a plain light and the film curve lifts and pales everything bright, so
+ * the cloth itself has to be darker and richer than that to come out as it:
+ * painted #bca68e it showed as cream (#d6c7b0) beside the white straps.
+ * Painted this, the sunlit strap measures #c3ad8b in the settled moon view
+ * and #bda37f in the harness (scripts/alien-shots.mjs --set props). If the
+ * theme's tan, the sun or the film curve changes, tune it again by measuring.
+ */
+const TAN = '#8b7252'
+/** The cream the pins and their badges glow in (`--color-bh-highlight`; CHAMPAGNE in src/moon/config.ts is the same, in linear light). */
+const CREAM = '#ffedc1'
+
+/** A colour part of the way from one to another, channel by channel, as written (sRGB). */
+function between(from: string, to: string, share: number) {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)
+  return `#${[0, 1, 2].map((i) => Math.round(channel(from, i) + (channel(to, i) - channel(from, i)) * share).toString(16).padStart(2, '0')).join('')}`
+}
+
 type Stripe = [centre: number, width: number, colour: string]
 const STRAPS: Record<StrapStyle, { base: string; stripes: Stripe[] }> = {
-  green: {
-    base: '#157d3a',
+  tan: {
+    base: TAN,
     stripes: [
-      [0.5, 0.3, '#1c8c44'],
+      // A broad band down the middle, a shade nearer the cream: tone on tone, as it was when the strap was green
+      [0.5, 0.3, between(TAN, CREAM, 0.22)],
       [0.16, 0.06, '#ece5c2'],
       [0.84, 0.06, '#ece5c2'],
     ],
@@ -88,8 +110,8 @@ const STRAPS: Record<StrapStyle, { base: string; stripes: Stripe[] }> = {
   white: {
     base: '#ecebe0',
     stripes: [
-      [0.27, 0.09, '#157d3a'],
-      [0.73, 0.09, '#157d3a'],
+      [0.27, 0.09, TAN],
+      [0.73, 0.09, TAN],
       [0.5, 0.035, '#d6c688'],
     ],
   },
@@ -107,7 +129,7 @@ function weaveHeight(x: number, y: number) {
 }
 
 /**
- * The webbing: woven polypropylene strap in green and in white, side by side
+ * The webbing: woven polypropylene strap in tan and in white, side by side
  * in one atlas (u picks the strap, v runs along it and tiles), and a tileable
  * normal map of the weave itself. One unit of v is one strap width of length.
  */

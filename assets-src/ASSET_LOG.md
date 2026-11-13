@@ -241,3 +241,75 @@ No clips are bought: the six from round 1 are retargeted onto the new skeleton.
 - Quoted 19, cost 19. **Round 2 running total 32.75** (balance read back as 116.25 = 149 - 32.75).
 - Job id `fa495d69-b567-4e30-8782-e1a0fef5a124`.
 
+# The moon's ground
+
+Three pictures of lunar ground for the moon scene's textures (`assets-src/README-moon.md` says how each is used; `assets-src/scripts/moon.py` reads them from `assets-src/raw/moon/hf/`). Hard cap for this job: **40** credits. The account read **69.75** at its start. (The last balance written in this log is 116.25 and `docs/HANDOFF.md` gives 109.75 for the end of that session: what was spent between there and 69.75 is not this job's and is not logged here.)
+
+No reference images and no uploads: every call is text only, and the prompts describe lunar ground and nothing else.
+
+## Quotes taken before the first paid call (cost-only preflight, nothing submitted)
+
+| Step | Model | Settings | Credits |
+| --- | --- | --- | --- |
+| Image | `gpt_image_2_6` | 1k, 1:1, quality medium | 0.5 |
+| Image | `gpt_image_2_6` | 2k, 1:1, quality high | 2.75 |
+| Image | `gpt_image_2_6` | 4k, 1:1, quality high | 4.25 |
+| Upscale | `upscale_image` (bytedance) | to 4k | 2 |
+
+The upscaler was not used: the generator's own 4k tier was cheaper than a 2k picture plus an upscale.
+
+## Calls
+
+### M.1 Draft: does the model draw a true height map?
+
+- Model `gpt_image_2_6`, aspect 1:1, quality medium, resolution 1k (1024 x 1024 out), count 1.
+- Cost 0.5. **Running total 0.5.**
+- Job id `bfd5c9c5-085d-4914-bda2-64c074f757f1`. Kept as `raw/moon/hf/draft_site_height_1k.png`; not used in the build.
+- It does: bowls that darken evenly toward the middle, a paler raised rim all the way round, stones as pale blobs, no lit side and no shadow. Too regular (every crater fresh and round), which the next prompt asks against.
+- Prompt:
+
+  > A grayscale HEIGHT MAP (displacement map, digital elevation model) of a patch of lunar regolith about ten metres across, viewed exactly top-down in orthographic projection. This is pure elevation data, not a photograph: the brightness of each pixel encodes height only. White is the highest ground, black is the lowest, and the flat dusty plain sits at mid grey. There is no lighting of any kind: no sun, no shading, no cast shadows, no highlights, no ambient occlusion. Every crater is drawn the way a height map draws it: a round bowl that gets smoothly darker toward its centre, surrounded by a thin, slightly lighter raised rim ring, radially symmetric with no bright side and no dark side. Content: a gently undulating plain peppered with impact craters at every scale in a natural power-law distribution: three or four broad shallow old craters one to two metres across with soft worn rims, about twenty craters 30 to 60 centimetres across, a hundred or more 5 to 20 centimetres across, and countless tiny pits. Fresh craters are deeper with crisp rims, old ones are shallow and soft, and some overlap. Scattered between them are small half-buried rocks, drawn as small compact light-grey blobs with crisp edges. Features are spread evenly over the whole image right up to every edge. Smooth continuous gradients like 16-bit terrain data, no film grain, no noise, no text, no labels, no border, no vignette, no horizon, no sky, no objects.
+
+### M.2 The site: a height map of ten metres of cratered ground
+
+- Model `gpt_image_2_6`, aspect 1:1, quality high, resolution 4k (2880 x 2880 out, not 4096), count 1.
+- Cost 4.25. **Running total 4.75.**
+- Job id `c4396816-4e6d-46a0-a646-37a8cd79c8b3`. Result `https://d8j0ntlcm91z4.cloudfront.net/<account>/hf_20261113_085551_c4396816-4e6d-46a0-a646-37a8cd79c8b3.png`, kept as `raw/moon/hf/site_height_4k.png` (11.9 MB).
+- Accepted on the first try. Craters of every size and age, overlapping, two fresh ones with thrown rays, stones in loose groups. Two faults, both dealt with in `moon.py`: its corners darken (a vignette, dropped with everything broader than the largest crater) and at full size it carries a faint weave a few pixels wide (dropped with everything finer than three pixels).
+- Prompt:
+
+  > A grayscale HEIGHT MAP (displacement map, digital elevation model) of a patch of lunar regolith about ten metres across, viewed exactly top-down in orthographic projection. This is pure elevation data, not a photograph: the brightness of each pixel encodes height only. White is the highest ground, black is the lowest, and the dusty plain sits at mid grey. There is no lighting of any kind: no sun, no shading, no cast shadows, no highlights, no ambient occlusion. Every crater is drawn the way a height map draws it: a bowl that gets smoothly darker toward its centre, surrounded by a slightly lighter raised rim, with no bright side and no dark side. Content: a gently rolling, hummocky plain of dust, saturated with impact craters at every scale in a natural power-law distribution, as on the real Moon: three or four broad, very shallow, ancient craters one to two metres across whose rims are worn almost away; about thirty craters 25 to 70 centimetres across; several hundred craters 4 to 20 centimetres across; and thousands of tiny pits down to the limit of resolution. Great variety of age: a few fresh craters are deep with crisp sharp rims and a faint apron of ejecta, most are older, shallower, softened and partly filled, some are only faint ghost rings. Shapes are natural, not perfect circles: slightly irregular outlines, craters overlapping and cutting into one another, small craters inside and on the rims of large ones, occasional pairs and loose clusters. Between the craters the ground has subtle lumpy clod texture. Scattered irregularly are half-buried angular rocks and pebbles of many sizes from one to fifteen centimetres, drawn as compact light-grey shapes with crisp edges, some in loose groups near the fresher craters. Features are spread over the whole image right up to every edge at an even density. Smooth continuous gradients like 16-bit terrain data, extremely fine detail, no film grain, no noise, no text, no labels, no border, no vignette, no horizon, no sky, no objects.
+
+### M.3 The tiling craters: a height map of two metres of pitted soil
+
+- Model `gpt_image_2_6`, aspect 1:1, quality high, resolution 2k (2048 x 2048 out), count 1.
+- Cost 2.75. **Running total 7.5.**
+- Job id `14ff9745-ef35-4bd1-8a16-96fd43972f1b`. Result `.../hf_20261113_085553_14ff9745-ef35-4bd1-8a16-96fd43972f1b.png`, kept as `raw/moon/hf/tile_height_2k.png` (7.5 MB).
+- Accepted on the first try: craggy clods, small craters, angular pebbles, even all over. It does not tile as generated (none of these do); `moon.py` makes it tile.
+- Prompt:
+
+  > A grayscale HEIGHT MAP (displacement map, digital elevation model) for a seamless tileable ground texture: a patch of lunar regolith about two metres across, viewed exactly top-down in orthographic projection. Pure elevation data, not a photograph: brightness encodes height only. White is highest, black is lowest, the dust surface sits at mid grey. No lighting of any kind: no sun, no shading, no cast shadows, no highlights. Each small crater is a bowl that darkens smoothly toward its centre with a slightly lighter raised rim, with no bright side and no dark side. Content: fine lunar soil densely pitted with small impact craters in a natural power-law size distribution, none of them larger than one tenth of the image width: a few dozen craters around a tenth of the image wide, hundreds of smaller ones, thousands of tiny pits. Mixed ages: some crisp and deep, most soft, shallow and worn, many overlapping, outlines slightly irregular. Between them lumpy clods of soil and a scatter of small angular half-buried pebbles of many sizes, drawn as compact light shapes with crisp edges. The statistics are perfectly uniform across the whole image: no large features, no gradient from one side to the other, no focal point, the same density of detail in every corner and right up to every edge, so that the image can repeat as a tile. Smooth continuous gradients like 16-bit terrain data, extremely fine detail, no film grain, no text, no border, no vignette, no horizon, no sky, no objects.
+
+### M.4 The grain: soil photographed in flat light
+
+- Model `gpt_image_2_6`, aspect 1:1, quality high, resolution 2k (2048 x 2048 out), count 1.
+- Cost 2.75. **Running total 10.25.**
+- Job id `7222ffe6-bed5-4c85-9aff-4be56a36523c`. Result `.../hf_20261113_085557_7222ffe6-bed5-4c85-9aff-4be56a36523c.png`, kept as `raw/moon/hf/tile_albedo_2k.png` (12.5 MB).
+- Accepted on the first try: sharp grains, crumbs and rock chips, no shadows to speak of, nothing large. It came out warmer (browner) than asked; only its brightness is used.
+- Prompt:
+
+  > Seamless tileable albedo texture for a 3D material: lunar regolith photographed exactly top-down in orthographic view, an area about one and a half metres across. Completely flat, even, shadowless illumination from directly behind the camera, as in a scanned material albedo map: no cast shadows at all, no directional light, no highlights, no dark side on any pebble. Neutral grey lunar soil, slightly warm, of medium brightness with gentle natural tonal mottling: fine powdery dust with a crisp granular texture, small clods and crumbs, thousands of tiny grains, a scatter of small angular pebbles and rock chips a few millimetres to three centimetres across in slightly lighter and slightly darker greys, a few glassy dark specks, and the faint tonal traces of very small shallow pits. Photorealistic and extremely sharp, every grain in focus. The texture is perfectly uniform across the whole image: no large features, no craters wider than a twentieth of the image, no gradient, no vignette, no focal point, the same density in every corner and right up to every edge, so that it can repeat as a tile. No footprints, no tracks, no objects, no horizon, no sky, no text, no border.
+
+## Totals
+
+| | Credits |
+| --- | --- |
+| Draft height map (1 image, 1k medium) | 0.5 |
+| Site height map (1 image, 4k high) | 4.25 |
+| Tile height map (1 image, 2k high) | 2.75 |
+| Soil photograph (1 image, 2k high) | 2.75 |
+| **Spent** | **10.25** |
+| Cap | 40 |
+| Balance at the start (read from the service) | 69.75 |
+| **Balance at the end (read from the service)** | **59.5** |
+

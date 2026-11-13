@@ -8,8 +8,8 @@ import regolithSrc from './shaders/regolith.glsl?raw'
 /** The most pins the ground can draw rings for. Matches MAX_PINS in the shader. */
 export const MAX_PINS = 8
 
-/** How wide the two sizes of grain are on the ground, metres. */
-const GRAIN = { fine: 1.3, coarse: 5 }
+/** How wide the two tiling squares are on the ground, metres: the grain, and the clods and small craters. */
+const GRAIN = { fine: 1.3, craters: 4.6 }
 
 export type Ground = {
   /** The moon itself. Its own frame is the frame of NASA's maps; it is turned so that the alien's spot is up. */
@@ -66,8 +66,11 @@ function sphereGrid(across: number, down: number, radius: number) {
   return geometry
 }
 
-export function buildGround(textures: { color: THREE.Texture; normal: THREE.Texture; detail: THREE.Texture; site: THREE.Texture }, radius: number, segments: number): Ground {
-  const round = 2 * Math.PI * radius
+export function buildGround(
+  textures: { color: THREE.Texture; normal: THREE.Texture; detail: THREE.Texture; craters: THREE.Texture; site: THREE.Texture },
+  radius: number,
+  segments: number,
+): Ground {
   const material = new THREE.ShaderMaterial({
     vertexShader: moonVert,
     fragmentShader: moonFrag.replace('#pragma regolith', regolithSrc),
@@ -78,20 +81,21 @@ export function buildGround(textures: { color: THREE.Texture; normal: THREE.Text
         uColor: { value: null },
         uNormal: { value: null },
         uDetail: { value: null },
+        uCraters: { value: null },
         uSite: { value: null },
         uSiteUp: { value: new THREE.Vector3() },
         uSiteU: { value: new THREE.Vector3() },
         uSiteV: { value: new THREE.Vector3() },
         uSiteReach: { value: SITE_REACH },
-        // Whole numbers round the moon, so the grain meets itself at the map's seam
-        uTile: { value: new THREE.Vector4(Math.round(round / GRAIN.fine), Math.round(round / GRAIN.fine) / 2, Math.round(round / GRAIN.coarse), Math.round(round / GRAIN.coarse) / 2) },
+        // Repeats in a metre. The squares are laid on in the moon's own space, not on its map, so there is no seam to meet at
+        uGrain: { value: new THREE.Vector2(1 / GRAIN.fine, 1 / GRAIN.craters) },
         uRadius: { value: radius },
         uSun: { value: new THREE.Vector3() },
         uSunLight: { value: new THREE.Color() },
         uFill: { value: new THREE.Vector3() },
         uFillLight: { value: new THREE.Color() },
         uEye: { value: new THREE.Vector3() },
-        uAlbedo: { value: 1.75 },
+        uAlbedo: { value: 1.82 },
         uBaked: { value: 1 },
         uTime: { value: 0 },
         uPins: { value: Array.from({ length: MAX_PINS }, () => new THREE.Vector4()) },
@@ -103,6 +107,7 @@ export function buildGround(textures: { color: THREE.Texture; normal: THREE.Text
   material.uniforms.uColor.value = textures.color
   material.uniforms.uNormal.value = textures.normal
   material.uniforms.uDetail.value = textures.detail
+  material.uniforms.uCraters.value = textures.craters
   material.uniforms.uSite.value = textures.site
 
   const geometry = sphereGrid(segments, segments / 2, radius)

@@ -7,7 +7,8 @@ import { createKTX2Loader } from '../stage/ktx2'
  *   /moon/moon-color-{4k,2k}.ktx2    LROC WAC colour mosaic: the broad tone of the ground
  *   /moon/moon-normal-2k.ktx2        slopes of the LOLA elevation model: the broad lie of the land
  *   /moon/site-{2k,1k}.ktx2          the ground round the chair, with its shadows baked in
- *   /moon/moon-detail.ktx2           the tiling grain
+ *   /moon/moon-detail.ktx2           the tiling grain: grit and pebbles
+ *   /moon/moon-craters-{1k,512}.ktx2 the tiling clods and small craters
  *   /moon/earth-{2k,1k}.ktx2         Blue Marble, clouds in alpha
  *   /sky/{1024,512}/*.webp           NASA's star map as a cube (see assets-src/README-sky.md)
  *   /basis/                          the Basis transcoder KTX2Loader runs in a worker
@@ -16,6 +17,7 @@ export type MoonAssets = {
   color: THREE.Texture
   normal: THREE.Texture
   detail: THREE.Texture
+  craters: THREE.Texture
   site: THREE.Texture
   earth: THREE.Texture
   /** Null if the star map could not be fetched: the sky is then plain black. */
@@ -23,7 +25,7 @@ export type MoonAssets = {
   dispose(): void
 }
 
-export type AssetSizes = { moon: '4k' | '2k'; site: '2k' | '1k'; earth: '2k' | '1k'; sky: 1024 | 512 }
+export type AssetSizes = { moon: '4k' | '2k'; site: '2k' | '1k'; craters: '1k' | '512'; earth: '2k' | '1k'; sky: 1024 | 512 }
 
 const SKY_FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz']
 
@@ -35,7 +37,7 @@ export async function loadAssets(renderer: THREE.WebGLRenderer, sizes: AssetSize
   const base = import.meta.env.BASE_URL
   const ktx2 = createKTX2Loader(renderer)
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
-  const total = 6
+  const total = 7
   let done = 0
   const count = <T>(promise: Promise<T>) =>
     promise.then((value) => {
@@ -45,7 +47,7 @@ export async function loadAssets(renderer: THREE.WebGLRenderer, sizes: AssetSize
 
   const map = async (name: string, wrap: 'round' | 'tile' | 'none') => {
     const texture = await ktx2.loadAsync(`${base}moon/${name}.ktx2`)
-    // The maps wrap round the moon east to west; the grain tiles both ways; the site picture is a single patch
+    // The maps wrap round the moon east to west; the grain and the craters tile both ways; the site picture is a single patch
     texture.wrapS = wrap === 'none' ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping
     texture.wrapT = wrap === 'tile' ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping
     texture.anisotropy = anisotropy
@@ -67,10 +69,11 @@ export async function loadAssets(renderer: THREE.WebGLRenderer, sizes: AssetSize
     )
 
   try {
-    const [color, normal, detail, site, earth, stars] = await Promise.all([
+    const [color, normal, detail, craters, site, earth, stars] = await Promise.all([
       count(map(`moon-color-${sizes.moon}`, 'round')),
       count(map('moon-normal-2k', 'round')),
       count(map('moon-detail', 'tile')),
+      count(map(`moon-craters-${sizes.craters}`, 'tile')),
       count(map(`site-${sizes.site}`, 'none')),
       count(map(`earth-${sizes.earth}`, 'round')),
       count(sky),
@@ -79,11 +82,12 @@ export async function loadAssets(renderer: THREE.WebGLRenderer, sizes: AssetSize
       color,
       normal,
       detail,
+      craters,
       site,
       earth,
       sky: stars,
       dispose() {
-        for (const texture of [color, normal, detail, site, earth, stars]) texture?.dispose()
+        for (const texture of [color, normal, detail, craters, site, earth, stars]) texture?.dispose()
       },
     }
   } finally {

@@ -40,6 +40,8 @@ const JOBS = [
   { name: 'moon-color-2k', kind: 'color', quality: 190 },
   { name: 'moon-normal-2k', kind: 'normal', rdo: 1.6 },
   { name: 'moon-detail', kind: 'data', rdo: 1.2 },
+  { name: 'moon-craters-1k', kind: 'data', rdo: 1.2 },
+  { name: 'moon-craters-512', kind: 'data', rdo: 1.2 },
   { name: 'site-2k', kind: 'data', rdo: 1.5 },
   { name: 'site-1k', kind: 'data', rdo: 1.5 },
   { name: 'earth-2k', kind: 'color', quality: 170 },

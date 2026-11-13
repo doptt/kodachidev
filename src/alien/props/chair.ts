@@ -9,7 +9,7 @@ import { bentTube, sweep, v3 } from './tube'
  * is: four bent aluminium tubes (the front legs and the bar that joins them
  * along the ground, the rear legs and theirs, the U of the seat and the U of
  * the back), flat white arms riveted across the tops of the legs, and woven
- * webbing in green and white: long straps running from the top of the back
+ * webbing in tan and white (the tan is the site's own, see textures.ts): long straps running from the top of the back
  * to the front of the seat, short ones across, each passing over and under
  * the others and wrapped round the tube at its ends with a screw through it.
  *
@@ -77,8 +77,8 @@ const WEAVE = 0.0012 // how far a strap rises or dips where it crosses another
 /** The gap between neighbouring straps, as a share of a strap's width. */
 const STRAP_GAP_SHARE = 0.22
 
-const LONG_STRAPS: StrapStyle[] = ['green', 'white']
-const CROSS_STRAPS: StrapStyle[] = ['white', 'green']
+const LONG_STRAPS: StrapStyle[] = ['tan', 'white']
+const CROSS_STRAPS: StrapStyle[] = ['white', 'tan']
 /** How far the front legs rake forward and the rear legs back, radians from upright. */
 const FRONT_RAKE = 0.56
 const REAR_RAKE = 0.1

@@ -1,9 +1,11 @@
-// The moon's ground, in three layers. NASA's colour map and the slopes of its
+// The moon's ground, in layers. NASA's colour map and the slopes of its
 // elevation model give the broad lie of the land. Over the cap round the chair
 // goes a picture made for this scene (assets-src/scripts/moon.py): craters,
 // boot prints and half-sunk stones, with the shadows the low sun throws across
-// them baked in. Over everything, a tiling grain. All of it is lit as dust,
-// under the scene's shadow map, a faint fill, and the pins' pulse rings.
+// them baked in. Over everything, two tiling squares: clods and small craters
+// a few strides across, and a grain of grit and pebbles a stride across. All
+// of it is lit as dust, under the scene's shadow map, a faint fill, and the
+// pins' pulse rings.
 //
 // Everything is worked out in the moon's own frame (the frame of the maps), so
 // the lights and the eye are handed in already turned into it.
@@ -17,13 +19,14 @@
 
 uniform sampler2D uColor;
 uniform sampler2D uNormal;
-uniform sampler2D uDetail;
+uniform sampler2D uDetail;  // the grain. rg: normal; b: lighter or darker dust
+uniform sampler2D uCraters; // clods and small craters, stored the same way
+uniform vec2 uGrain;        // how many times each of those repeats in a metre: the grain, the craters
 uniform sampler2D uSite;   // r: in the sun (1) or in baked shadow (0); g: lighter or darker dust; b, a: normal
 uniform vec3 uSiteUp;      // the chair's spot, and the two axes the site picture is laid out on
 uniform vec3 uSiteU;
 uniform vec3 uSiteV;
 uniform float uSiteReach;  // how far round from the chair the picture reaches, radians
-uniform vec4 uTile;        // how many times the grain repeats round the moon and from pole to pole: fine (xy) and coarse (zw)
 uniform vec3 uSun;       // direction to the sun
 uniform vec3 uSunLight;  // its colour times intensity
 uniform vec3 uFill;      // direction the earthshine comes from
@@ -40,6 +43,19 @@ varying vec2 vUv;
 varying vec3 vLocal;
 
 #pragma regolith
+
+// A tiling square of ground at the place p (in repeats of the square). The moon's own map bunches up toward its
+// poles, one of which is just over the edge of the settled picture, so the square is not laid on the map: it is
+// laid on from three sides, along each of the moon's axes, and the three are mixed by which way the ground
+// faces (`weights`). xyz: how it leans the ground, in the moon's frame; w: lighter or darker dust.
+vec4 tiled(sampler2D map, vec3 p, vec3 weights) {
+  // Seen along x, the square's width runs along z and its top is toward y; and so on round
+  vec3 x = texture2D(map, vec2(p.z, -p.y)).xyz;
+  vec3 y = texture2D(map, vec2(p.x, -p.z)).xyz;
+  vec3 z = texture2D(map, vec2(p.x, -p.y)).xyz;
+  vec3 lean = weights.x * vec3(0.0, x.y * 2.0 - 1.0, x.x * 2.0 - 1.0) + weights.y * vec3(y.x * 2.0 - 1.0, 0.0, y.y * 2.0 - 1.0) + weights.z * vec3(z.x * 2.0 - 1.0, z.y * 2.0 - 1.0, 0.0);
+  return vec4(lean, dot(weights, vec3(x.z, y.z, z.z)));
+}
 
 // One pin's light on the ground: a steady small disc at its foot, and a ring that widens and fades
 float pinGlow(vec3 dir, vec4 pin, float offset) {
@@ -72,17 +88,22 @@ void main() {
   // Its slopes are the ground's own: they turn the normal that is lit
   vec3 alongU = normalize(uSiteU - up * dot(up, uSiteU));
   vec3 alongV = normalize(uSiteV - up * dot(up, uSiteV));
-  n = normalize(n + (alongU * (site.b * 2.0 - 1.0) + alongV * (site.a * 2.0 - 1.0)) * (here * 1.6));
+  vec3 slope = (alongU * (site.b * 2.0 - 1.0) + alongV * (site.a * 2.0 - 1.0)) * here;
+  n = normalize(n + slope * 1.6);
 
-  // The grain, at two sizes. It tiles on the map's own grid, which bunches up toward the map's poles, so it is let go there.
-  // It is not lit as a surface in its own right: with no shadows cast between grains, a low sun would turn every
-  // slope that faces away into a black hole. It brightens and darkens the ground it lies on instead, by how much
-  // more or less of the sun it catches.
-  float open = smoothstep(0.12, 0.5, length(up.xz));
-  vec3 fine = texture2D(uDetail, vUv * uTile.xy).xyz;
-  vec3 coarse = texture2D(uDetail, vUv * uTile.zw + vec2(0.37, 0.61)).xyz;
-  vec2 lean = ((fine.xy * 2.0 - 1.0) * 1.5 + (coarse.xy * 2.0 - 1.0) * 0.6) * open;
-  vec3 leaned = normalize(n + east * lean.x + north * lean.y);
+  // The craters and the grain. They are not lit as a surface in their own right: with no shadows cast between
+  // grains, a low sun would turn every slope that faces away into a black hole. They brighten and darken the
+  // ground they lie on instead, by how much more or less of the sun it catches. Under the site's picture, which
+  // has craters of its own with their shadows, the tiled craters are held down.
+  vec3 weights = pow(abs(up), vec3(6.0));
+  weights /= weights.x + weights.y + weights.z;
+  vec4 fine = tiled(uDetail, vLocal * uGrain.x, weights);
+  vec4 coarse = tiled(uCraters, vLocal * uGrain.y + vec3(0.37, 0.61, 0.13), weights);
+  vec3 lean = fine.xyz * 1.9 + coarse.xyz * mix(1.0, 0.45, here);
+  // The site's slopes go in here as well. Dust seen from low down is nearly as bright on a slope turned from the sun
+  // as on one turned to it (regolith.glsl), which is true to the Moon and leaves a crater as a black shadow with
+  // nothing round it; this is what puts the light back on its far wall and shades the near one into the shadow.
+  vec3 leaned = normalize(n + lean - up * dot(lean, up) + slope * 0.5);
   float facing = dot(n, uSun);
   float relief = clamp(1.0 + (dot(leaned, uSun) - facing) / (max(facing, 0.0) + 0.28), 0.12, 2.2);
 
@@ -90,7 +111,7 @@ void main() {
   // The mosaic is a little brown and a little flat: real dust under a hard sun reads nearly neutral, the seas well darker than the highlands
   albedo = mix(vec3(dot(albedo, vec3(0.2126, 0.7152, 0.0722))), albedo, 0.6);
   albedo = pow(albedo, vec3(1.25)) * uAlbedo;
-  albedo *= mix(1.0, 0.62 + 0.76 * fine.z, open) * mix(1.0, 0.78 + 0.44 * coarse.z, 0.7 * open) * mix(1.0, 0.55 + 0.9 * site.g, here);
+  albedo *= (0.62 + 0.76 * fine.w) * (0.7 + 0.6 * coarse.w) * mix(1.0, 0.55 + 0.9 * site.g, here);
 
   // In shadow: of the alien, his chair and the loose stones (the shadow map), or of the ground's own relief (baked)
   float shadow = getShadowMask() * mix(1.0, site.r, here);
