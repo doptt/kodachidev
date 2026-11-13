@@ -27,13 +27,76 @@ import type { BoneRole, Rig } from './rig'
  * model with no clothes the measured colours all come out as skin and
  * nothing is treated as cloth.
  *
+ * The sweatshirt is black. The model's picture has it lilac grey, and the
+ * picture is left as it is: the dye goes on here, per pixel (`DYE`). How
+ * light the picture is at a dyed pixel, against the sweatshirt as a whole,
+ * is kept, so the painted folds, seams and weave are all still there, only
+ * darker. Which pixels are dyed is decided in three ways together:
+ *  - by hue: the sweatshirt's rather than his skin's (the shorts are khaki
+ *    and the drawstrings cream, so they are left alone), and no lighter
+ *    than the sweatshirt gets;
+ *  - by place: only on or just past a part of the body where clothes are
+ *    worn. The cuffs follow the hands and the collar follows the head, but
+ *    the rims of his eyes, his toes and the tips of his antennae have
+ *    greyish pixels of their own that must not turn black;
+ *  - and well inside the sweatshirt, with sweatshirt all round, whatever
+ *    the hue, unless it is as light as a drawstring. The picture is an
+ *    atlas of small patches with no margin between them, so along every
+ *    edge of a patch skin from the patch next door leaks in: a faint line
+ *    on lilac, a bright scratch on black.
+ * The last two are per vertex (`dyeZone`), worked out in `measureCloth`.
+ *
  * The wrap is the part that needs the shader opened up furthest: it must use
  * the sun's light before the shadow map has been applied to it, because the
  * far side of any body is by definition in its own shadow.
  */
 const WRAP = 0.3
 
+/**
+ * Black cotton, as a linear colour: what the sweatshirt's average becomes. A
+ * shade warm, and nowhere near zero, as dyed cloth is: it reflects about two
+ * percent of the sun, enough for the folds and the lit edge to show. Much
+ * lower and the folds go; much higher and it is a grey sweatshirt.
+ */
+const DYE = new THREE.Color(0.019, 0.0187, 0.0183)
+/** How strongly the picture's light and dark carry over into the dyed cloth: 1 is as painted, more is deeper folds. */
+const DYE_CONTRAST = 1.1
+/** A texel darker than this (linear, 0..1) has no hue to speak of: the eyes, the holes in the picture. */
+const HUELESS = 0.004
+/** Nothing of the sweatshirt is painted lighter than this many times its average; what is, is skin. Fades out between the two. */
+const DYE_LIGHTEST = [1.6, 2.0]
+/** The same where everything round about is sweatshirt: there only the drawstrings are spared, which are lighter than this. */
+const DYE_LIGHTEST_WITHIN = [2.6, 3.2]
+/** The cell of the grid the vertices are counted on to say what is near what, as a fraction of his height: 1 cm on the shipped model. */
+const DYE_CELL = 0.0085
+/**
+ * How many cells past the bones clothes are worn on the dye still takes. On
+ * the shipped model the cuffs and collar end within 2.5 cm of those bones and
+ * the nearest stray grey pixels (the eyes' rims) are 10 cm away.
+ */
+const DYE_REACH = 3
+/** How many cells round a vertex are looked at to say whether it is well inside the sweatshirt, and the share of them that must be sweatshirt: from the first not at all, from the second fully. */
+const DYE_WITHIN = 2
+const DYE_WITHIN_SHARE = [0.75, 0.9]
+
 export type ClothColours = { skin: THREE.Color; garments: [THREE.Color, THREE.Color] }
+
+const lightness = (c: THREE.Color) => (c.r + c.g + c.b) / 3
+
+/**
+ * Where a hue lies between his skin's and the sweatshirt's, as numbers the
+ * shader can use: with `hue = colour / lightness`, `dot(hue, xyz) + w` is 0
+ * for his skin and 1 for the sweatshirt. All zero when he wears none.
+ */
+function dyeKey(colours: ClothColours) {
+  const [sweatshirt] = colours.garments
+  const hue = (c: THREE.Color) => new THREE.Vector3(c.r, c.g, c.b).divideScalar(Math.max(lightness(c), HUELESS))
+  const skin = hue(colours.skin)
+  const axis = hue(sweatshirt).sub(skin)
+  if (apart(sweatshirt, colours.skin) <= SAME || axis.lengthSq() < 1e-4) return new THREE.Vector4(0, 0, 0, 0)
+  axis.divideScalar(axis.lengthSq())
+  return new THREE.Vector4(axis.x, axis.y, axis.z, -skin.dot(axis))
+}
 
 /** Bones under which clothes are worn: the trunk and arms for the sweatshirt, the hips and thighs for the shorts. */
 const SWEATSHIRT: BoneRole[] = ['spine', 'chest', 'neck', 'leftShoulder', 'rightShoulder', 'leftUpperArm', 'rightUpperArm', 'leftForeArm', 'rightForeArm']
@@ -49,9 +112,64 @@ function signature(c: THREE.Color) {
 const apart = (a: THREE.Color, b: THREE.Color) => Math.hypot(...signature(a).map((v, i) => v - signature(b)[i]))
 
 /**
+ * Counts the vertices on a grid of cells in the bind pose, so that what is
+ * near a vertex can be asked without looking through the others: `share`
+ * gives, for every vertex, the share of the vertices in the cube of
+ * `radius` cells each way from its own cell that are flagged.
+ */
+function gridOf(cloud: Cloud, cell: number) {
+  const p = cloud.positions
+  // Which cell each vertex is in along each axis, and how many cells there are along it
+  const cells = new Int32Array(p.length)
+  const size = [0, 0, 0]
+  for (let axis = 0; axis < 3; axis++) {
+    let low = Infinity
+    let high = -Infinity
+    for (let i = axis; i < p.length; i += 3) {
+      if (p[i] < low) low = p[i]
+      if (p[i] > high) high = p[i]
+    }
+    for (let i = axis; i < p.length; i += 3) cells[i] = Math.floor((p[i] - low) / cell)
+    // One more than there are: the tables below start with a layer of zeros
+    size[axis] = Math.floor((high - low) / cell) + 2
+  }
+  const [nx, ny, nz] = size
+
+  /** A table in which the entry at (x, y, z) is how many of the wanted vertices are in cells below x, y and z. */
+  const table = (wanted: Uint8Array | null) => {
+    const sums = new Int32Array(nx * ny * nz)
+    for (let i = 0; i < cloud.count; i++) if (!wanted || wanted[i]) sums[cells[i * 3] + 1 + nx * (cells[i * 3 + 1] + 1 + ny * (cells[i * 3 + 2] + 1))]++
+    for (let z = 1; z < nz; z++) for (let y = 1; y < ny; y++) for (let x = 2, at = 2 + nx * (y + ny * z); x < nx; x++, at++) sums[at] += sums[at - 1]
+    for (let z = 1; z < nz; z++) for (let y = 2; y < ny; y++) for (let x = 1, at = 1 + nx * (y + ny * z); x < nx; x++, at++) sums[at] += sums[at - nx]
+    for (let z = 2; z < nz; z++) for (let y = 1; y < ny; y++) for (let x = 1, at = 1 + nx * (y + ny * z); x < nx; x++, at++) sums[at] += sums[at - nx * ny]
+    return sums
+  }
+  const all = table(null)
+
+  return {
+    share(flagged: Uint8Array, radius: number) {
+      const some = table(flagged)
+      const out = new Float32Array(cloud.count)
+      for (let i = 0; i < cloud.count; i++) {
+        const x0 = Math.max(cells[i * 3] - radius, 0)
+        const x1 = Math.min(cells[i * 3] + radius + 1, nx - 1)
+        const y0 = nx * Math.max(cells[i * 3 + 1] - radius, 0)
+        const y1 = nx * Math.min(cells[i * 3 + 1] + radius + 1, ny - 1)
+        const z0 = nx * ny * Math.max(cells[i * 3 + 2] - radius, 0)
+        const z1 = nx * ny * Math.min(cells[i * 3 + 2] + radius + 1, nz - 1)
+        const box = (sums: Int32Array) => sums[x1 + y1 + z1] - sums[x0 + y1 + z1] - sums[x1 + y0 + z1] - sums[x1 + y1 + z0] + sums[x0 + y0 + z1] + sums[x0 + y1 + z0] + sums[x1 + y0 + z0] - sums[x0 + y0 + z0]
+        out[i] = box(some) / box(all)
+      }
+      return out
+    },
+  }
+}
+
+/**
  * Marks where clothes are worn (a per-vertex `clothZone` attribute, 1 on the
- * trunk, arms, hips and thighs) and measures the colour of his skin and of
- * what he wears on his trunk and on his hips.
+ * trunk, arms, hips and thighs) and where the sweatshirt's dye may go
+ * (`dyeZone`), and measures the colour of his skin and of what he wears on
+ * his trunk and on his hips.
  */
 export function measureCloth(rig: Rig, cloud: Cloud, texture: TextureReader | null): ClothColours {
   const bones = rig.mesh.skeleton.bones
@@ -87,7 +205,38 @@ export function measureCloth(rig: Rig, cloud: Cloud, texture: TextureReader | nu
   const onHips = mean(new Set([indexOf('hips')]))
   // A garment the colour of his skin is no garment
   const garment = (colour: THREE.Color | null) => (colour && apart(colour, skin) > SAME ? colour : skin.clone())
-  return { skin, garments: [garment(onTrunk), garment(onHips)] }
+  const colours: ClothColours = { skin, garments: [garment(onTrunk), garment(onHips)] }
+
+  // Where the dye may go. 0 to 1: how nearly the vertex is on a clothed part of the body, which the cuffs and the collar are
+  // just past. 1 to 2: how surely it is well inside the sweatshirt, with sweatshirt all round it.
+  const dye = new Float32Array(cloud.count)
+  const key = dyeKey(colours)
+  if (texture && uv && key.lengthSq() > 0) {
+    let low = Infinity
+    let high = -Infinity
+    for (let i = 0; i < cloud.count; i++) {
+      low = Math.min(low, cloud.positions[i * 3 + 1])
+      high = Math.max(high, cloud.positions[i * 3 + 1])
+    }
+    const grid = gridOf(cloud, DYE_CELL * (high - low))
+    const reach = grid.share(Uint8Array.from(zone), DYE_REACH)
+    for (let i = 0; i < cloud.count; i++) dye[i] = zone[i] > 0 ? 1 : THREE.MathUtils.smoothstep(reach[i], 0, 0.1)
+    // A vertex is sweatshirt if the picture at it has anything of the sweatshirt's hue (at an edge of a patch of the picture it is mixed with whatever lies next to it there)
+    const sweatshirt = new Uint8Array(cloud.count)
+    const from = Math.max(lightness(colours.garments[0]), HUELESS)
+    const texel: [number, number, number] = [0, 0, 0]
+    for (let i = 0; i < cloud.count; i++) {
+      if (dye[i] < 1) continue
+      texture.at(uv.getX(i), uv.getY(i), texel)
+      const light = (texel[0] + texel[1] + texel[2]) / 3
+      const hue = (texel[0] * key.x + texel[1] * key.y + texel[2] * key.z) / Math.max(light, HUELESS) + key.w
+      if (hue > 0.25 && light > HUELESS * 3 && light < DYE_LIGHTEST[1] * from) sweatshirt[i] = 1
+    }
+    const within = grid.share(sweatshirt, DYE_WITHIN)
+    for (let i = 0; i < cloud.count; i++) if (dye[i] === 1) dye[i] += THREE.MathUtils.smoothstep(within[i], DYE_WITHIN_SHARE[0], DYE_WITHIN_SHARE[1])
+  }
+  rig.mesh.geometry.setAttribute('dyeZone', new THREE.BufferAttribute(dye, 1))
+  return colours
 }
 
 export function makeSkin(source: THREE.Material | THREE.Material[], colours: ClothColours) {
@@ -116,20 +265,30 @@ export function makeSkin(source: THREE.Material | THREE.Material[], colours: Clo
     skinColour: { value: colours.skin },
     garmentA: { value: colours.garments[0] },
     garmentB: { value: colours.garments[1] },
+    dyeKey: { value: dyeKey(colours) },
+    dye: { value: DYE },
+    // How light the sweatshirt is in the picture, on average: a pixel that light comes out exactly the dye's colour
+    dyeFrom: { value: Math.max(lightness(colours.garments[0]), HUELESS) },
   }
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms)
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float clothZone;\nvarying float vClothZone;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvClothZone = clothZone;')
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float clothZone;\nattribute float dyeZone;\nvarying float vClothZone;\nvarying float vDyeZone;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvClothZone = clothZone;\nvDyeZone = dyeZone;')
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         /* glsl */ `#include <common>
         varying float vClothZone;
+        varying float vDyeZone;
         uniform vec3 skinColour;
         uniform vec3 garmentA;
         uniform vec3 garmentB;
+        uniform vec4 dyeKey;
+        uniform vec3 dye;
+        uniform float dyeFrom;
         // 1 on cloth, 0 on skin
         float cloth = 0.0;
+        // 1 on the sweatshirt, which is dyed
+        float dyed = 0.0;
         vec4 clothSignature( vec3 c ) {
           float light = ( c.r + c.g + c.b ) / 3.0;
           return vec4( c / ( light + 0.02 ), light * 1.5 );
@@ -145,6 +304,18 @@ export function makeSkin(source: THREE.Material | THREE.Material[], colours: Clo
           // Where both garments measured as skin there are no clothes at all
           float worn = step( ${SAME.toFixed(2)}, max( distance( clothSignature( garmentA ), clothSignature( skinColour ) ), distance( clothSignature( garmentB ), clothSignature( skinColour ) ) ) );
           cloth = worn * smoothstep( 0.4, 0.6, vClothZone ) * smoothstep( -0.03, 0.03, toSkin - toCloth );
+          // The sweatshirt, dyed black: what has its hue, is dark enough to be it and is where it is worn. The picture's light and dark are kept
+          float painted = ( diffuseColor.r + diffuseColor.g + diffuseColor.b ) / 3.0;
+          float hue = dot( diffuseColor.rgb / max( painted, ${HUELESS.toFixed(3)} ), dyeKey.xyz ) + dyeKey.w;
+          float against = painted / dyeFrom;
+          // Well inside it, whatever is not as light as a drawstring is sweatshirt: at the seams of the picture other colours leak in
+          float within = clamp( vDyeZone - 1.0, 0.0, 1.0 );
+          float byHue = smoothstep( 0.3, 0.55, hue ) * ( 1.0 - smoothstep( ${DYE_LIGHTEST[0].toFixed(2)}, ${DYE_LIGHTEST[1].toFixed(2)}, against ) );
+          float byPlace = within * ( 1.0 - smoothstep( ${DYE_LIGHTEST_WITHIN[0].toFixed(2)}, ${DYE_LIGHTEST_WITHIN[1].toFixed(2)}, against ) );
+          dyed = max( byHue, byPlace ) * smoothstep( ${HUELESS.toFixed(3)}, ${(HUELESS * 3).toFixed(3)}, painted ) * smoothstep( 0.0, 1.0, vDyeZone );
+          diffuseColor.rgb = mix( diffuseColor.rgb, dye * pow( min( against, ${DYE_LIGHTEST[0].toFixed(2)} ), ${DYE_CONTRAST.toFixed(2)} ), dyed );
+          // All of it is cloth, the cuffs and the collar too
+          cloth = max( cloth, dyed );
           // Cotton drinks light: a hard sun does not bleach it the way it does skin
           diffuseColor.rgb *= mix( 1.0, 0.78, cloth );
         }`,
@@ -158,7 +329,8 @@ export function makeSkin(source: THREE.Material | THREE.Material[], colours: Clo
           material.clearcoat *= 1.0 - cloth;
         #endif
         #ifdef USE_SHEEN
-          material.sheenColor = mix( material.sheenColor, vec3( 0.22 ) + 0.5 * diffuseColor.rgb, cloth );
+          // The fuzz of a dyed cloth is dyed too: it catches the light at the edges, faintly
+          material.sheenColor = mix( material.sheenColor, vec3( mix( 0.22, 0.03, dyed ) ) + 0.5 * diffuseColor.rgb, cloth );
           material.sheenRoughness = mix( material.sheenRoughness, 0.85, cloth );
         #endif`,
       )
