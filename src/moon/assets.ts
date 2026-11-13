@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { createKTX2Loader } from '../stage/ktx2'
 
 /**
  * The scene's files (see assets-src/README-moon.md for where each comes from):
@@ -33,7 +33,7 @@ const SKY_FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz']
  */
 export async function loadAssets(renderer: THREE.WebGLRenderer, sizes: AssetSizes, onProgress: (done: number, total: number) => void): Promise<MoonAssets> {
   const base = import.meta.env.BASE_URL
-  const ktx2 = new KTX2Loader().setTranscoderPath(`${base}basis/`).detectSupport(renderer)
+  const ktx2 = createKTX2Loader(renderer)
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
   const total = 6
   let done = 0

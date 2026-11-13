@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import type { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { createKTX2Loader } from '../stage/ktx2'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 
 /**
@@ -108,7 +109,7 @@ export async function loadRig(renderer: THREE.WebGLRenderer, base: string, onPro
   loader.setMeshoptDecoder(MeshoptDecoder)
   let ktx2: KTX2Loader | null = null
   if (manifest.textureFormat === 'ktx2') {
-    ktx2 = new KTX2Loader().setTranscoderPath(`${import.meta.env.BASE_URL}basis/`).detectSupport(renderer)
+    ktx2 = createKTX2Loader(renderer)
     loader.setKTX2Loader(ktx2)
   }
   try {

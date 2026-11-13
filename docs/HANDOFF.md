@@ -198,7 +198,9 @@ Fonts: Outfit for display (`font-hero`), Geist for text, Geist Mono for small la
 | `public/sky/{512,1024,2048}/` | NASA's Deep Star Map as cube faces | `assets-src/scripts/sky.py`, see `assets-src/README-sky.md` |
 | `public/moon/` | Moon colour and slopes, the close-up ground, the grain, the Earth (KTX2) | `assets-src/scripts/moon.py`, `moon.mjs`, see `README-moon.md` |
 | `public/models/` | The alien and his manifest | the pipeline in `assets-src/`, see its `README.md` |
-| `public/basis/` | The Basis transcoder three.js uses for KTX2 | copied from `three` |
+| `public/basis/` | The Basis transcoder three.js uses for KTX2, and `worker.js`, the file its workers start from | the transcoder is copied from `three`; `worker.js` is ours |
+
+**KTX2 and the Content-Security-Policy.** The Basis transcoder builds functions with `new Function`, which the page's policy (`vercel.json`) forbids. So KTX2 loaders are made with `createKTX2Loader` (`src/stage/ktx2.ts`), which starts the transcoder's workers from `/basis/worker.js`; `vercel.json` serves that one file with a policy of its own that allows it. A plain `new KTX2Loader()` works on the dev server, which sends no policy, and fails silently on the deployment. To check before deploying, serve `dist/` with the headers of `vercel.json`.
 | `public/contact/` | The flat moon picture for the fallback | the owner's first reference, re-encoded |
 
 The alien was generated with Higgsfield from the owner's picture; every call and its cost is in `assets-src/ASSET_LOG.md`. The account began that session with 270 credits and ended with 109.75. `assets-src/raw/` and `assets-src/tools/` (downloads, intermediates, the KTX encoder) are not in git; things that were generated but are not used on the site are in `raw/not-shipped/`.
