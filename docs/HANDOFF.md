@@ -1,19 +1,48 @@
 # kodachi.dev: how the site is laid out and how it works
 
-Last brought up to date on 2026-11-12, after a clean-up of the whole codebase. This is the one document that describes the site; read it before changing anything. The code's own comments go further into each file.
+Last brought up to date on 2026-11-13, at the end of a session that rebuilt the lensed sky with the true lens and changed three things on the moon. This is the one document that describes the site; read it before changing anything. The code's own comments go further into each file.
 
 ## State
 
-- **One commit is on `main`, not pushed**: the black hole sequence. Everything after it is in the working tree, uncommitted: the lensed sky, the shared stage, smooth scrolling, the preloader, the moon, the alien, the clean-up. Commit only when the owner asks.
-- `npm test` (78 tests), `npx tsc --noEmit` and `npx vite build` pass. axe reports 0 violations at 1440 and 375 wide.
+- **`main` is what is live** (kodachi.dev, deployed by Vercel from `main`). Its last commit is the animated lensed sky.
+- **The work of 2026-11-13 is on the branch `true-lens`, pushed, not merged**: the true lens for the projects, the alien's black sweatshirt, the chair's tan straps, and the first half of a better moon surface. The owner has seen none of it on a screen. Do not merge it into `main` or deploy it until they have looked and said so.
+- `npm test` (90 tests), `npm run typecheck` and `npm run build` pass on that branch.
 - Dev server: `npm run dev`, port 5173.
+
+## Where the last session stopped (2026-11-13)
+
+Read this first if you are picking the work up. The design and the plan for the lens are in `docs/superpowers/specs/2026-11-13-true-lens-design.md` and `docs/superpowers/plans/2026-11-13-true-lens.md`; how it works now is under "The lensed sky" below.
+
+**Finished, waiting for the owner's eye**
+
+- **The true lens.** Built, reviewed by a fresh reviewer, its findings fixed. The owner approved the design on paper and has not seen the result. Four things in it were decided without them and are theirs to overturn:
+  - The words are beside the picture on wide screens, with the whole scene right of centre. The design said they would stay in the shadow; there turned out to be no room.
+  - Projects waiting behind the hole are lit at 45% (`WAITING` in `timeline.ts`), because the ring of the next project outshone the one being read.
+  - On short screens the words are shortened (three lines of summary, no list of what it is built with).
+  - The picture keeps the size it had, and the shadow is smaller for it.
+- **The alien's sweatshirt is black** (`src/alien/skin.ts`, in the shader). Stills: `screenshots/hoodie/`.
+- **The chair's coloured straps are the theme's tan as seen on screen** (`TAN` in `src/alien/textures.ts`).
+
+**Not finished**
+
+- **The moon's surface.** The owner asked for a better-looking moon made with Higgsfield: the same size and place on screen, better shading, more detail. What is in: three generated pictures behind the close-up ground, a new tiling crater layer and the grain; fresh craters with pale aprons. At the settled view it still reads much as it did. What is not in, and is the part that would show: shadows cast by the generated relief under the low sun, and more tonal range. The heights the shadows need are already in the tiles' alpha channel. The plan for the shader, step by step, is in `assets-src/README-moon.md` and in the known issue below. `uAlbedo` in `ground.ts` was not retuned after the last rebuild and the ground is a little darker than before (median 95 against 99). The limb was measured after the first rebuild (under 0.15 px of shift) and not after the second, though nothing that moves it changed.
+- **Deferred from the lens's review**, none of them visible at the default settings: the lens table is rebuilt every frame for a fifth of the stretch at about 0.9 ms and has not been measured on a phone's processor; a shooting star near the ring can be up to twelve times too bright; the page and the renderer decide "beside or under" from slightly different numbers, so within a pixel of the changeover (aspect 1.15) they can disagree, and crossing it while resizing moves the scene in one jump; the picture's bottom edge has no spare margin above the ring, so a smaller gap tried in the harness may draw a faint line there.
+- **Nobody has watched any of this move.** Everything was judged from stills on one laptop GPU. Safari, Firefox, real phones and slower GPUs are untested.
+
+**For a session without this machine**
+
+- No GPU: `scripts/bh-shots.mjs --software` renders with SwiftShader. It is slow and its frame rates mean nothing, but the pictures are right.
+- `assets-src/raw/` and `assets-src/tools/` are not in git. Without them `assets-src/scripts/moon.py` cannot rebuild `site-*`, `moon-craters-*` or `moon-detail`: the three Higgsfield pictures it starts from are in `assets-src/raw/moon/hf/` on the owner's laptop, as is the KTX encoder. The shader work on the moon needs none of that; rebuilding textures does.
+- `screenshots/` is not in git either. The stills named in this document are on the owner's laptop.
+- Higgsfield: the moon work spent 10.25 credits and left the balance at 59.5. The balance read 69.75 when that work began, though this document had recorded 109.75 after the alien; nothing in this session's log accounts for the difference. The owner set no budget beyond "use Higgsfield for the moon"; the last session capped itself at 40.
 
 ## What the owner has decided
 
 These stand until the owner says otherwise. Where a pasted brief or an older note disagrees, these win.
 
 - **The black hole is finished and theirs.** Its look, renderer and pacing (`src/blackhole/`) are not to be changed unless they ask for exactly that. A rewrite was started once from a pasted brief and they had it reverted.
-- **The moon scene and the alien model are approved as they are**: the framing, the ground, the light, his colours, the chair, the model. Changes since approval were all asked for one at a time: a beer bottle in place of a mug, the footer up for the whole moon section, icon badges over the pins.
+- **The moon scene and the alien model are approved as they are**: the framing, the ground, the light, his colours, the chair, the model. Changes since approval were all asked for one at a time: a beer bottle in place of a mug, the footer up for the whole moon section, icon badges over the pins, a matte black sweatshirt, the chair's green straps in the theme's gold-tan, and a better-shaded, more detailed moon surface in the same place on screen.
+- **The projects' lens is to be the real one**, with the work still shown cleanly. They approved the design in `docs/superpowers/specs/2026-11-13-true-lens-design.md`.
 - **The moon is never a floating globe.** It is a dome across the lower half of the screen, with its edge on a line the owner drew (`OUTLINE` in `src/moon/timeline.ts`).
 - **The page goes dark and stays dark.** The purple of the first three sections fades to black before "about me", and everything after is cream on black.
 - **Palette of the dark part**: Creamy Candle Flame `#FFEDC1` for highlights and hot parts, Muted Biscuit `#BCA68E` for bodies and secondary text, on true black. Tokens are `--color-bh-*`.
@@ -74,7 +103,7 @@ tests/                  unit tests of the pure modules
 | 4 | Run-in | in `sections/WorkIntro.tsx` | 150lvh of empty page in which the purple fades to black and the first stars drift in. |
 | 5 | About | `sections/AboutSpace.tsx` | `#about`. Huge glowing "about me", three numbers, the bio decoding itself out of scrambled letters. |
 | 6 | Black hole | `sections/WorkIntro.tsx` + `src/blackhole/` | `#work`. Pinned for 600lvh. A caption and "See more" while it idles, then the fall, ending in exact black. |
-| 7 | Projects | `sections/LensedWork.tsx` + `src/lens/` | `#work-projects`. Pinned for about 815lvh. The lensed sky: each project rises over the horizon as a ring of light and unrolls into its picture. |
+| 7 | Projects | `sections/LensedWork.tsx` + `src/lens/` | `#work-projects`. Pinned for about 815lvh. The lensed sky: each project waits behind the hole as a ring of light and unrolls into its picture. |
 | 8 | How I work | `sections/About.tsx` | `#approach`. Four traits and the tools list in a bento panel, recoloured cream by the `on-dark` class. |
 | 9 | Contact | `sections/Contact.tsx` + `src/moon/` + `src/alien/` | `#contact`. Pinned for 380lvh. The moon, the alien, and a pin for each way of getting in touch. |
 | 10 | Footer | `components/layout/Footer.tsx` | Site name, credit, links. Sticks to the bottom of the screen for the whole of the moon section. |
@@ -141,15 +170,19 @@ A ray-marched Schwarzschild black hole with a disk of spiral strands, drawn in i
 
 ### The lensed sky (`src/lens/`)
 
-What follows the fall. The camera hovers just above the hole; the hole's shadow is the black lower part of the screen and its edge is the horizon. The projects are lit pictures hung on the sky. One is settled above the horizon, readable; the next is behind the hole, smeared by the lens into the ring along the horizon. Scrolling turns the sky: the settled picture leaves over the top and the ring unrolls into the next. After the last, the camera drops and the sky closes into a shrinking ring overhead.
+What follows the fall. The camera hovers above the hole; the hole's shadow is the dark dome at the bottom of the screen. The projects are pictures painted on the sky, and the lens is the real one, with nothing easing it off. One project is settled above the hole, flat and readable. The next is behind the hole, where the lens makes a ring of it: a band across the screen, some way above the shadow (the Einstein ring is 16 degrees clear of the shadow's edge, not on it). The one after that is a mirrored sliver between the ring and the shadow. Scrolling turns the sky: the settled picture bends away over the top, the ring breaks, and its upper part unrolls into the next picture. After the last, the camera drops, the picture bends as the lens changes under it, and the whole sky closes into a circle overhead.
 
-- `geodesic.ts`: the physics. A ray stays in one plane, so the lens is a single table per camera height: angle from straight down to how far round the hole the ray ends up. 384 entries, spaced toward the edge of the shadow; the innermost are continued along their logarithm, not integrated.
-- **The lens is eased on purpose.** A real hole this close would bend every screenshot beyond reading, so the true deflection is used at the edge of the shadow and eased toward flat space a few degrees above it (`LENS_FLOOR`, `skyAngle`). During the last fall the easing is let go.
-- `timeline.ts`: `lensTimeline(p, count)` gives the phase (which project), the fall, the camera and the fades; `sources` says which projects are lit and where; `composition` frames the picture for the screen's shape. Pacing constants are at the top: `INTRO`, `PER_PROJECT`, `OUTRO`, `HOLD`, `THETA_STEP`. The section's height follows from the number of projects.
-- `renderer.ts`, `shaders/lens.frag.glsl`: one table lookup a pixel, the screenshots as an array texture, and NASA's star map (`public/sky/`) looked up in the direction each ray ends up, so the sky is really lensed. `shaders/grade.frag.glsl` grades without a film curve, so screenshots keep their colours.
-- **The sky moves.** NASA's map is the galaxy and its dust; it drifts slowly round the vertical (`STAR_DRIFT`), and the stars in it shimmer. Over it the shader draws three layers of stars of its own (`starLayer` in `lens.frag.glsl`): round dots a pixel or two wide, coloured from ember to blue-white, each twinkling on its own beat, each layer drifting a little faster than the one behind (`LAYER_DRIFT`), which gives the sky depth. Now and then a shooting star crosses (`meteor`). All of it is looked up in the direction each ray ends up, so it is lensed with the rest. Under reduced motion the clock is held at 0: nothing drifts or twinkles, and there are no shooting stars. The hole, its edge line, the rings and the pictures were not touched.
+- `geodesic.ts`: the physics. A ray stays in one plane, so the lens is a single table per camera height: angle from straight down to how far round the hole the ray ends up. 384 entries, spaced toward the edge of the shadow; the innermost (within a ten-thousandth of the way from the edge) are continued along their logarithm, not integrated. A table costs a little under a millisecond on a laptop (0.8 to 1.0 ms measured; nothing measured on a phone) and is worked out again on every frame while the camera climbs or falls, about a fifth of the stretch.
+- **The pictures are painted for the lens** (`picture.ts`). A lens this strong would fan a screenshot out and squeeze it. So each picture is put on the sky already stretched, in exactly the shape that the lens, seen from where the camera rests, bends back into a flat rectangle. Street painters do the same with pictures that look right from one spot. Nothing in the light's path is adjusted: settled, a picture is flat to a fraction of a pixel; anywhere else it is bent as it would be. A pixel finds its place in a picture in three steps, the same in `pictureCoord` and in the shader's loop: turn its sky direction back to where the project rests; run the lens backwards (a second small table, `inverseTable`, for the resting height); read off the point on the resting screen. A settled picture has to stand wholly above the ring, because below it the sky is seen a second time, mirrored, and no painting comes out flat there. `rest(aspect)` works out everything about the resting view for a screen of one shape, and the renderer keeps it until the shape changes.
+- `timeline.ts`: `lensTimeline(p, count)` gives the phase (which project), the fall, the camera and the fades; `sources` says which projects are lit, where, and how brightly; `framing` lays the screen out round the ring. Pacing constants are at the top: `INTRO`, `PER_PROJECT`, `OUTRO`, `HOLD`. The camera opens at `R_OPEN` (1.78, the nearly flat horizon the black hole's fall ends on), climbs to `R_HOVER` (2.5, the limb visibly round) during the intro, and drops to `R_END` at the end. How far the sky turns from one project to the next is not a constant any more: it is the depth of a picture's patch of sky and a little more (`rest().step`). The section's height follows from the number of projects.
+- **Framing.** From the bottom up: the shadow; the band between it and the ring; the ring; a small gap; the picture. The picture keeps the size it had, so the shadow is smaller than it was. On screens wider than `SIDE_BY_SIDE` (1.15) the whole scene stands right of centre (`Framing.shift`, a sideways slide of the view, as with a view camera: nothing is turned) and the words are a column beside the picture. On narrower ones the scene is in the middle and the words are in the shadow under it. `pictureBox(aspect, tune)` tells the page where the picture is and how deep the shadow is.
+- **The page tells the scene what it needs in pixels** (`lensTune` in `LensedWork.tsx`, read by the scene every frame as `Tune`). The navigation and the words are so many pixels whatever the height of the screen, so shares of the height cannot be relied on to clear them. `ceiling` is the highest the picture's top may go (under the navigation). `shadow` is how much of the height the shadow must fill: on a narrow screen, the height of the words and a little more. To give it, the framing first moves the picture up, then makes it smaller, but never under a fifth of the screen's height (`HIGH_MIN`). On short screens (under 760px tall when the words are in the shadow, under 560px when they are beside the picture) the words are shortened instead: the summary is cut to three lines and the list of what it is built with is kept for screen readers only.
+- **Waiting projects are dimmer** (`WAITING`, 0.45). The ring of the next project is a band a sixth of the screen deep; at full brightness it outshines the picture being read. A picture's own brightness is not part of the lens.
+- `renderer.ts`, `shaders/lens.frag.glsl`: one table lookup a pixel for the lens and four more for the pictures (one for each slot a project can be lit in, whether or not it is), the screenshots as an array texture, and NASA's star map (`public/sky/`) looked up in the direction each ray ends up. `shaders/grade.frag.glsl` grades without a film curve, so screenshots keep their colours.
+- **Brightness follows the lens.** A lens does not change how bright a surface looks, only how big, so the pictures, their hairlines (one brightness everywhere, `HAIRLINE`) and the galaxy are drawn as bright as they are. A star is a point, and is brighter by as much as the lens enlarges the sky round it (`mag` in the shader: the solid angle of the pixel over the solid angle of sky it sees, capped at `MAG_MAX`). Stars flare as they cross the ring and are dim in the squeezed band under it. Not included: redshift (for a hovering camera it is one factor over the whole sky) and spin.
+- **The sky moves** (`sky.ts`). NASA's map is the galaxy and its dust, laid with its centre behind the first settled picture; it drifts slowly (`STAR_DRIFT`) about an axis that leans 25 degrees off the scene's vertical (`DRIFT_TILT`), so that stars cross the ring and do not slide along it. Over the map the shader draws three layers of stars of its own (`starLayer`): round dots a pixel or two wide, coloured from ember to blue-white, each twinkling on its own beat, each layer drifting a little faster than the one behind (`LAYER_DRIFT`). Now and then a shooting star crosses, aimed at the sky round the settled picture (`meteor`, `uMeteorAim`). Under reduced motion the scene is not shown at all.
 - `scene.ts` is the stage scene; `LensScene.tsx` is the same scene on its own canvas, for the harness only.
-- `sections/LensedWork.tsx` is the pinned section and the words for each project, set in the shadow under the horizon. Every project's words are always in the page; only the settled one's are visible. With reduced motion or no WebGL it renders `Flat`, a plain list.
+- `sections/LensedWork.tsx` is the pinned section and the words for each project: a column beside the picture on wide screens, a row in the shadow under it on narrow ones. Every project's words are always in the page; only the settled one's are visible. With reduced motion or no WebGL it renders `Flat`, a plain list.
 - While the visitor is paused on a project, this section preloads the moon.
 
 The join with the black hole: the lens section has `margin-top: -100lvh`, so it pins on the frame the black hole's stage lets go, black on black.
@@ -160,7 +193,7 @@ A three.js scene, fetched as its own chunk. The top of a moon a few metres acros
 
 - `timeline.ts`: scroll to camera. The section opens close on the alien and pulls back to the settled view (`TRAVEL` 1.7 screens of scroll, then `HOLD` 1.1 in which nothing moves but what the visitor moves). The settled camera is solved so the moon's limb lies on `OUTLINE`, the owner's drawn line; a test checks the fit.
 - `config.ts`: the fixed facts (where he sits, the sun, the Earth, pin sizes). `geo.ts`: latitude and longitude to positions, and the occlusion test for pins.
-- `world.ts` builds and draws it: `ground.ts` (NASA colour and slopes over the whole ball, a made-up close-up of the ground round the chair, a tiling grain; a lunar reflectance model; the pins' pulse rings), `rocks.ts`, `earth.ts`, `pins3d.ts`, the sun with a shadow map, and `post.ts` (bloom, the sky laid in behind, the film curve). `assets.ts` loads the textures by tier.
+- `world.ts` builds and draws it: `ground.ts` (NASA colour and slopes over the whole ball; a close-up of the ground round the chair whose crater field is a generated height map, with its shadows baked for the scene's sun; two tiling squares, clods and small craters 4.6 m across and a grain 1.3 m across, laid on from three sides so they do not pinch at the map's pole, each carrying its heights in the alpha channel, which the shader does not read yet; a lunar reflectance model; the pins' pulse rings), `rocks.ts`, `earth.ts`, `pins3d.ts`, the sun with a shadow map, and `post.ts` (bloom, the sky laid in behind, the film curve). `assets.ts` loads the textures by tier.
 - `orbit.ts`: dragging swings the camera a little way round the chair, with inertia and limits, and a slow sway when left alone.
 - `state.ts` is the one object the scene and the page share: the page writes scroll progress, the drag and which pin is open; the scene writes back where each pin is on screen.
 - `MoonOverlay.tsx` is the DOM over the canvas: for each pin a hit target carrying its floating icon badge, a leader line, and a label card with its link and copy button. The cards are real links and buttons, so the keyboard reaches them; focusing one swings the view to its pin. On phones a tapped pin's card is a sheet at the bottom.
@@ -173,8 +206,8 @@ Everything at his spot, as one actor the moon scene places (`types.ts` is the ag
 
 - `rig.ts` loads the model and its manifest (`public/models/alien.glb`, `alien.json`). `measure.ts` reads off the mesh what the actor needs: limb lengths, the eyes, the hands, the antennae.
 - **The model's own clips are not played.** `pose.ts` seats him with an IK solver as he sits in the owner's picture (reclined, ankles crossed, one hand hanging, the other holding the bottle), and `clips.ts` bakes that pose into clips at load: idle, sip, look up, shift. An AnimationMixer cross-fades them; `maths/schedule.ts` decides when (a sip every 6 to 10 seconds, blinks, the odd ambient beat).
-- `gaze.ts` turns his head and eyes toward the cursor or a hovered pin, within what a neck can do. `antennae.ts` springs the antenna bones from the head's motion. `face.ts` gives each painted eye a glossy shell and a lid for the blink. `hands.ts` bends the finger vertices once, at load, round the bottle (the model has no finger bones). `skin.ts` replaces the one material with one that treats skin and cloth differently.
-- `props/`: the lawn chair (bent tube, woven webbing), the beer bottle, the cooler and water bottles, all built in code. `textures.ts` paints their textures on canvases. `env.ts` is a small reflection map for the shiny things. `contact.ts` lays contact shadows; `dust.ts` is the puff when he is first revealed.
+- `gaze.ts` turns his head and eyes toward the cursor or a hovered pin, within what a neck can do. `antennae.ts` springs the antenna bones from the head's motion. `face.ts` gives each painted eye a glossy shell and a lid for the blink. `hands.ts` bends the finger vertices once, at load, round the bottle (the model has no finger bones). `skin.ts` replaces the one material with one that treats skin and cloth differently. The sweatshirt is dyed black in that shader, not in the model: the texture in `alien.glb` still has it lilac grey, and `DYE` in `skin.ts` is the colour it becomes, with the texture's light and dark kept so the folds show. A pixel is dyed if it has the sweatshirt's hue and lies on or just past the clothed bones (a per-vertex `dyeZone` attribute built in `measureCloth`, which keeps the dye off the eye rims and toes); well inside the sweatshirt everything darker than a drawstring is dyed whatever its hue, because the texture atlas has no margins and skin leaks in along every patch edge. Building `dyeZone` adds about 20 ms to the actor's build.
+- `props/`: the lawn chair (bent tube, woven webbing in white and tan; the tan is painted `#8b7252` so that in the moon's sun it shows as the theme's `--color-bh-accent`, about `#c3ad8b` measured on screen), the beer bottle, the cooler and water bottles, all built in code. `textures.ts` paints their textures on canvases. `env.ts` is a small reflection map for the shiny things. `contact.ts` lays contact shadows; `dust.ts` is the puff when he is first revealed.
 - `maths/` holds the pure parts (IK, spring, look limits, schedule, shape fitting), with tests.
 
 ## Styling
@@ -197,7 +230,7 @@ Fonts: Outfit for display (`font-hero`), Geist for text, Geist Mono for small la
 | `public/bg/` | The purple field, its glow map, the hero stills | `dev/background.build-field.py`, from `animatedbg.mp4` in the repo root |
 | `public/work/` | Project screenshots; the black hole's still | by hand |
 | `public/sky/{512,1024,2048}/` | NASA's Deep Star Map as cube faces | `assets-src/scripts/sky.py`, see `assets-src/README-sky.md` |
-| `public/moon/` | Moon colour and slopes, the close-up ground, the grain, the Earth (KTX2) | `assets-src/scripts/moon.py`, `moon.mjs`, see `README-moon.md` |
+| `public/moon/` | Moon colour and slopes, the close-up ground, the tiling craters, the grain, the Earth (KTX2) | `assets-src/scripts/moon.py`, `moon.mjs`, see `README-moon.md` |
 | `public/models/` | The alien and his manifest | the pipeline in `assets-src/`, see its `README.md` |
 | `public/basis/` | The Basis transcoder three.js uses for KTX2, and `worker.js`, the file its workers start from | the transcoder is copied from `three`; `worker.js` is ours |
 
@@ -205,6 +238,8 @@ Fonts: Outfit for display (`font-hero`), Geist for text, Geist Mono for small la
 | `public/contact/` | The flat moon picture for the fallback | the owner's first reference, re-encoded |
 
 The alien was generated with Higgsfield from the owner's picture; every call and its cost is in `assets-src/ASSET_LOG.md`. The account began that session with 270 credits and ended with 109.75. `assets-src/raw/` and `assets-src/tools/` (downloads, intermediates, the KTX encoder) are not in git; things that were generated but are not used on the site are in `raw/not-shipped/`.
+
+The moon's close-up ground, its tiling craters and its grain were also made from Higgsfield pictures (three text-only images, two of them unlit height maps, 10.25 credits; see "The moon's ground" in `assets-src/ASSET_LOG.md` and `assets-src/README-moon.md`). The account read 59.5 credits afterwards. The pictures are in `assets-src/raw/moon/hf/`, not in git; `moon.py` needs them to rebuild `site-*`, `moon-craters-*` and `moon-detail`.
 
 ## Dev tools
 
@@ -214,7 +249,7 @@ Harness pages, each one scene on its own. Most take `?p=0.5` for a fixed scroll 
 | --- | --- |
 | `/dev/background.html` | The purple field |
 | `/dev/blackhole.html` | The black hole (`&set=smear:0` overrides a field of the frame) |
-| `/dev/lens.html` | The lensed sky. Projects settle at p = 0.112, 0.294, 0.476, 0.657; the fall starts at 0.839 |
+| `/dev/lens.html` | The lensed sky. Projects settle at p = 0.112, 0.294, 0.476, 0.657; the fall starts at 0.839. `&r=` (resting height), `&gap=` (degrees between ring and picture), `&high=`, `&top=`, `&shift=` try another framing without editing code |
 | `/dev/moon.html` | The moon |
 | `/dev/alien.html` | The alien on plain ground, with camera presets and buttons for sip, blink, beats |
 | `/dev/model-viewer.html` | Any GLB on a turntable |
@@ -244,10 +279,12 @@ Playwright only uses the real GPU when Chromium is launched with `--use-angle=d3
 ## Known issues and what has not been done
 
 - **Building the moon stalls the page for about a third of a second.** It is held back until the visitor has stopped scrolling on a project (or reaches the third), which hides it, but the work itself is not split up.
-- **Performance is only known on one machine.** Scrolling through the lensed sky had 0% of frames over 20ms on every tier on an RTX 4060 laptop, on the dev server. The moon has not been measured per tier. Nothing has been measured on a mid-range laptop or a phone.
+- **Performance is only known on one machine.** Scrolling through the lensed sky was measured before and after the true lens, like for like, on the production build on an RTX 4060 laptop (default tier, two runs each): 0% and 1% of about 3,780 frames over 20ms before, 0% and 0% after. The slow frames are in the same places in both: where the moon is fetched and built (the third project) and where the lens hands over to the moon. The lowest tier was measured only after (1%). Medium and high were not measured. The moon has not been measured per tier. Nothing has been measured on a mid-range laptop or a phone.
 - **Nothing has been tested in Safari or Firefox**, or on a real phone or tablet.
+- **The true lens has only been judged from stills**, on one GPU: the way a picture unrolls out of the ring, the climb at the opening, the last fall, stars flaring as they cross the ring, and how often a shooting star is in view. Nobody has watched it move.
 - **The alien's motion has only been judged from stills**, as has the bobbing of the pins' badges.
-- **Up close**: the beer bottle's glass reads as glossy and opaque; his fingers go about halfway round it; mid-sip, from the settled camera, the bottle crosses in front of one eye.
+- **The moon's generated relief is only shaded, not shadowed, outside the baked close-up.** The tiling craters and grain brighten and darken the ground but cast nothing. The heights needed are already in the tiles' alpha; the planned step is a short march toward the sun in `moon.frag.glsl` with step counts per tier (see `assets-src/README-moon.md`). More tonal range (mare against highland) was also asked for and not done.
+- **Up close**: the beer bottle's glass reads as glossy and opaque; his fingers go about halfway round it; mid-sip, from the settled camera, the bottle crosses in front of one eye; a few pale flecks remain along the hood seam by the collar, where the texture atlas bleeds and the dye is deliberately cautious next to skin.
 - **On phones the footer overlaps the lowest pin's ring.**
 - **The sections do not flow into one another as one camera move.** Each scene starts and ends in black.
 - **The black hole's still image** (`public/work/blackhole.jpg`) does not match the scene.
