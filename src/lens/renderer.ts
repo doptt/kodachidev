@@ -17,10 +17,9 @@ import {
   type TargetOptions,
 } from '@/blackhole/gl'
 import type { Quality } from '@/blackhole/quality'
-import { TABLE_SIZE, deflectionTable, shadowAngle } from './geodesic'
-import { INVERSE_SIZE, cameraBasis, rest, type Rest } from './picture'
-import { skyMatrix } from './sky'
-import { MAX_SOURCES, R_HOVER, sources, type LensFrame, type Tune } from './timeline'
+import { LENS_FLOOR, TABLE_SIZE, deflectionTable, shadowAngle, skyAngle } from './geodesic'
+import { MAX_CARDS, cards, ringLayout } from './ring'
+import { R_HOVER, THETA_STEP, cameraPitch, composition, horizonGlow, sources, type LensFrame } from './timeline'
 
 /** How far the pointer swings the camera, radians. */
 const SWING_X = (2.2 * Math.PI) / 180
@@ -31,10 +30,47 @@ const FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const
 const SKY_SIZE: Record<Quality['name'], number> = { ultra: 2048, high: 2048, medium: 1024, low: 1024 }
 /** Seconds the sky takes to come up once its map has arrived. */
 const SKY_FADE = 1.2
+/**
+ * How the Milky Way lies in the scene when the first project is settled, in
+ * radians: how far above level the galaxy's centre is, how far to the right of
+ * straight ahead (to the left if negative), and how far the band is tipped
+ * from level (up on the right if positive). The sky turns from there.
+ *
+ * The centre is up to the left of the first picture and the band runs down
+ * behind it to the lower right, so the picture stands on dark sky with the
+ * galaxy passing behind it, not on the galaxy's bright dusty heart.
+ */
+const GALAXY_RISE = (13 * Math.PI) / 180
+const GALAXY_SIDE = (-20 * Math.PI) / 180
+const GALAXY_TILT = (-24 * Math.PI) / 180
+/**
+ * The star map's own axes as they lie in the scene (x right, y up, z ahead)
+ * for the first project: the galaxy's centre, its pole, and the way along its band.
+ */
+const GALAXY = (() => {
+  const centre = [Math.sin(GALAXY_SIDE) * Math.cos(GALAXY_RISE), Math.sin(GALAXY_RISE), Math.cos(GALAXY_SIDE) * Math.cos(GALAXY_RISE)]
+  const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+  // Level, across the line of sight to the centre; then tipped about that line
+  const level = [Math.cos(GALAXY_SIDE), 0, -Math.sin(GALAXY_SIDE)]
+  const upright = cross(centre, level)
+  const along = level.map((v, i) => v * Math.cos(GALAXY_TILT) + upright[i] * Math.sin(GALAXY_TILT))
+  return { centre, pole: cross(centre, along), along }
+})()
 /** How fast the stars drift round the sky on their own, radians per second. */
 const STAR_DRIFT = 0.007
-/** Shooting stars start this far above the middle of a settled picture, radians, and fall across the sky round it. */
-const METEOR_ABOVE = (8 * Math.PI) / 180
+/** Seconds a further view takes to come up once its picture is in. */
+const MORE_FADE = 0.45
+/** A further view goes to the GPU only once nothing in the sky has moved for this long, milliseconds: an upload can cost a frame. */
+const QUIET = 140
+/** How many further views are fetched and decoded at once. */
+const MORE_AT_ONCE = 2
+
+export type ShotSizes = {
+  /** The size of a layer of the projects' first pictures, in pixels. */
+  shot: { w: number; h: number }
+  /** The size of a layer of their further views. */
+  more: { w: number; h: number }
+}
 
 export type LensInput = {
   /** Scene clock, seconds. */
@@ -42,6 +78,8 @@ export type LensInput = {
   frame: LensFrame
   /** Eased pointer, -1..1, y up. */
   pointer: readonly [number, number]
+  /** Where each project's ring of cards is, in cards (see ring.ts). A project that is missing is on its first picture. */
+  ring?: readonly number[]
   /** False under reduced motion: no twinkle, no drift. */
   alive: boolean
 }
@@ -63,6 +101,8 @@ export class LensRenderer {
   private bloom: Target[] = []
   private table: WebGLTexture | null = null
   private shots: WebGLTexture | null = null
+  /** The further views of every project, a layer each, in project order. */
+  private views: WebGLTexture | null = null
   private sky: WebGLTexture | null = null
   /** Faces of the star map that have been decoded and are waiting to go to the GPU. */
   private skyFaces: ImageBitmap[] | null = null
@@ -74,6 +114,21 @@ export class LensRenderer {
   private dirty = true
   /** One entry per project: 0 until its screenshot is in the texture, -1 if it could not be loaded. */
   private loaded: number[] = []
+  /** The same for each layer of the further views, and when each went in (`performance.now()`). */
+  private viewLoaded: number[] = []
+  private viewSince: number[] = []
+  /** The layer each project's further views start at. */
+  private viewFirst: number[] = []
+  /** Further views still to be fetched, those being fetched, and those decoded and waiting to go to the GPU. */
+  private viewQueue: { project: number; layer: number; src: string }[] = []
+  private viewFetching = 0
+  private viewDecoded: { project: number; layer: number; img: HTMLImageElement }[] = []
+  private viewTimer = 0
+  /** When anything in the sky last moved, and what it looked like then. */
+  private movedAt = 0
+  private seen = ''
+  /** The project nearest to settled, for choosing which further views to fetch first. */
+  private settled = 0
   private width = 0
   private height = 0
   private disposed = false
@@ -81,22 +136,32 @@ export class LensRenderer {
   /** The deflection table in use, and the radius it was worked out for. */
   private tableData = new Float32Array(TABLE_SIZE)
   private tableRadius = -1
-  /** The lens run backwards for the height the camera rests at: what the pictures are painted with. */
-  private inverse: WebGLTexture | null = null
-  /** The resting view the pictures are painted for, and what it was worked out from. */
-  private resting: Rest | null = null
-  private restingKey = ''
-  /** The dev page tries other resting heights and framings through this. Empty on the site. */
-  tune: { radius?: number } & Tune = {}
+  /** The same for the height the camera hovers at, which the layout is worked out from. */
+  private hoverTable = deflectionTable(R_HOVER)
+
 
   private images: readonly string[]
+  private more: readonly (readonly string[])[]
   private shotSize: { w: number; h: number }
+  private moreSize: { w: number; h: number }
 
-  constructor(gl: WebGL2RenderingContext, parallel: KHR_parallel_shader_compile | null, images: readonly string[], shotSize = { w: 1600, h: 1000 }) {
+  /**
+   * `images` is one screenshot per project; `more` is each project's further
+   * views, in the same order (a project without any may be missing or empty).
+   */
+  constructor(
+    gl: WebGL2RenderingContext,
+    parallel: KHR_parallel_shader_compile | null,
+    images: readonly string[],
+    more: readonly (readonly string[])[] = [],
+    sizes: ShotSizes = { shot: { w: 1600, h: 1000 }, more: { w: 1280, h: 800 } },
+  ) {
     this.gl = gl
     this.parallel = parallel
     this.images = images
-    this.shotSize = shotSize
+    this.more = images.map((_, i) => more[i] ?? [])
+    this.shotSize = sizes.shot
+    this.moreSize = sizes.more
   }
 
   /** Starts the shaders compiling. False if they could not even be started. */
@@ -160,33 +225,37 @@ export class LensRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 
-    // The same lens run backwards, kept beside it. Made here with the table, so that whatever
-    // brings the one back (a restored context) brings back the other.
-    this.inverse = gl.createTexture()
-    if (!this.inverse) return false
-    gl.bindTexture(gl.TEXTURE_2D, this.inverse)
-    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R32F, INVERSE_SIZE, 1)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    this.restingKey = ''
-
-    // The screenshots: one layer each, stored as sRGB so they are read back as linear light
-    const { w, h } = this.shotSize
-    const layers = Math.max(1, this.images.length)
-    this.shots = gl.createTexture()
-    if (!this.shots) return false
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.shots)
-    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, Math.floor(Math.log2(Math.max(w, h))) + 1, gl.SRGB8_ALPHA8, w, h, layers)
-    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    // The screenshots: one layer each, stored as sRGB so they are read back as linear light.
+    // The projects' first pictures are one stack; their further views are another, of smaller layers,
+    // which fills in after the first is complete (see `fetchViews`).
     const aniso = gl.getExtension('EXT_texture_filter_anisotropic')
-    if (aniso) gl.texParameterf(gl.TEXTURE_2D_ARRAY, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)))
+    const stack = (size: { w: number; h: number }, layers: number) => {
+      const texture = gl.createTexture()
+      if (!texture) return null
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture)
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, Math.floor(Math.log2(Math.max(size.w, size.h))) + 1, gl.SRGB8_ALPHA8, size.w, size.h, Math.max(1, layers))
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      if (aniso) gl.texParameterf(gl.TEXTURE_2D_ARRAY, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)))
+      return texture
+    }
+    this.viewFirst = []
+    this.viewQueue = []
+    for (const [project, list] of this.more.entries()) {
+      this.viewFirst.push(this.viewQueue.length)
+      for (const src of list) this.viewQueue.push({ project, layer: this.viewQueue.length, src })
+    }
+    this.viewLoaded = this.viewQueue.map(() => 0)
+    this.viewSince = this.viewQueue.map(() => 0)
+    this.shots = stack(this.shotSize, this.images.length)
+    this.views = stack(this.moreSize, this.viewQueue.length)
+    if (!this.shots || !this.views) return false
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
 
     this.loaded = this.images.map(() => 0)
+    if (this.images.length === 0) this.fetchViews()
     this.images.forEach((src, layer) => void this.loadShot(src, layer, this.shots!))
 
     // The star map: one black texel until the real one arrives, so the shader always has something to read
@@ -269,27 +338,30 @@ export class LensRenderer {
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, null)
   }
 
-  /** Fetches one screenshot, fits it to the layer size and uploads it. */
-  private async loadShot(src: string, layer: number, into: WebGLTexture) {
+  /** Fetches and decodes one picture. Null if it could not be had. */
+  private async decode(src: string): Promise<HTMLImageElement | null> {
     const img = new Image()
     img.decoding = 'async'
     img.src = src
     try {
       await img.decode()
+      return img
     } catch {
-      // The picture stays dark; its details are still on the page
-      if (this.shots === into) this.loaded[layer] = -1
-      return
+      return null
     }
+  }
+
+  /** Fits a picture to a layer of `size` and sends it to layer `layer` of `into`. False if it could not be done. */
+  private upload(img: HTMLImageElement, into: WebGLTexture, layer: number, size: { w: number; h: number }): boolean {
     const gl = this.gl
-    if (this.disposed || !gl || gl.isContextLost() || this.shots !== into) return
-    const { w, h } = this.shotSize
+    if (this.disposed || !gl || gl.isContextLost()) return false
+    const { w, h } = size
     // Fit like `object-fit: cover; object-position: top`
     const fit = document.createElement('canvas')
     fit.width = w
     fit.height = h
     const ctx = fit.getContext('2d')
-    if (!ctx) return
+    if (!ctx) return false
     const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight)
     const dw = img.naturalWidth * scale
     ctx.imageSmoothingQuality = 'high'
@@ -301,12 +373,86 @@ export class LensRenderer {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     gl.generateMipmap(gl.TEXTURE_2D_ARRAY)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
-    this.loaded[layer] = 1
+    return true
+  }
+
+  /** Fetches one project's first picture and uploads it. When the last of them is in, the further views follow. */
+  private async loadShot(src: string, layer: number, into: WebGLTexture) {
+    const img = await this.decode(src)
+    if (this.shots !== into) return
+    // A picture that did not come stays dark; its details are still on the page
+    this.loaded[layer] = img && this.upload(img, into, layer, this.shotSize) ? 1 : -1
+    if (this.loaded.every((v) => v !== 0)) this.fetchViews()
+  }
+
+  /**
+   * Fetches the further views, a couple at a time, those of the project
+   * nearest to settled first. The scene does not wait for them: a card whose
+   * picture is not in yet is simply not drawn, and comes up when it is.
+   */
+  private fetchViews() {
+    while (!this.disposed && this.viewFetching < MORE_AT_ONCE && this.viewQueue.length > 0) {
+      let pick = 0
+      for (let n = 1; n < this.viewQueue.length; n++) {
+        if (Math.abs(this.viewQueue[n].project - this.settled) < Math.abs(this.viewQueue[pick].project - this.settled)) pick = n
+      }
+      const [next] = this.viewQueue.splice(pick, 1)
+      const into = this.views
+      this.viewFetching++
+      void this.decode(next.src).then((img) => {
+        this.viewFetching--
+        if (this.disposed || this.views !== into) return
+        if (img) this.viewDecoded.push({ project: next.project, layer: next.layer, img })
+        else this.viewLoaded[next.layer] = -1
+        this.sendViews()
+        this.fetchViews()
+      })
+    }
+  }
+
+  /**
+   * Sends the further views that have been decoded to the GPU, one at a time
+   * and only while the sky is still: each is a few megabytes, and the frame it
+   * lands on can run long. Before the scene is on screen that is at once.
+   */
+  private sendViews(wait = 0) {
+    if (this.viewTimer || this.disposed || this.viewDecoded.length === 0) return
+    this.viewTimer = window.setTimeout(() => {
+      this.viewTimer = 0
+      if (this.disposed || !this.views) return
+      const still = performance.now() - this.movedAt
+      if (still < QUIET) return this.sendViews(QUIET - still + 20)
+      // The settled project's first
+      let pick = 0
+      for (let n = 1; n < this.viewDecoded.length; n++) {
+        if (Math.abs(this.viewDecoded[n].project - this.settled) < Math.abs(this.viewDecoded[pick].project - this.settled)) pick = n
+      }
+      const [next] = this.viewDecoded.splice(pick, 1)
+      const ok = this.upload(next.img, this.views, next.layer, this.moreSize)
+      this.viewLoaded[next.layer] = ok ? 1 : -1
+      this.viewSince[next.layer] = performance.now()
+      this.sendViews(34)
+    }, wait)
+  }
+
+  /** How bright the card for view `view` of project `project` may be: 0 until its picture is in, then rising to 1. */
+  private arrived(project: number, view: number, alive: boolean): number {
+    if (view === 0) return Math.max(0, this.loaded[project] ?? 0)
+    const layer = this.viewFirst[project] + view - 1
+    if (this.viewLoaded[layer] !== 1) return 0
+    if (!alive) return 1
+    const t = Math.min(1, (performance.now() - this.viewSince[layer]) / (MORE_FADE * 1000))
+    return t * t * (3 - 2 * t)
   }
 
   /** True once every screenshot is in (or is known not to be coming). */
   get shotsReady() {
     return !!this.shots && this.loaded.length === this.images.length && this.loaded.every((v) => v !== 0)
+  }
+
+  /** How many of the further views are on the GPU, of how many there are: for the dev overlay and the scripts. */
+  get viewsIn() {
+    return `${this.viewLoaded.filter((v) => v === 1).length}/${this.viewLoaded.length}`
   }
 
   /** Switches tier: the render targets are re-made at the next frame. */
@@ -348,30 +494,7 @@ export class LensRenderer {
 
   get ready(): boolean {
     const gl = this.gl
-    return !!gl && !gl.isContextLost() && !this.pending && !!this.vao && !!this.table && !!this.inverse && !!this.shots
-  }
-
-  /**
-   * The resting view for a screen of this shape. Worked out again only when
-   * the shape (or the dev page's tuning) changes, and the backwards lens goes
-   * to the GPU with it: a stale one would leave a settled picture bent.
-   */
-  private restFor(aspect: number): Rest {
-    const { gap, high, top, shift, ceiling, shadow } = this.tune
-    // The dev page hands over whatever was in the address bar: anything that is not a height is ignored
-    const radius = Number.isFinite(this.tune.radius) && this.tune.radius! > 1.5 ? this.tune.radius! : R_HOVER
-    const key = [aspect.toFixed(5), radius, gap, high, top, shift, ceiling, shadow].join('|')
-    if (!this.resting || key !== this.restingKey) {
-      const gl = this.gl!
-      this.resting = rest(aspect, radius, { gap, high, top, shift, ceiling, shadow })
-      this.restingKey = key
-      gl.activeTexture(gl.TEXTURE0)
-      gl.bindTexture(gl.TEXTURE_2D, this.inverse)
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, INVERSE_SIZE, 1, gl.RED, gl.FLOAT, this.resting.inverse)
-    }
-    return this.resting
+    return !!gl && !gl.isContextLost() && !this.pending && !!this.vao && !!this.table && !!this.shots && !!this.views
   }
 
   /**
@@ -386,6 +509,13 @@ export class LensRenderer {
     if (this.dirty || cw !== this.width || ch !== this.height || !this.scene) this.allocate(cw, ch)
     if (!this.scene || this.bloom.length < 2) return
     const { frame } = input
+    // Anything that moves the sky puts off the uploads of the further views until it has stopped
+    const look = `${frame.phase.toFixed(4)} ${frame.fall.toFixed(4)} ${frame.fade.toFixed(3)} ${(input.ring ?? []).map((v) => v.toFixed(3)).join(' ')}`
+    if (look !== this.seen) {
+      this.seen = look
+      this.movedAt = performance.now()
+    }
+    this.settled = Math.min(this.images.length - 1, Math.max(0, Math.round(frame.phase)))
     const P = this.programs
     const scene = this.scene
     gl.bindVertexArray(this.vao)
@@ -406,7 +536,7 @@ export class LensRenderer {
       return
     }
 
-    // The deflection table follows the camera, up through the climb and down through the fall
+    // The deflection table follows the camera down
     if (Math.abs(frame.radius - this.tableRadius) > 1e-5) {
       this.tableRadius = frame.radius
       deflectionTable(frame.radius, this.tableData)
@@ -417,38 +547,71 @@ export class LensRenderer {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, TABLE_SIZE, 1, gl.RED, gl.FLOAT, this.tableData)
     }
 
-    // Framing, and the shape the pictures are painted in, are worked out for the height the
-    // camera rests at, and kept through the climb and the fall
+    // Framing is worked out for the height the camera hovers at, and kept through the fall
     const aspect = cw / ch
-    const resting = this.restFor(aspect)
-    const comp = resting.framing
-    const thetaRead = resting.thetaRead
-    const lit = sources(frame.phase, this.images.length, thetaRead, resting.step, frame.lift)
+    const comp = composition(aspect, shadowAngle(R_HOVER))
+    const thetaRead = skyAngle(this.hoverTable, R_HOVER, Math.PI / 2 + comp.centre, comp.reach)
+    const lit = sources(frame.phase, this.images.length, thetaRead, frame.lift)
+    // Each lit project's middle card, and round the settled one the cards beside it
+    const layout = ringLayout(comp, aspect)
+    const shown = cards(lit, frame.phase, frame.fall, (i) => input.ring?.[i] ?? 0, (i) => 1 + this.more[i].length, layout)
 
-    // Camera: looking down past the limb at rest, tipping back to the zenith during the fall
+    // Camera: level with the horizon at rest. During the fall it tips back toward the zenith, and then
+    // forward again and on down past where it rested, which is what takes the sky out over the top.
+    // `frame.pitch` is how far it has tipped, as a share of the way from rest to straight up.
     const sway = input.alive ? 1 : 0
     const yaw = input.pointer[0] * SWING_X * sway
     const tip = frame.pitch / (Math.PI / 2)
-    const pitch = comp.pitch + (Math.PI / 2 - comp.pitch) * tip + input.pointer[1] * SWING_Y * sway * (1 - tip)
-    const basis = cameraBasis(yaw, pitch)
+    const pitch = cameraPitch(frame.pitch, comp.pitch) + input.pointer[1] * SWING_Y * sway * Math.min(1, 1 - tip)
+    const cy = Math.cos(yaw)
+    const sy = Math.sin(yaw)
+    const cp = Math.cos(pitch)
+    const sp = Math.sin(pitch)
+    const basis = new Float32Array([cy, 0, -sy, -sy * sp, cp, -cy * sp, sy * cp, sp, cy * cp])
     const tanY = comp.tanHalfFov
     const pix = (2 * tanY) / scene.h
 
-    // The stars turn with the projects (about the axis across the view), and drift a little on their own
-    const turn = frame.phase * resting.step + frame.lift * thetaRead
+    // The stars turn with the projects (about the axis across the view), and drift a little on their own.
+    // In the fall they turn the way the last picture is carried, at their own pace (`roll`).
+    const turn = frame.phase * THETA_STEP + frame.roll * thetaRead
+    const ct = Math.cos(turn)
+    const st = Math.sin(turn)
     const drift = input.alive ? input.time * STAR_DRIFT : 0
-    // The Milky Way lies with its centre behind the first settled picture and its band across the
-    // view; the sky turns from there (see sky.ts)
-    const sky = skyMatrix(turn, drift, Math.PI / 2 - thetaRead)
+    const cd = Math.cos(drift)
+    const sd = Math.sin(drift)
+    // Scene direction to star-map direction: first the turn about x, then the drift about y, then
+    // onto the map's own axes (x the galaxy's centre, y its pole, z along the band), which lie
+    // in the scene as GALAXY says.
+    // Rows of the turn-and-drift matrix (r0, r1, r2), then the rows of the map's axes applied to them
+    const r0 = [cd, sd * st, sd * ct]
+    const r1 = [0, ct, -st]
+    const r2 = [-sd, cd * st, cd * ct]
+    const onto = (axis: number[]) => [0, 1, 2].map((i) => axis[0] * r0[i] + axis[1] * r1[i] + axis[2] * r2[i])
+    const gx = onto(GALAXY.centre)
+    const gy = onto(GALAXY.pole)
+    const gz = onto(GALAXY.along)
+    // Column-major
+    const sky = new Float32Array([gx[0], gy[0], gz[0], gx[1], gy[1], gz[1], gx[2], gy[2], gz[2]])
 
-    // How far each lit project is from where it rests, as the cosine and sine of the turn.
-    // Unused slots are left at no turn and no brightness.
-    const turns = new Float32Array(MAX_SOURCES * 2)
-    const layers = new Float32Array(MAX_SOURCES * 3)
-    for (let n = 0; n < MAX_SOURCES; n++) turns[n * 2] = 1
-    lit.forEach((s, n) => {
-      turns.set([Math.cos(s.theta - thetaRead), Math.sin(s.theta - thetaRead)], n * 2)
-      layers.set([s.index, s.gain * (this.loaded[s.index] ?? 0), s.light], n * 3)
+    // A card's middle is `theta` from the zenith on the meridian straight ahead, then turned
+    // `turn` round the vertical; its own up and right are turned with it. Slots left over are off.
+    const centres = new Float32Array(MAX_CARDS * 3)
+    const ups = new Float32Array(MAX_CARDS * 3)
+    const rights = new Float32Array(MAX_CARDS * 3)
+    const layers = new Float32Array(MAX_CARDS * 2)
+    const shapes = new Float32Array(MAX_CARDS * 3)
+    shown.forEach((card, n) => {
+      const ct = Math.cos(card.theta)
+      const st = Math.sin(card.theta)
+      const ca = Math.cos(card.turn)
+      const sa = Math.sin(card.turn)
+      centres.set([st * sa, ct, st * ca], n * 3)
+      ups.set([-ct * sa, st, -ct * ca], n * 3)
+      rights.set([ca, 0, -sa], n * 3)
+      // The first picture of each project is a layer of one stack; the further views are in the other, counted from -1 down
+      const layer = card.view === 0 ? card.project : -1 - (this.viewFirst[card.project] + card.view - 1)
+      layers.set([layer, card.gain * this.arrived(card.project, card.view, input.alive)], n * 2)
+      shapes.set([card.scale, card.edge, card.shade], n * 3)
     })
 
     // 1. The sky
@@ -456,35 +619,42 @@ export class LensRenderer {
     gl.viewport(0, 0, scene.w, scene.h)
     gl.useProgram(P.lens.program)
     gl.uniform2f(P.lens.u('uTan'), tanY * aspect, tanY)
-    // The scene stands right of centre at rest, and comes back to the middle as the camera tips up for the fall
-    gl.uniform1f(P.lens.u('uShift'), comp.shift * (1 - tip))
     gl.uniformMatrix3fv(P.lens.u('uCam'), false, basis)
     gl.uniform1f(P.lens.u('uEdge'), shadowAngle(frame.radius))
+    gl.uniform1f(P.lens.u('uReach'), comp.reach)
+    gl.uniform1f(P.lens.u('uFloor'), LENS_FLOOR + (0.85 - LENS_FLOOR) * frame.squeeze)
     gl.uniform1f(P.lens.u('uPix'), pix)
-    gl.uniformMatrix3fv(P.lens.u('uSky'), false, sky.matrix)
+    gl.uniformMatrix3fv(P.lens.u('uSky'), false, sky)
     gl.uniform1f(P.lens.u('uSkyOn'), this.skyLevel)
     // Wrapped, so the shader's sines keep their precision however long the page is left open
     gl.uniform1f(P.lens.u('uTime'), input.alive ? input.time % 3600 : 0)
     gl.uniform1f(P.lens.u('uAlive'), input.alive ? 1 : 0)
-    gl.uniform3f(P.lens.u('uDriftAxis'), sky.axis[0], sky.axis[1], sky.axis[2])
-    gl.uniform1f(P.lens.u('uMeteorAim'), thetaRead - METEOR_ABOVE)
-    gl.uniform2fv(P.lens.u('uSrcTurn[0]'), turns)
-    gl.uniform3fv(P.lens.u('uSrcLayer[0]'), layers)
-    gl.uniformMatrix3fv(P.lens.u('uRest'), false, resting.basis)
-    gl.uniform1f(P.lens.u('uRestCentre'), comp.centreY)
+    // The drift is about the scene's vertical, which on the map is this
+    gl.uniform3f(P.lens.u('uDriftAxis'), GALAXY.centre[1], GALAXY.pole[1], GALAXY.along[1])
+    gl.uniform3fv(P.lens.u('uSrcCentre[0]'), centres)
+    gl.uniform3fv(P.lens.u('uSrcUp[0]'), ups)
+    gl.uniform3fv(P.lens.u('uSrcRight[0]'), rights)
+    gl.uniform2fv(P.lens.u('uSrcLayer[0]'), layers)
+    gl.uniform3fv(P.lens.u('uSrcShape[0]'), shapes)
+    gl.uniform2f(P.lens.u('uSideFade'), layout.fade[0], layout.fade[1])
     gl.uniform2f(P.lens.u('uHalf'), comp.half[0], comp.half[1])
     gl.uniform1f(P.lens.u('uFade'), frame.fade)
     gl.uniform1f(P.lens.u('uStars'), frame.stars)
-    gl.uniform1f(P.lens.u('uRim'), frame.rim)
+    // The horizon glows while a project is settled and dims while the sky is on its way to the next
+    gl.uniform1f(P.lens.u('uRim'), frame.rim * horizonGlow(frame.phase))
     bindTexture(gl, P.lens, 'uTable', 0, this.table)
-    bindTexture(gl, P.lens, 'uInverse', 3, this.inverse)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.shots)
     gl.uniform1i(P.lens.u('uShots'), 1)
     gl.activeTexture(gl.TEXTURE2)
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.sky)
     gl.uniform1i(P.lens.u('uSkyMap'), 2)
+    gl.activeTexture(gl.TEXTURE3)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.views)
+    gl.uniform1i(P.lens.u('uMore'), 3)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
+    gl.activeTexture(gl.TEXTURE2)
     gl.bindTexture(gl.TEXTURE_CUBE_MAP, null)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
@@ -542,8 +712,8 @@ export class LensRenderer {
     if (gl && !gl.isContextLost()) {
       for (const t of [this.scene, ...this.bloom]) deleteTarget(gl, t)
       gl.deleteTexture(this.table)
-      gl.deleteTexture(this.inverse)
       gl.deleteTexture(this.shots)
+      gl.deleteTexture(this.views)
       gl.deleteTexture(this.sky)
       for (const p of Object.values(this.programs)) gl.deleteProgram(p.program)
       if (this.pending) retirePending(gl, this.parallel, Object.values(this.pending))
@@ -556,8 +726,11 @@ export class LensRenderer {
     this.pending = null
     this.scene = null
     this.bloom = []
-    this.table = this.inverse = this.shots = this.sky = null
-    this.resting = null
+    this.table = this.shots = this.views = this.sky = null
+    window.clearTimeout(this.viewTimer)
+    this.viewTimer = 0
+    this.viewQueue = []
+    this.viewDecoded = []
     if (this.skyFaces) for (const bitmap of this.skyFaces) bitmap.close()
     this.skyFaces = null
     this.vao = null

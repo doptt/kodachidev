@@ -3,7 +3,8 @@ import { useCoarsePointer, usePrefersReducedMotion } from '@/hooks/useMediaQuery
 
 const SIZE = 34 // px
 const FOLLOW = 0.35 // how quickly the circle catches up (0–1 per frame at 60fps)
-const INTERACTIVE = 'a, button, [role="button"], input, textarea, select, label, summary'
+// The last is for things that are not controls but answer the pointer: the cards in the lensed sky set it while the pointer is over one
+const INTERACTIVE = 'a, button, [role="button"], input, textarea, select, label, summary, [data-cursor="hover"]'
 
 /**
  * A translucent circle that trails the mouse. It lags behind the pointer and

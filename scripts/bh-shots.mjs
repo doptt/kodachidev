@@ -5,6 +5,7 @@
 //     [--name shot] [--tier ultra] [--frames 48] [--software] [--reduced-motion] [--back]
 //     [--query nogl]   extra query string for site mode (nogl shows the still-image fallback)
 //     [--page lens]    dev mode: the harness to load, /dev/<page>.html (default blackhole)
+//     [--card 0.5]     dev mode, lens: hold the settled project's ring of cards there (1 is its second view in the middle)
 //     [--stage "[data-lens-stage]"]   site mode: the pinned stage to scroll through (default the black hole's)
 //
 // dev   loads /dev/blackhole.html?p=… (the isolated scene)
@@ -43,6 +44,8 @@ const query = flag('query', null)
 // dev mode: which harness to load (blackhole or lens). site mode: which pinned stage to scroll through
 const devPage = flag('page', 'blackhole')
 const stage = flag('stage', '[data-bh-stage]')
+// dev mode, lens: where to hold the ring of cards
+const card = flag('card', null)
 
 mkdirSync(out, { recursive: true })
 
@@ -120,6 +123,7 @@ for (const size of sizes) {
       if (tier) q.set('bhtier', tier)
       if (reduced) q.set('still', '1')
       if (set) q.set('set', set)
+      if (card !== null) q.set('card', String(card))
       await page.goto(`${url}/dev/${devPage}.html?${q}`, { waitUntil: 'networkidle' })
       await shoot(`p${String(p).replace('.', '_')}`)
     }

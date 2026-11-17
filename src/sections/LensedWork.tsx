@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { PROJECTS, WORK_INTRO, type Project } from '@/content/projects'
 import { startLensDriver } from '@/lens/driver'
-import { INTRO, PER_PROJECT, SIDE_BY_SIDE, caption, lensTimeline, pictureBox, settledAt, span, type Tune } from '@/lens/timeline'
+import { RING_KEEP, createRings } from '@/lens/ring'
+import { attachSwipe, frameTime, framing } from '@/lens/swipe'
+import { INTRO, PER_PROJECT, caption, lensTimeline, settledAt, span } from '@/lens/timeline'
 import { StarField } from '@/blackhole/StarField'
 import { scrollToTarget } from '@/motion/scroll'
 import { defineMoonScene } from '@/moon'
@@ -14,14 +16,23 @@ const projects: readonly Project[] = PROJECTS
 const images = projects.map((p) => p.image)
 const host = (url: string) => new URL(url).host
 
+type View = { image: string; imageAlt: string; label: string }
+/** What a project's first picture is called among its views: every one of them is its home page. */
+const FIRST_VIEW = 'Home'
+/** Every project's views, its first picture and then the further ones: the cards of its ring. */
+const views: readonly (readonly View[])[] = projects.map((p) => [{ image: p.image, imageAlt: p.imageAlt, label: FIRST_VIEW }, ...(p.more ?? [])])
+const more = projects.map((p) => (p.more ?? []).map((m) => m.image))
+
 /** Scroll progress through the pinned stage, 0..1. Written by the section, read by the scene every frame. */
 let lensProgress = 0
+/** Which project the sky is on, as drawn: glided by the driver from one to the next. Unset until the driver has run. */
+let lensPhase: number | undefined
 /**
- * What the page needs of the scene's framing: room under the navigation, and a shadow deep enough
- * for the words. Both are so many pixels whatever the height of the screen, so the section works
- * them out and the scene reads them every frame.
+ * Each project's ring of cards: where it has been turned to. Written by the
+ * section as the visitor drags, clicks or uses the controls; read by the scene
+ * every frame. React hears only when the card in the middle changes.
  */
-let lensTune: Tune = {}
+const rings = createRings(views.map((v) => v.length))
 
 /**
  * Registers the lensed sky with the stage. The scene's code, shaders and
@@ -30,10 +41,25 @@ let lensTune: Tune = {}
  * moment the two overlap at the hand-over.
  */
 function defineLensScene() {
-  stage.define('lens', async (ctx) => (await import('@/lens/scene')).createLensScene({ progress: () => lensProgress, images, tune: () => lensTune })(ctx), { priority: 2 })
+  stage.define(
+    'lens',
+    async (ctx) =>
+      (await import('@/lens/scene')).createLensScene({
+        progress: () => lensProgress,
+        phase: () => lensPhase,
+        images,
+        more,
+        ring: (i) => rings.read(i, frameTime()),
+        held: rings.holding,
+      })(ctx),
+    { priority: 2 },
+  )
 }
 
-const meta = 'lens-meta font-mono text-[0.72rem] tracking-[0.06em] text-bh-glow'
+/** How the stars over the end of the fall start out. One object, so React never writes over what the driver has set since. */
+const STARS_UNSEEN = { display: 'none', opacity: 0 } as const
+
+const meta = 'font-mono text-[0.72rem] tracking-[0.06em] text-bh-glow'
 const pill = 'inline-flex items-center rounded-pill px-2.5 py-1 font-mono text-[0.7rem] tracking-[0.03em] text-[#c9bda6] shadow-[inset_0_0_0_1px_rgb(188_166_142/0.28)]'
 
 function VisitLink({ project, onFocus, className }: { project: Project; onFocus?: () => void; className?: string }) {
@@ -59,17 +85,34 @@ function VisitLink({ project, onFocus, className }: { project: Project; onFocus?
 }
 
 /**
- * The words for one project. On a wide screen they are a column beside the
- * picture (`side`); on a narrow one a row in the shadow under it. Every
+ * The words for one project, set in the shadow under the horizon. Every
  * project's words are always on the page, stacked in the same place; only the
  * one whose picture has settled is visible. They change by opacity and
  * position alone (see .lens-caption): anything heavier would be re-drawn over
  * a canvas that is itself drawing every frame.
  */
-function Words({ project, index, shown, side, compact, onFocus }: { project: Project; index: number; shown: boolean; side: boolean; compact: boolean; onFocus: () => void }) {
+function Words({
+  project,
+  index,
+  shown,
+  card,
+  under,
+  onFocus,
+  onPick,
+}: {
+  project: Project
+  index: number
+  shown: boolean
+  /** Which of the project's views is in the middle of its ring. */
+  card: number
+  /** How far down the screen the bottom of the picture is, 0..1. */
+  under: number
+  onFocus: () => void
+  onPick: (card: number) => void
+}) {
   return (
-    <li className={cn('lens-caption col-start-1 row-start-1', side ? 'flex flex-col gap-5' : 'grid items-end gap-x-10 gap-y-3 lg:grid-cols-12', shown && 'is-shown')}>
-      <div className={side ? undefined : 'lg:col-span-5'}>
+    <li className={cn('lens-caption col-start-1 row-start-1 grid items-end gap-x-10 gap-y-3 lg:grid-cols-12', shown && 'is-shown')}>
+      <div className="lg:col-span-5">
         <p className={meta}>
           {index + 1} of {projects.length}
           <span className="mx-2 text-bh-ember" aria-hidden="true">
@@ -81,25 +124,142 @@ function Words({ project, index, shown, side, compact, onFocus }: { project: Pro
           {project.name}
         </h3>
       </div>
-      <p className={cn('max-w-[34rem] text-[0.92rem] leading-[1.6] text-pretty text-[#c9bda6]', !side && 'lg:col-span-4 lg:pb-1', compact && 'line-clamp-3')}>
+      <p className="max-w-[34rem] text-[0.92rem] leading-[1.6] text-pretty text-[#c9bda6] lg:col-span-4 lg:pb-1">
         {project.summary}
         <span className="sr-only"> Pictured: {project.imageAlt}.</span>
       </p>
-      <div className={side ? undefined : 'lg:col-span-3 lg:pb-1'}>
-        {/* On a short screen the list of what it is built with is kept for screen readers and not shown */}
-        <ul role="list" aria-label="Built with" className={compact ? 'sr-only' : 'flex flex-wrap gap-1.5'}>
+      <div className="lg:col-span-3 lg:pb-1">
+        <ul role="list" aria-label="Built with" className="flex flex-wrap gap-1.5">
           {project.stack.map((s) => (
             <li key={s} className={pill}>
               {s}
             </li>
           ))}
         </ul>
-        <div className={compact ? undefined : 'mt-2'}>
+        <div className="mt-2">
           {/* Only the project that is up can be clicked: the others are stacked, unseen, in the same place */}
           <VisitLink project={project} onFocus={onFocus} className={shown ? 'pointer-events-auto' : undefined} />
         </div>
       </div>
+      {views[index].length > 1 && <Views name={project.name} list={views[index]} shown={shown} card={card} under={under} onFocus={onFocus} onPick={onPick} />}
     </li>
+  )
+}
+
+const arrow =
+  'grid size-8 place-items-center rounded-full bg-black/30 text-bh-highlight shadow-[inset_0_0_0_1px_rgb(188_166_142/0.3)] transition-[box-shadow,opacity] duration-(--duration-base) ease-(--ease-glass) hover:shadow-[inset_0_0_0_1px_rgb(255_237_193/0.7)] focus-ring aria-disabled:opacity-35 aria-disabled:hover:shadow-[inset_0_0_0_1px_rgb(188_166_142/0.3)]'
+
+/**
+ * The controls for a project's ring of cards, set just under its picture:
+ * back, a dot for each view, on, and the name of the view in the middle. They
+ * do with buttons what a drag across the sky does, so the keyboard and
+ * assistive technology reach every view: the arrow keys turn the ring from any
+ * of them, and each dot carries its view's name and the description of its
+ * picture. The dots are one stop in the tab order, as a row of tabs is.
+ */
+function Views({
+  name,
+  list,
+  shown,
+  card,
+  under,
+  onFocus,
+  onPick,
+}: {
+  name: string
+  list: readonly View[]
+  shown: boolean
+  card: number
+  under: number
+  onFocus: () => void
+  onPick: (card: number) => void
+}) {
+  const dots = useRef<(HTMLButtonElement | null)[]>([])
+  const last = list.length - 1
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const to = e.key === 'ArrowRight' ? card + 1 : e.key === 'ArrowLeft' ? card - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? last : null
+    if (to === null || e.altKey || e.ctrlKey || e.metaKey) return
+    e.preventDefault()
+    const next = Math.min(last, Math.max(0, to))
+    onPick(next)
+    // Among the dots, focus goes with the view
+    if ((e.target as HTMLElement).dataset.dot !== undefined) dots.current[next]?.focus()
+  }
+
+  return (
+    // A line across the screen with no height of its own, a little under the picture; the controls hang from it
+    <div className="lens-views absolute inset-x-0 flex h-0 justify-center" style={{ bottom: `calc(${((1 - under) * 100).toFixed(2)}lvh - 1.1rem)` }}>
+      <div
+        role="group"
+        aria-label={`Views of ${name}`}
+        onKeyDown={onKeyDown}
+        className={cn('grid h-max justify-items-center gap-1.5', shown && 'pointer-events-auto')}
+      >
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={card > 0 ? `Previous view: ${list[card - 1].label}` : 'Previous view'}
+            aria-disabled={card === 0}
+            tabIndex={shown ? 0 : -1}
+            onFocus={onFocus}
+            onClick={() => card > 0 && onPick(card - 1)}
+            className={arrow}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              <path d="M10 3.5 5.5 8l4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <ol role="list" className="flex items-center">
+            {list.map((v, j) => (
+              <li key={v.image} className="flex">
+                <button
+                  ref={(el) => {
+                    dots.current[j] = el
+                  }}
+                  type="button"
+                  data-dot
+                  aria-label={`${v.label}, view ${j + 1} of ${list.length}`}
+                  aria-current={j === card ? 'true' : undefined}
+                  aria-describedby={`view-${slug}-${j}`}
+                  tabIndex={j === card ? 0 : -1}
+                  onFocus={onFocus}
+                  onClick={() => onPick(j)}
+                  className="lens-dot grid size-6 place-items-center rounded-full focus-ring"
+                >
+                  <i aria-hidden="true" className="block size-1.5 rounded-full bg-bh-highlight" />
+                </button>
+                <span id={`view-${slug}-${j}`} className="sr-only">
+                  {v.imageAlt}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <button
+            type="button"
+            aria-label={card < last ? `Next view: ${list[card + 1].label}` : 'Next view'}
+            aria-disabled={card === last}
+            tabIndex={shown ? 0 : -1}
+            onFocus={onFocus}
+            onClick={() => card < last && onPick(card + 1)}
+            className={arrow}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              <path d="M6 3.5 10.5 8 6 12.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+        {/* The name of the view in the middle. All of them are stacked in one place; one shows. */}
+        <p aria-hidden="true" className="grid justify-items-center font-mono text-[0.68rem] tracking-[0.14em] whitespace-nowrap text-bh-accent uppercase">
+          {list.map((v, j) => (
+            <span key={v.image} className={cn('lens-view-name col-start-1 row-start-1', j === card && 'is-shown')}>
+              {v.label}
+            </span>
+          ))}
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -110,64 +270,116 @@ function Words({ project, index, shown, side, compact, onFocus }: { project: Pro
  */
 function Stage() {
   const sectionRef = useRef<HTMLElement>(null)
+  const pinRef = useRef<HTMLDivElement>(null)
+  const swipeRef = useRef<HTMLDivElement>(null)
+  const starsRef = useRef<HTMLDivElement>(null)
   const [near, setNear] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [words, setWords] = useState({ index: 0, shown: false })
+  /** Which card is in the middle of each project's ring. */
+  const [middle, setMiddle] = useState<readonly number[]>(() => projects.map(() => 0))
+  /** The view last turned to, said aloud for those who cannot see the sky. */
+  const [said, setSaid] = useState('')
+  /** The project whose ring can be turned just now, or -1. Kept by the driver, read by the pointer's handlers. */
+  const turnable = useRef(-1)
   const count = projects.length
 
-  // Where the words go follows from where the scene puts the picture, which follows from the
-  // shape of the screen: beside the picture where there is room, in the shadow under it where
-  // there is not. `left` is how much of the width lies left of the picture and `middle` how
-  // far down the screen the middle of the picture is, both 0..1; `under` is where the
-  // navigation ends, in pixels. On a short screen there is not the height for all of the words
-  // and a picture worth looking at, and the words are shortened (`compact`).
-  const [place, setPlace] = useState({ side: false, compact: false, left: 0, middle: 0, under: 72 })
-  const wordsRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const pin = sectionRef.current?.querySelector<HTMLElement>('[data-lens-pin]')
-    const box = wordsRef.current
-    if (!pin || !box) return
-    const measure = () => {
-      const width = pin.clientWidth
-      const height = Math.max(1, pin.clientHeight)
-      const aspect = width / height
-      const side = aspect >= SIDE_BY_SIDE
-      // The navigation is so many pixels deep whatever the screen. (Held to a sensible range: it may be mid-move when this is read.)
-      const bar = document.querySelector('header')?.firstElementChild?.getBoundingClientRect().bottom ?? 64
-      const under = Math.min(96, Math.max(48, bar)) + 14
-      // In the shadow the words need their own height, and a little more: toward the sides of the
-      // screen the limb dips, and its line glows. Beside the picture they need none of it; there the
-      // scene is only asked to keep some of the limb in view.
-      const dip = 0.06 * width + 12
-      lensTune = { ceiling: 1 - (2 * under) / height, shadow: side ? 0.08 : Math.min(0.5, (box.offsetHeight + dip) / height) }
-      const picture = pictureBox(aspect, lensTune)
-      // Decided by the height alone, not by whether the words fit as they stand: that would
-      // depend on which layout is up, and flip back and forth
-      const compact = height < (side ? 560 : 760)
-      const next = { side, compact, left: (1 + picture.left) / 2, middle: (1 - (picture.top + picture.bottom) / 2) / 2, under }
-      setPlace((prev) =>
-        prev.side === next.side && prev.compact === next.compact && prev.left === next.left && prev.middle === next.middle && prev.under === next.under ? prev : next,
-      )
-    }
-    measure()
-    // The words change height when their type arrives or they wrap differently
-    const observer = new ResizeObserver(measure)
-    observer.observe(pin)
-    observer.observe(box)
-    return () => observer.disconnect()
+  const showCard = useCallback((project: number, card: number) => {
+    setMiddle((prev) => (prev[project] === card ? prev : prev.map((v, i) => (i === project ? card : v))))
   }, [])
+  /** The visitor has turned a ring: the page follows, and says where it is. */
+  const turned = useCallback(
+    (project: number, card: number) => {
+      showCard(project, card)
+      const list = views[project]
+      setSaid(`${projects[project].name}: ${list[card].label}, view ${card + 1} of ${list.length}`)
+    },
+    [showCard],
+  )
+  const pick = (project: number, card: number) => {
+    rings.goTo(project, card, performance.now())
+    turned(project, rings.card(project))
+  }
 
   // Scroll → progress. The scene reads it every frame; React only hears when the words change.
   useEffect(() => {
     const section = sectionRef.current
     if (!section) return
-    return startLensDriver(section, (p, isPinned) => {
+    let starlight: number | undefined
+    return startLensDriver(section, count, (p, isPinned, phase) => {
       lensProgress = p
+      lensPhase = phase
       setPinned(isPinned)
-      const next = caption(lensTimeline(p, count), count)
+      const frame = lensTimeline(p, count)
+      // The words go by the sky as drawn, so they come up as the picture arrives, not when it sets off
+      const next = caption({ ...frame, phase }, count)
       setWords((prev) => (prev.index === next.index && prev.shown === next.shown ? prev : next))
+      // A ring can be turned while its project is up and its cards are out. If the sky moves on
+      // under a drag, the drag is over: the ring settles on the card nearest the middle.
+      const can = next.shown && frame.fall <= 0 ? next.index : -1
+      if (can !== turnable.current) {
+        const was = turnable.current
+        turnable.current = can
+        if (was >= 0) {
+          rings.releaseAll(performance.now())
+          showCard(was, rings.card(was))
+        }
+      }
+      // A project that has gone out of sight goes back to its first picture
+      for (let i = 0; i < count; i++) {
+        if (rings.away(i) && Math.abs(phase - i) > RING_KEEP) {
+          rings.reset(i)
+          showCard(i, 0)
+        }
+      }
+      // The stars over the black the fall ends in. Written straight onto their one element: it changes
+      // on every frame of the scroll, which is no business of React's or of anything else in the stage.
+      const stars = starsRef.current
+      if (stars && frame.beyond !== starlight) {
+        // Out of the page altogether until they are wanted, so their canvas is not drawn under the projects
+        if (starlight === undefined || frame.beyond > 0 !== starlight > 0) stars.style.display = frame.beyond > 0 ? 'block' : 'none'
+        stars.style.opacity = frame.beyond.toFixed(3)
+        starlight = frame.beyond
+      }
     })
-  }, [count])
+  }, [count, showCard])
+
+  // Focus inside a project's words keeps them up (see .lens-caption). Once another project has settled,
+  // focus left behind in the last one's controls or link is let go, so its words do not stay over the new ones.
+  useEffect(() => {
+    const focused = document.activeElement
+    const captions = sectionRef.current?.querySelectorAll('.lens-caption')
+    if (!(focused instanceof HTMLElement) || !captions) return
+    captions.forEach((el, i) => {
+      if (!el.contains(focused)) return
+      // Focus a click left there goes as soon as the sky moves on; focus the keyboard put there stays
+      // until the next project is up, since tabbing to a project is what brings it up
+      if (words.shown ? i !== words.index : !focused.matches(':focus-visible')) focused.blur()
+    })
+  }, [words.index, words.shown])
+
+  // Dragging across the sky at the height of the pictures turns the ring of the project that is up
+  useEffect(() => {
+    const el = swipeRef.current
+    const pin = pinRef.current
+    if (!el || !pin) return
+    return attachSwipe(el, { rings, project: () => turnable.current, bounds: () => pin.getBoundingClientRect(), onCard: turned })
+  }, [turned])
+
+  // Where the picture is on screen, for laying the page's own parts round it: only the shape of the screen changes it
+  const [shape, setShape] = useState(() => (window.innerWidth / Math.max(1, window.innerHeight)).toFixed(3))
+  useEffect(() => {
+    const pin = pinRef.current
+    if (!pin) return
+    const ro = new ResizeObserver(() => setShape((pin.offsetWidth / Math.max(1, pin.offsetHeight)).toFixed(3)))
+    ro.observe(pin)
+    return () => ro.disconnect()
+  }, [])
+  const box = useMemo(() => framing(Number(shape)).box, [shape])
+  // Down the screen, 0..1: the picture's top and bottom, and the band across the sky that takes the drag
+  const top = (1 - box.top) / 2
+  const bottom = (1 - box.bottom) / 2
+  const slack = 0.1 * (bottom - top)
 
   // The sky is the scene on screen for as long as this stage is pinned
   useEffect(defineLensScene, [])
@@ -245,32 +457,51 @@ function Stage() {
       className="relative z-10 -mt-[100lvh]"
       style={{ height: `${(span(count) + 1) * 100}lvh` }}
     >
-      <div data-lens-pin className="sticky top-0 h-lvh overflow-clip">
+      <div ref={pinRef} data-lens-pin className="sticky top-0 h-lvh overflow-clip">
+        {/*
+          The fall ends with the sky gone out over the top and the screen black. The stars of the page
+          that follows come up in that black (the driver sets how far, see above), so the stage hands
+          over to "How I work" with the same thin scatter already on screen, and scrolls away with it.
+        */}
+        <div ref={starsRef} data-lens-beyond aria-hidden="true" className="pointer-events-none absolute inset-0" style={STARS_UNSEEN}>
+          <StarField seed={0x3c41} />
+        </div>
+        {/*
+          The band of sky the pictures stand in. Pressing here and dragging sideways turns the ring of
+          cards; a finger moving up or down still scrolls the page (touch-action), and so does the wheel.
+          It is there only while a project with more than one view is up, and stops short of the navigation.
+        */}
         <div
-          ref={wordsRef}
-          className={
-            place.side
-              ? // Beside the picture, level with its middle: a box from under the navigation to as far below the
-                // picture's middle as that is above it, with the words in the middle of it. On a short screen
-                // the words are taller than the box, and then they start under the navigation and run down.
-                // The sky is behind them here, so they carry a dark halo and their small print is lighter.
-                'pointer-events-none absolute left-0 flex flex-col pr-10 pl-8 [text-shadow:0_0_16px_rgb(0_0_0/0.95),0_1px_3px_rgb(0_0_0/0.9)] lg:pr-14 lg:pl-14 [&_.lens-meta]:text-[#c9bda6]'
-              : 'pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-14 lg:pb-10'
-          }
-          style={
-            place.side
-              ? { top: `${place.under}px`, height: `max(0px, calc(2 * (${place.middle * 100}% - ${place.under}px)))`, width: `${place.left * 100}%` }
-              : undefined
-          }
-        >
+          ref={swipeRef}
+          data-lens-swipe
+          aria-hidden="true"
+          className={cn(
+            'absolute inset-x-0 cursor-grab touch-pan-y select-none data-dragging:cursor-grabbing',
+            !(words.shown && views[words.index].length > 1) && 'pointer-events-none',
+          )}
+          style={{ top: `max(4.75rem, ${((top - slack) * 100).toFixed(2)}%)`, bottom: `${((1 - bottom - slack) * 100).toFixed(2)}%` }}
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-14 lg:pb-10">
           <h2 id="work-projects-title" className="sr-only">
             {WORK_INTRO.title}
           </h2>
-          <ol role="list" className={place.side ? 'my-auto grid' : 'mx-auto grid max-w-[84rem]'}>
+          <ol role="list" className="mx-auto grid max-w-[84rem]">
             {projects.map((p, i) => (
-              <Words key={p.slug} project={p} index={i} shown={words.shown && words.index === i} side={place.side} compact={place.compact} onFocus={() => goTo(i)} />
+              <Words
+                key={p.slug}
+                project={p}
+                index={i}
+                shown={words.shown && words.index === i}
+                card={middle[i]}
+                under={bottom}
+                onFocus={() => goTo(i)}
+                onPick={(card) => pick(i, card)}
+              />
             ))}
           </ol>
+          <p aria-live="polite" className="sr-only">
+            {said}
+          </p>
         </div>
       </div>
 
@@ -296,15 +527,48 @@ function Flat() {
         <ol role="list" className="mt-14 flex flex-col gap-20 md:mt-20 md:gap-28">
           {projects.map((p, i) => (
             <li key={p.slug} className="grid items-end gap-x-12 gap-y-6 lg:grid-cols-12">
-              <img
-                src={p.image}
-                alt={p.imageAlt}
-                width={1600}
-                height={1000}
-                loading="lazy"
-                decoding="async"
-                className="block aspect-[16/10] w-full rounded-glass-sm object-cover object-top shadow-[0_0_0_1px_rgb(255_237_193/0.35),0_0_60px_-20px_rgb(255_237_193/0.35)] lg:col-span-8"
-              />
+              {views[i].length > 1 ? (
+                // The project's views in a row that scrolls sideways and stops on each: the first, then the further ones
+                <ul
+                  role="list"
+                  aria-label={`Views of ${p.name}`}
+                  tabIndex={0}
+                  className="-m-1 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain p-1 pb-3 [scrollbar-color:rgb(188_166_142/0.45)_transparent] [scrollbar-width:thin] focus-ring lg:col-span-8"
+                >
+                  {views[i].map((v, j) => (
+                    <li key={v.image} className="w-[88%] shrink-0 snap-center first:snap-start last:snap-end">
+                      <figure>
+                        <img
+                          src={v.image}
+                          alt={v.imageAlt}
+                          width={1600}
+                          height={1000}
+                          loading="lazy"
+                          decoding="async"
+                          className="block aspect-[16/10] w-full rounded-glass-sm object-cover object-top shadow-[0_0_0_1px_rgb(255_237_193/0.35)]"
+                        />
+                        <figcaption className={cn(meta, 'mt-2.5')}>
+                          {j + 1} of {views[i].length}
+                          <span className="mx-2 text-bh-ember" aria-hidden="true">
+                            /
+                          </span>
+                          {v.label}
+                        </figcaption>
+                      </figure>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <img
+                  src={p.image}
+                  alt={p.imageAlt}
+                  width={1600}
+                  height={1000}
+                  loading="lazy"
+                  decoding="async"
+                  className="block aspect-[16/10] w-full rounded-glass-sm object-cover object-top shadow-[0_0_0_1px_rgb(255_237_193/0.35),0_0_60px_-20px_rgb(255_237_193/0.35)] lg:col-span-8"
+                />
+              )}
               <div className="lg:col-span-4">
                 <p className={meta}>
                   {i + 1} of {projects.length}
@@ -336,12 +600,13 @@ function Flat() {
 
 /**
  * The work, shown in the sky on the far side of the fall. The camera hovers
- * above the black hole; the hole's shadow is the dark dome at the bottom of
- * the screen. The lens is the real one. Each project waits behind the hole,
- * where the lens makes a ring of it, and unrolls into its picture as you
- * scroll, coming to rest flat; its words sit beside it on a wide screen, and
- * in the shadow under it on a narrow one. After the last one the camera drops
- * the rest of the way and the sky closes overhead.
+ * just above the black hole; the hole's shadow is the dark lower part of the
+ * screen and its edge is the horizon, a band of tan light with streaks
+ * running under it. Scrolling sends the sky on: the settled picture leaves
+ * over the top and the next comes up over the horizon, pressed flat by the
+ * lens, and unrolls into place; its words sit in the shadow underneath. After
+ * the last one the camera drops toward the hole and then sinks into the dark:
+ * the horizon goes out over the top, and the stars of the next section come up.
  *
  * The canvas is decoration and hidden from assistive tech; the words are
  * ordinary page content and all of them are always there to be read. With

@@ -4,15 +4,19 @@
 //   &bhtier=ultra|high|medium|low    force a quality tier
 //   &nohud                           hide the slider (for screenshots)
 //   &set=phase:1.5,fade:1            override fields of the frame, to isolate an effect
-//   &r=2.5                           the height the camera rests at (the horizon is 1)
-//   &gap=4                           degrees between the ring and the bottom of the picture
-//   &high=0.44                       height of the picture, as a share of the screen
-//   &top=0.8                         top edge of the picture, in NDC (-1 bottom .. 1 top)
-//   &shift=0.3                       how far right of the middle the scene stands, in NDC
+//   &card=0.5                        hold the settled project's ring of cards there, for a still:
+//                                    1 is its second view in the middle, 0.5 half way to it
+//
+// Dragging the slider across a project's hold plays the move to the next one in time, as on the site.
+// Dragging across the sky turns the settled project's ring of cards, as on the site; so does clicking
+// a card beside the middle one, and a wheel or trackpad turned sideways.
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import LensScene from '../src/lens/LensScene'
 import { PROJECTS } from '../src/content/projects'
+import { RING_KEEP, createRings } from '../src/lens/ring'
+import { attachSwipe, frameTime } from '../src/lens/swipe'
+import { caption, glide, type Glide, type LensFrame } from '../src/lens/timeline'
 
 const params = new URLSearchParams(location.search)
 const overrides = Object.fromEntries(
@@ -23,14 +27,40 @@ const overrides = Object.fromEntries(
     .map(([k, v]) => [k, Number(v)]),
 )
 const images = PROJECTS.map((p) => p.image)
-const number = (name: string) => (params.has(name) ? Number(params.get(name)) : undefined)
-const gap = number('gap')
-const tune = { radius: number('r'), gap: gap === undefined ? undefined : (gap * Math.PI) / 180, high: number('high'), top: number('top'), shift: number('shift') }
+const more = PROJECTS.map((p) => ('more' in p ? p.more.map((m) => m.image) : []))
+const rings = createRings(more.map((list) => 1 + list.length))
+const heldAt = params.has('card') ? Number(params.get('card')) : null
+
+// The site's driver glides the phase; here the page does it, once for each frame drawn.
+// It also does the section's part for the rings: which one can be turned, and putting back
+// the ring of a project that has gone out of sight.
+let sky: Glide | null = null
+let seen = 0
+let turnable = -1
+function glided(frame: LensFrame): LensFrame {
+  const now = performance.now()
+  const dt = Math.min((now - seen) / 1000, 0.1)
+  seen = now
+  sky = sky ? glide(sky, frame.phase, dt) : { value: frame.phase, velocity: 0 }
+  const drawn = { ...frame, phase: sky.value, ...overrides }
+  const up = caption(drawn, images.length)
+  const can = up.shown && drawn.fall <= 0 ? up.index : -1
+  if (can !== turnable) {
+    turnable = can
+    rings.releaseAll(now)
+  }
+  for (let i = 0; i < images.length; i++) {
+    if (heldAt !== null) rings.set(i, i === up.index ? heldAt : 0)
+    else if (rings.away(i) && Math.abs(drawn.phase - i) > RING_KEEP) rings.reset(i)
+  }
+  return drawn
+}
 
 function Page() {
   const [p, setP] = useState(() => Number(params.get('p') ?? 0.2))
   const progress = useRef(p)
   progress.current = p
+  const swipe = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState('starting')
   const [info, setInfo] = useState('')
 
@@ -38,21 +68,25 @@ function Page() {
     const id = window.setInterval(() => {
       const c = document.querySelector('canvas')
       if (c) {
-        setInfo(`${c.dataset.stageTier} · ${c.dataset.stageFps} fps · ${c.width}×${c.height} · ${c.dataset.stageGpu}`)
+        const card = turnable >= 0 ? ` · card ${rings.read(turnable, performance.now()).toFixed(2)} of project ${turnable + 1}` : ''
+        setInfo(`${c.dataset.stageTier} · ${c.dataset.stageFps} fps · ${c.width}×${c.height} · views ${c.dataset.statViews} · ${c.dataset.stageGpu}${card}`)
         setStatus(c.dataset.stageState ?? 'starting')
       }
     }, 500)
     return () => window.clearInterval(id)
   }, [])
 
+  // The whole page takes the drag here: there is nothing else on it to press
+  useEffect(() => {
+    const el = swipe.current
+    if (!el || heldAt !== null) return
+    return attachSwipe(el, { rings, project: () => turnable, bounds: () => el.getBoundingClientRect() })
+  }, [])
+
   return (
     <>
-      <LensScene
-        progress={() => progress.current}
-        images={images}
-        tweak={(f) => ({ ...f, ...overrides })}
-        tune={tune}
-      />
+      <LensScene progress={() => progress.current} images={images} more={more} ring={(i) => rings.read(i, frameTime())} held={rings.holding} tweak={glided} />
+      <div ref={swipe} style={{ position: 'fixed', inset: 0, touchAction: 'pan-y', userSelect: 'none' }} />
       {!params.has('nohud') && (
         <div className="hud">
           <div>

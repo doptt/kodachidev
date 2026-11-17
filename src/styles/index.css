@@ -660,6 +660,43 @@ html[data-bh-entered] [data-bh-stage]::after {
 }
 
 /*
+ * The controls for a project's ring of cards (Views in LensedWork), under its
+ * picture. They are one of the caption's blocks, so they come and go with it,
+ * last of all. Within them only opacity and position change: the dot of the
+ * view in the middle is brighter and larger, and its name takes the place of
+ * the last one's.
+ */
+.lens-caption.is-shown > .lens-views {
+  transition-delay: 330ms;
+}
+.lens-dot > i {
+  opacity: 0.36;
+  transition:
+    opacity var(--duration-base) var(--ease-out-soft),
+    transform var(--duration-base) var(--ease-out-soft);
+}
+.lens-dot:hover > i {
+  opacity: 0.7;
+}
+.lens-dot[aria-current='true'] > i {
+  opacity: 1;
+  transform: scale(1.5);
+}
+.lens-view-name {
+  opacity: 0;
+  transform: translateY(5px);
+  transition:
+    opacity 180ms var(--ease-out-soft),
+    transform 180ms var(--ease-out-soft);
+}
+.lens-view-name.is-shown {
+  opacity: 1;
+  transform: none;
+  transition-duration: 460ms;
+  transition-delay: 90ms;
+}
+
+/*
  * Sections set in the dark after the black hole (`on-dark`): the same
  * components as the rest of the site, with the periwinkle inks and glass
  * swapped for the black hole's cream. The colours are the theme's own
