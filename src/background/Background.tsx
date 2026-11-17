@@ -53,7 +53,6 @@ export default function Background({ scene, still, className }: BackgroundProps)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [stillSrc, setStillSrc] = useState(() => pickStill(typeof window !== 'undefined' ? window.innerWidth : 1920))
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
-  const coarsePointer = useMediaQuery('(hover: none), (pointer: coarse)')
   const forcedScene = scene ?? query('scene')
   const useStill = !!still || reducedMotion || query('nogl') !== null
 
@@ -74,7 +73,7 @@ export default function Background({ scene, still, className }: BackgroundProps)
   // The field: on screen while the page is lit, withdrawn once it has gone fully dark
   useEffect(() => {
     if (useStill) return
-    stage.define('field', createFieldScene({ mouse: !coarsePointer, forcedScene, veil: () => Math.max(blackHole.theme, blackHole.dim) }), { priority: 0, keep: 60000 })
+    stage.define('field', createFieldScene({ mouse: true, forcedScene, veil: () => Math.max(blackHole.theme, blackHole.dim) }), { priority: 0, keep: 60000 })
     let hide: (() => void) | null = null
     const sync = () => {
       const dark = Math.max(blackHole.theme, blackHole.dim) >= 0.999
@@ -90,7 +89,7 @@ export default function Background({ scene, still, className }: BackgroundProps)
       off()
       hide?.()
     }
-  }, [useStill, coarsePointer, forcedScene])
+  }, [useStill, forcedScene])
 
   // The canvas is opaque. Once it has a picture it stays up, going black between scenes like the page
   // behind it; where the field is not running (reduced motion) it shows only while another scene draws,
@@ -136,9 +135,17 @@ export function BgScrim({ strength = 0.55, className, style }: { strength?: numb
   )
 }
 
+// As tall as the window at its tallest (lvh), not as it is this moment. On a desktop the two are the
+// same. On a phone the window grows and shrinks as the browser's bars slide away and back during a
+// scroll: following that would resize the canvas, and re-make every scene's render targets, in the
+// middle of the scroll, and would put the scenes out of step with the pinned stages laid over them,
+// which are one lvh tall as well.
 const rootStyle: CSSProperties = {
   position: 'fixed',
-  inset: 0,
+  top: 0,
+  left: 0,
+  right: 0,
+  height: '100lvh',
   zIndex: -10,
   pointerEvents: 'none',
   overflow: 'hidden',

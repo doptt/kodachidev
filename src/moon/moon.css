@@ -329,7 +329,8 @@
   .moon-card {
     top: auto;
     right: 0.75rem;
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    /* Above the browser's bar when that is showing: the overlay is as tall as the window at its tallest */
+    bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + var(--bar-gap, 0px));
     left: 0.75rem;
     width: auto;
     min-width: 0;
@@ -427,6 +428,13 @@ main:has([data-moon-stage]) + .moon-footer > * {
 @media (min-width: 64rem) {
   main:has([data-moon-stage]) + .moon-footer {
     --moon-footer: 7.5rem;
+  }
+}
+/* Phones: three short rows, low enough that the pin in front of him stands clear of them */
+@media (max-width: 40rem) {
+  main:has([data-moon-stage]) + .moon-footer {
+    --moon-footer: 10.5rem;
+    background: linear-gradient(to top, rgb(0 0 0 / 0.94) 0, rgb(0 0 0 / 0.8) 55%, rgb(0 0 0 / 0) 100%);
   }
 }
 /* A sheet opened by a tap has the bottom of the screen to itself */

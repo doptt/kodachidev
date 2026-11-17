@@ -13,7 +13,7 @@ const BLOOM = '/bg/bloom.webp'
  * the field fades to black with it.
  */
 export function createFieldScene(opts: {
-  /** Enable the gentle mouse parallax (false on touch devices). */
+  /** Enable the gentle parallax that follows the mouse, or a finger on the screen. */
   mouse: boolean
   /** Force one look regardless of the sections on the page (for tests). */
   forcedScene?: string | null

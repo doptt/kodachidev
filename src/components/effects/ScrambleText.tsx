@@ -170,14 +170,16 @@ export function ScrambleText({ text, as: Tag = 'p', className }: { text: string;
     )
     io.observe(root)
 
-    let pending: PointerEvent | null = null
-    const onMove = (e: PointerEvent) => {
-      if (!revealed || e.pointerType === 'touch') return
+    // Words near the pointer decode again. On a phone the finger is the pointer: the words it passes
+    // over, or scrolls past under it, come apart and settle as they do under a mouse.
+    let pending: { clientX: number; clientY: number } | null = null
+    const near = (at: { clientX: number; clientY: number }) => {
+      if (!revealed) return
       if (pending) {
-        pending = e
+        pending = at
         return
       }
-      pending = e
+      pending = at
       requestAnimationFrame(() => {
         const p = pending
         pending = null
@@ -192,13 +194,24 @@ export function ScrambleText({ text, as: Tag = 'p', className }: { text: string;
         wake()
       })
     }
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') near(e)
+    }
+    const onTouch = (e: TouchEvent) => {
+      const t = e.touches[0]
+      if (t) near(t)
+    }
     root.addEventListener('pointermove', onMove, { passive: true })
+    root.addEventListener('touchstart', onTouch, { passive: true })
+    root.addEventListener('touchmove', onTouch, { passive: true })
 
     return () => {
       if (raf) cancelAnimationFrame(raf)
       window.clearTimeout(ambient)
       io.disconnect()
       root.removeEventListener('pointermove', onMove)
+      root.removeEventListener('touchstart', onTouch)
+      root.removeEventListener('touchmove', onTouch)
       // Leave the real text behind
       for (const w of words) {
         w.done.textContent = w.text

@@ -58,3 +58,36 @@ test('it never steps below the lowest tier', () => {
   assert.deepEqual(run(g, 40, 10000), [])
   assert.equal(g.current, 'low')
 })
+
+test('a phone with a real GPU always gets a tier: the scenes run on it', async () => {
+  const { pickTier } = await import('../src/blackhole/quality.ts')
+  const phone = (gpu, more = {}) => pickTier(gpu, { coarsePointer: true, ...more })
+  // iPhones say only "Apple GPU", and report four cores or fewer
+  assert.equal(phone('Apple GPU', { cores: 4 }), 'low')
+  assert.equal(phone('ANGLE (Qualcomm, Adreno (TM) 740, OpenGL ES 3.2)'), 'medium')
+  assert.equal(phone('Mali-G57 MC2', { memoryGb: 4, cores: 8 }), 'low')
+  // The weakest start on the tier made for them rather than on a still picture
+  assert.equal(phone('Mali-G52', { memoryGb: 2, cores: 8 }), 'lite')
+  assert.equal(phone('PowerVR Rogue GE8320', { memoryGb: 4, cores: 4 }), 'lite')
+  // Software rendering still gets nothing, on any device
+  assert.equal(phone('Google SwiftShader'), null)
+})
+
+test('a desktop is given what it was given before', async () => {
+  const { pickTier } = await import('../src/blackhole/quality.ts')
+  const desk = (gpu) => pickTier(gpu, { coarsePointer: false })
+  assert.equal(desk('ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Laptop GPU Direct3D11)'), 'ultra')
+  assert.equal(desk('Apple M2'), 'high')
+  assert.equal(desk('Intel(R) UHD Graphics 620'), 'medium')
+  assert.equal(desk('llvmpipe'), null)
+})
+
+test('on a phone the governor steps one tier further, to lite, and stops there', async () => {
+  const { PHONE_ORDER } = await import('../src/blackhole/quality.ts')
+  const g = new Governor('medium', { order: PHONE_ORDER })
+  assert.deepEqual(run(g, 30, 20000), ['low', 'lite'])
+  assert.equal(g.current, 'lite')
+  // A desktop never reaches it
+  const d = new Governor('medium')
+  assert.deepEqual(run(d, 30, 20000), ['low'])
+})

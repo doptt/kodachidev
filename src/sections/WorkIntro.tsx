@@ -42,7 +42,7 @@ function Caption({ reduced }: { reduced: boolean }) {
     <div
       inert={!shown}
       className={cn(
-        'bh-intro absolute bottom-[max(6.5rem,calc(env(safe-area-inset-bottom)+5.5rem))] left-5 z-10 max-w-[23rem] sm:left-8 md:bottom-16 lg:left-14',
+        'bh-intro absolute bottom-[calc(max(6.5rem,env(safe-area-inset-bottom)+5.5rem)+var(--bar-gap))] left-5 right-5 z-10 max-w-[23rem] sm:right-auto sm:left-8 md:bottom-16 lg:left-14',
         // A soft pool of shadow behind the words, for narrow screens where the disk reaches into this corner
         'before:absolute before:-inset-x-10 before:-inset-y-8 before:-z-10 before:bg-[radial-gradient(closest-side,rgb(0_0_0/0.78),rgb(0_0_0/0.5)_60%,transparent)]',
         !shown && 'pointer-events-none',
@@ -216,7 +216,7 @@ export function WorkIntro({ onEntered, onExited, onProgress }: WorkIntroProps) {
 
           <div
             aria-hidden="true"
-            className="bh-cue pointer-events-none absolute inset-x-0 bottom-[max(2.25rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-3"
+            className="bh-cue pointer-events-none absolute inset-x-0 bottom-[calc(max(2.25rem,env(safe-area-inset-bottom))+var(--bar-gap))] flex flex-col items-center gap-3"
           >
             <span className="font-mono text-[0.68rem] uppercase tracking-[0.34em] text-bh-accent [text-shadow:0_0_14px_rgb(0_0_0/0.9)]">
               Scroll to enter

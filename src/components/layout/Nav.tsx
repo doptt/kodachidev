@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from 'motion/react'
 import { cn } from '@/lib/cn'
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { useMediaQuery, usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { useCurrentSection } from './ScrollRail'
 import { SoundToggle } from '@/sound/SoundToggle'
 
 /** Horizontal reach of the curve that sweeps each side of the bar up into the top edge. */
@@ -108,7 +109,13 @@ export function Nav() {
   const [condensed, setCondensed] = useState(false)
   const [open, setOpen] = useState(false)
   const reduced = usePrefersReducedMotion()
-  const { scrollY } = useScroll()
+  const { scrollY, scrollYProgress } = useScroll()
+  // Phones have no room for the rail down the right edge, so the bar itself says where the page is:
+  // once the page has left its top, the site's name gives way to the section's number and name, and
+  // a line along the top of the bar fills with the scroll
+  const phone = useMediaQuery('(max-width: 767.98px)')
+  const place = useCurrentSection(phone)
+  const placed = phone && place.shown
   const menuId = useId()
   const buttonRef = useRef<HTMLButtonElement>(null)
   const firstLinkRef = useRef<HTMLAnchorElement>(null)
@@ -160,13 +167,26 @@ export function Nav() {
             className="flex min-h-11 items-center gap-2.5 rounded-pill pr-2 text-ink focus-ring"
           >
             <Monogram />
-            <span
-              className={cn(
-                'font-nav text-[0.95rem] font-light tracking-tight transition-[opacity,max-width,transform] duration-(--duration-base) ease-(--ease-glass)',
-                condensed ? 'md:max-w-0 md:-translate-x-1 md:opacity-0 overflow-hidden' : 'max-w-40 opacity-100',
-              )}
-            >
-              kodachi.dev
+            <span className="grid items-center md:contents">
+              <span
+                className={cn(
+                  'col-start-1 row-start-1 font-nav text-[0.95rem] font-light tracking-tight transition-[opacity,max-width,transform] duration-(--duration-base) ease-(--ease-glass)',
+                  condensed ? 'md:max-w-0 md:-translate-x-1 md:opacity-0 overflow-hidden' : 'max-w-40 opacity-100',
+                  placed && 'max-md:-translate-y-1.5 max-md:opacity-0',
+                )}
+              >
+                kodachi.dev
+              </span>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'col-start-1 row-start-1 flex items-baseline gap-2 font-mono text-[0.68rem] tracking-[0.1em] whitespace-nowrap uppercase transition-[opacity,transform] duration-(--duration-base) ease-(--ease-glass) md:hidden',
+                  placed ? 'opacity-100' : 'translate-y-1.5 opacity-0',
+                )}
+              >
+                <span className="nav-mark tabular-nums">{place.number}</span>
+                <span className="text-ink-muted">{place.label}</span>
+              </span>
             </span>
           </a>
 
@@ -230,6 +250,10 @@ export function Nav() {
             </button>
           </div>
         </nav>
+        {/* Phones: how far down the page, as a line along the top edge of the bar */}
+        <span aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden md:hidden">
+          <motion.span className="nav-fill absolute inset-0 origin-left" style={{ scaleX: scrollYProgress }} />
+        </span>
         {/* After the nav so its ref is attached before this measures it; z-index keeps it underneath */}
         <NotchShape target={navRef} />
       </div>

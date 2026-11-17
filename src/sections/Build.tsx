@@ -30,18 +30,25 @@ export function Build() {
               as="li"
               index={i}
               key={item.id}
-              className={`flex flex-col hover:bg-periwinkle-300/[0.035] ${spans[i]}`}
+              // On a phone the drawing stands beside its number and title and the words run under both,
+              // so six cells are three screens, not seven; from 640px up it is the column it always was
+              className={`grid grid-cols-[8.25rem_minmax(0,1fr)] gap-x-4 hover:bg-periwinkle-300/[0.035] data-[lit=true]:bg-periwinkle-300/[0.035] sm:flex sm:flex-col ${spans[i]}`}
             >
-              <span className="font-mono text-[0.72rem] tracking-[0.08em] text-ink-faint" aria-hidden="true">
+              <span className="col-start-2 row-start-1 max-sm:self-end font-mono text-[0.72rem] tracking-[0.08em] text-ink-faint" aria-hidden="true">
                 {String(i + 1).padStart(2, '0')}
               </span>
-              <div className="flex justify-center py-4 md:py-6">
+              <div className="col-start-1 row-span-2 row-start-1 flex justify-center max-sm:items-center sm:py-4 md:py-6">
                 <IsoArt boxes={art[item.id]} floatDelay={i * 1.3} />
               </div>
-              <RevealText as="h3" className="text-[1.05rem] font-medium tracking-[-0.01em] text-ink" text={item.title} delay={0.15 + i * 0.07} />
+              <RevealText
+                as="h3"
+                className="col-start-2 row-start-2 text-[1.05rem] max-sm:mt-1.5 max-sm:self-start font-medium tracking-[-0.01em] text-ink"
+                text={item.title}
+                delay={0.15 + i * 0.07}
+              />
               <RevealText
                 as="p"
-                className="mt-2 max-w-[26rem] text-[0.9rem] leading-[1.6] text-pretty text-ink-muted"
+                className="col-span-2 mt-2 max-w-[26rem] text-[0.9rem] leading-[1.6] text-pretty text-ink-muted max-sm:mt-3"
                 text={item.body}
                 delay={0.3 + i * 0.07}
               />

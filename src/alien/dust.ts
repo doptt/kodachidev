@@ -15,7 +15,7 @@ import { seededRandom } from './maths/schedule'
  * and nothing is uploaded after the first frame.
  */
 const GRAVITY = 1.62
-const COUNT: Record<TierName, number> = { ultra: 280, high: 200, medium: 120, low: 64 }
+const COUNT: Record<TierName, number> = { ultra: 280, high: 200, medium: 120, low: 64, lite: 48 }
 
 export type DustSite = {
   x: number

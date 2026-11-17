@@ -7,7 +7,7 @@ Last brought up to date on 2026-11-17, at the end of a session that put the proj
 - **`main` is what is live** (kodachi.dev, deployed by Vercel from `main`). On 2026-11-17 the owner had everything committed and pushed to `main`: the work of 2026-11-13 from the branch `true-lens` (the alien's black sweatshirt, the chair's tan straps, the first half of a better moon surface) and the projects section as described below.
 - **The owner did not like the true lens** (2026-11-13). The projects went back to the earlier lensed sky, edited to match a reference video of theirs (see "The lensed sky"). The true lens is in the history (`530b749`) and its design and plan are in `docs/superpowers/`.
 - They have seen the projects section on the dev server and said it looked good so far; the cards, the glow on every project and the new ending went in after that and were pushed at their word without their having watched them.
-- `npm test` (98 tests), `npm run typecheck` and `npm run build` pass on the working tree.
+- `npm test` (101 tests), `npm run typecheck` and `npm run build` pass on the working tree.
 - Dev server: `npm run dev`, port 5173.
 
 ## Where the last session stopped (2026-11-17)
@@ -41,6 +41,19 @@ Read this first if you are picking the work up.
 - `assets-src/raw/` and `assets-src/tools/` are not in git. Without them `assets-src/scripts/moon.py` cannot rebuild `site-*`, `moon-craters-*` or `moon-detail`: the three Higgsfield pictures it starts from are in `assets-src/raw/moon/hf/` on the owner's laptop, as is the KTX encoder. The shader work on the moon needs none of that; rebuilding textures does.
 - `screenshots/` is not in git either. The stills named in this document are on the owner's laptop.
 - Higgsfield: the moon work spent 10.25 credits and left the balance at 59.5. The balance read 69.75 when that work began, though this document had recorded 109.75 after the alien; nothing in this session's log accounts for the difference. The owner set no budget beyond "use Higgsfield for the moon"; the last session capped itself at 40.
+
+## Phones (2026-11-17)
+
+The owner asked for the phone version to be the desktop site, moving, and fitted to a phone rather than squeezed onto one, with the desktop left exactly as it was. What was done, all of it decided without them:
+
+- **Phones run the live scenes.** `pickTier` (`blackhole/quality.ts`) used to return null for a phone with four cores or fewer, or 3 GB or less, which is every iPhone (Safari reports "Apple GPU" and at most four cores): the whole site fell back to the still purple image, the black hole's JPEG, the flat project list and the flat moon picture. A phone with a real GPU now always gets a tier. There is a fifth tier, `lite`, for phones only (`PHONE_ORDER`): the weakest start on it, and the governor takes any phone down to it if the frame rate cannot hold. Desktops never reach it (`TIER_ORDER` is unchanged). The stills remain only as the first paint, under reduced motion, and where there is no WebGL2 or only software rendering.
+- **A finger is the pointer** (`motion/touch.ts`, `followTouch`). The camera's lean in every scene, the pyramid's tilt, the purple field's drift and the bio's re-scrambling follow the finger while it is down, scrolling included (touch events, since a touch's pointer events are cancelled when it becomes a scroll).
+- **`TouchRipple`** (`components/effects/`) is the cursor circle's counterpart: a ring opens under each touch, periwinkle on the lit page and cream in the dark.
+- **Hover has a counterpart**: a bento cell is lit (`data-lit`, set in `BentoCell` where `(hover: none)`) while it crosses the middle of the screen, which tints it and lifts its drawing as the mouse does; raised glass cards light on press.
+- **The scroll rail's counterpart is in the bar** (`Nav`, `useCurrentSection` in `ScrollRail.tsx`): below 768px, once the page has left its top, the site's name gives way to the section's number and name, and a line along the top of the bar fills with the scroll.
+- **The canvas is one `lvh` tall** (`Background.tsx`), not the height of the window at that moment, so the browser's bars sliding away mid-scroll neither resize it nor put it out of step with the pinned stages. `--bar-gap` (`100lvh - 100dvh`, zero on a desktop) lifts whatever sits along the bottom of a pinned stage clear of the bars while they show.
+- **Layout below 640px**: the hero's three cards are one row that is swiped, so the hero is a single screen; each cell of "What I build" is its drawing beside its number and title with the words under (the section is 1,980px, down from 2,810); the black hole's caption stays inside the screen; the footer over the moon is three short rows (10.5rem, down from 13) with the way back to the top as an arrow beside the name, and the pin in front of the alien stands a little higher, so the footer no longer overlaps it; the arrows and dots under a project's picture take a 44px touch.
+- **Checked**: `npm test` (101), type check and build pass. Desktop was compared before and after on the production build at 1440, 1024 and 768 wide with the scenes off: every element in the same place, pictures identical. The phone was checked from stills in emulation (360, 390 and 430 wide, a tablet, a phone on its side) with software rendering and the tier forced. **Nothing has run on a real phone**: frame rates on `low` and `lite`, memory on an older iPhone, and how the finger-following feels are all untested.
 
 ## What the owner has decided
 
@@ -128,7 +141,7 @@ tests/                  unit tests of the pure modules
 - `stage.preload(id)` loads and compiles it without showing it. `stage.show(id)` asks for it to be on screen and returns a function that withdraws the request; `useShowScene(id, on)` does that from a component. When more than one is asked for, the highest priority that is ready is drawn. When none is, the canvas is black and the loop stops.
 - A scene that becomes ready while another is showing gets one `warm()` call, to pay its first-frame costs off screen.
 - A scene nothing has asked for in a while is disposed and made again when next wanted.
-- The stage picks a quality tier from the GPU's name (`blackhole/quality.ts`: ultra, high, medium, low), steps down if the frame rate cannot hold, and handles a lost context.
+- The stage picks a quality tier from the GPU's name (`blackhole/quality.ts`: ultra, high, medium, low, and lite on phones only), steps down if the frame rate cannot hold, and handles a lost context.
 - `standalone.ts` runs one scene on a canvas of its own under the same contract. The harness pages use it.
 
 The scenes on the stage, by priority: `field` (0, the purple background), `lens` (2, the projects), `moon` (3). **The black hole is not on the stage**: it has its own canvas inside its pinned section, as it had before the stage existed, because the owner wants it left alone. Once its fall has ended in black, CSS hides that section's contents (`html[data-bh-entered] .bh-stage`) so its canvas does not sit in front of the shared one.
@@ -296,7 +309,6 @@ Playwright only uses the real GPU when Chromium is launched with `--use-angle=d3
 - **The alien's motion has only been judged from stills**, as has the bobbing of the pins' badges.
 - **The moon's generated relief is only shaded, not shadowed, outside the baked close-up.** The tiling craters and grain brighten and darken the ground but cast nothing. The heights needed are already in the tiles' alpha; the planned step is a short march toward the sun in `moon.frag.glsl` with step counts per tier (see `assets-src/README-moon.md`). More tonal range (mare against highland) was also asked for and not done.
 - **Up close**: the beer bottle's glass reads as glossy and opaque; his fingers go about halfway round it; mid-sip, from the settled camera, the bottle crosses in front of one eye; a few pale flecks remain along the hood seam by the collar, where the texture atlas bleeds and the dye is deliberately cautious next to skin.
-- **On phones the footer overlaps the lowest pin's ring.**
 - **The sections do not flow into one another as one camera move.** Each scene starts and ends in black.
 - **The black hole's still image** (`public/work/blackhole.jpg`) does not match the scene.
 - **The flat moon picture** in the fallback is the owner's first reference: a different alien, in a space suit.

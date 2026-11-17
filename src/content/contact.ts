@@ -65,6 +65,6 @@ export const CONTACT_PINS: readonly ContactPin[] = [
     value: CONTACT.discord.handle,
     copy: CONTACT.discord.handle,
     copyLabel: 'Copy handle',
-    spot: { wide: [0.65, 0.86], tall: [0.5, 0.77] },
+    spot: { wide: [0.65, 0.86], tall: [0.5, 0.745] },
   },
 ]

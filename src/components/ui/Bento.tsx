@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from 'react'
+import { useEffect, useRef, type ElementType, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { cn } from '@/lib/cn'
 import { GlassSurface } from '@/components/glass/GlassSurface'
@@ -57,11 +57,25 @@ export function BentoCell({
 }) {
   const reduced = usePrefersReducedMotion()
   const Tag = as === 'li' ? motion.li : motion.div
+  const ref = useRef<HTMLElement>(null)
+  // A phone has no hover. What a cell does under the mouse (its tint, its drawing lifting) it does
+  // there while it crosses the middle of the screen, so the panel answers the scroll as it answers a pointer.
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !window.matchMedia('(hover: none)').matches) return
+    const io = new IntersectionObserver(([entry]) => (el.dataset.lit = String(entry.isIntersecting)), { rootMargin: '-42% 0px -42% 0px' })
+    io.observe(el)
+    return () => {
+      io.disconnect()
+      delete el.dataset.lit
+    }
+  }, [])
   return (
     <Tag
+      ref={ref as never}
       {...blurIn(reduced, index * 0.07, { y: 16, blur: 8, duration: 0.7 })}
       className={cn(
-        'group/cell relative border-b border-r border-line p-7 transition-colors duration-(--duration-base) ease-(--ease-glass) md:col-span-3 md:p-9',
+        'group/cell relative border-b border-r border-line px-6 py-7 transition-colors duration-(--duration-base) ease-(--ease-glass) sm:p-7 md:col-span-3 md:p-9',
         className,
       )}
     >

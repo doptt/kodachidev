@@ -2,7 +2,7 @@
  * Quality tiers and the governor that steps down through them when the frame
  * rate can't hold.
  */
-export type TierName = 'ultra' | 'high' | 'medium' | 'low'
+export type TierName = 'ultra' | 'high' | 'medium' | 'low' | 'lite'
 
 export type Quality = {
   name: TierName
@@ -26,13 +26,23 @@ export type Quality = {
   smearTaps: number
 }
 
+/** The steps a desktop goes down through. It stops at `low`. */
 export const TIER_ORDER: readonly TierName[] = ['ultra', 'high', 'medium', 'low']
+/** The steps a phone or tablet goes down through: one further, to a tier made for small, slow GPUs. */
+export const PHONE_ORDER: readonly TierName[] = ['medium', 'low', 'lite']
+
+/** The order the governor steps down through on this kind of device. */
+export function tierOrder(coarsePointer: boolean): readonly TierName[] {
+  return coarsePointer ? PHONE_ORDER : TIER_ORDER
+}
 
 export const TIERS: Record<TierName, Quality> = {
   ultra: { name: 'ultra', scale: 1, supersample: 1.5, maxInternal: 5.4e6, maxDpr: 2, maxPixels: 5.2e6, steps: 300, detail: 5, bloom: 7, smearTaps: 14 },
   high: { name: 'high', scale: 0.8, supersample: 1, maxInternal: 4.2e6, maxDpr: 2, maxPixels: 4.2e6, steps: 220, detail: 5, bloom: 6, smearTaps: 12 },
   medium: { name: 'medium', scale: 0.7, supersample: 1, maxInternal: 3e6, maxDpr: 1.5, maxPixels: 3e6, steps: 150, detail: 4, bloom: 5, smearTaps: 8 },
   low: { name: 'low', scale: 0.58, supersample: 1, maxInternal: 2e6, maxDpr: 1.5, maxPixels: 2e6, steps: 110, detail: 4, bloom: 4, smearTaps: 6 },
+  // Phones only (see PHONE_ORDER): a small screen held close hides the softer picture, and it is a third of the work of `low`
+  lite: { name: 'lite', scale: 0.5, supersample: 1, maxInternal: 1.1e6, maxDpr: 1.25, maxPixels: 1.1e6, steps: 80, detail: 4, bloom: 4, smearTaps: 5 },
 }
 
 export function isTier(name: string | null | undefined): name is TierName {
@@ -43,6 +53,10 @@ export function isTier(name: string | null | undefined): name is TierName {
  * First guess from the GPU's name and the kind of device. Returns null when
  * the scene shouldn't run at all (software rendering), so the caller can show
  * the still image instead.
+ *
+ * A phone with a real GPU always runs the scenes: the site is the same site on
+ * a phone. The weakest start on `lite`, and the governor takes any of them
+ * down to it if the frame rate cannot hold.
  */
 export function pickTier(gpu: string, opts: { coarsePointer: boolean; memoryGb?: number; cores?: number }): TierName | null {
   const g = gpu.toLowerCase()
@@ -50,7 +64,9 @@ export function pickTier(gpu: string, opts: { coarsePointer: boolean; memoryGb?:
   if (opts.coarsePointer) {
     // Phones and tablets. Recent Apple chips and flagship Android GPUs get one step more.
     if (/apple (a1[5-9]|a[2-9]\d|m\d)|adreno \(tm\) (7[3-9]\d|8\d\d)|immortalis/.test(g)) return 'medium'
-    if ((opts.memoryGb ?? 4) <= 3 || (opts.cores ?? 8) <= 4) return null
+    // iPhones and iPads report their GPU only as "Apple GPU"; every one that has WebGL2 with float targets holds `low`
+    if (/apple/.test(g)) return 'low'
+    if ((opts.memoryGb ?? 4) <= 3 || (opts.cores ?? 8) <= 4) return 'lite'
     return 'low'
   }
   if (/rtx|radeon rx (5[6-9]|[6-9])\d{2,3}|rx (6|7|8|9)\d{3}|arc\(tm\) a[57]\d\d|apple m\d (pro|max|ultra)|geforce gtx 1[06][6-9]0|gtx 10[78]0|titan/.test(g)) return 'ultra'
@@ -74,15 +90,23 @@ export function pickTier(gpu: string, opts: { coarsePointer: boolean; memoryGb?:
 /** Frames ignored after rendering starts or resumes, while shaders compile and the first frames settle. */
 const START_GRACE_MS = 1500
 
+export type GovernorOptions = {
+  floorFps?: number
+  sustainMs?: number
+  settleMs?: number
+  /** The tiers to step down through, best first (default TIER_ORDER). */
+  order?: readonly TierName[]
+}
+
 export class Governor {
   private ema = 16.7
   private slowMs = 0
   private settleMs = START_GRACE_MS
 
   private tier: TierName
-  private opts: { floorFps?: number; sustainMs?: number; settleMs?: number }
+  private opts: GovernorOptions
 
-  constructor(tier: TierName, opts: { floorFps?: number; sustainMs?: number; settleMs?: number } = {}) {
+  constructor(tier: TierName, opts: GovernorOptions = {}) {
     this.tier = tier
     this.opts = opts
   }
@@ -113,9 +137,10 @@ export class Governor {
     }
     this.slowMs = this.ema > floor ? this.slowMs + dtMs : Math.max(0, this.slowMs - dtMs * 2)
     if (this.slowMs < (this.opts.sustainMs ?? 900)) return null
-    const i = TIER_ORDER.indexOf(this.tier)
-    if (i >= TIER_ORDER.length - 1) return null
-    this.tier = TIER_ORDER[i + 1]
+    const order = this.opts.order ?? TIER_ORDER
+    const i = order.indexOf(this.tier)
+    if (i < 0 || i >= order.length - 1) return null
+    this.tier = order[i + 1]
     this.slowMs = 0
     this.settleMs = this.opts.settleMs ?? 700
     this.ema = 16.7

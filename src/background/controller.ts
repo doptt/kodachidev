@@ -1,5 +1,6 @@
 import { cloneScene, easeScene, mixScenes, sceneFrom, SCENES, DEFAULT_SCENE, type BgScene } from './scenes'
 import type { FrameUniforms } from './renderer'
+import { followTouch } from '../motion/touch'
 
 /**
  * Turns page state (scroll, pointer, which sections are on screen, time) into
@@ -33,10 +34,11 @@ export class BackgroundController {
     this.mouseTarget.x = 0
     this.mouseTarget.y = 0
   }
+  private offTouch: (() => void) | null = null
 
   constructor(
     private opts: {
-      /** Enable the gentle mouse parallax (false on touch devices). */
+      /** Enable the gentle parallax: the field leans away from the mouse, or from a finger on the screen. */
       mouse: boolean
       /** Force a single scene (for testing). */
       forcedScene?: string | null
@@ -53,6 +55,10 @@ export class BackgroundController {
     if (this.opts.mouse) {
       window.addEventListener('pointermove', this.onPointerMove, { passive: true })
       document.documentElement.addEventListener('pointerleave', this.onPointerLeave)
+      this.offTouch = followTouch((x, y) => {
+        this.mouseTarget.x = x / (window.innerWidth || 1) - 0.5
+        this.mouseTarget.y = y / (window.innerHeight || 1) - 0.5
+      }, this.onPointerLeave)
     }
   }
 
@@ -61,6 +67,8 @@ export class BackgroundController {
     this.sectionsObserver = null
     window.removeEventListener('pointermove', this.onPointerMove)
     document.documentElement.removeEventListener('pointerleave', this.onPointerLeave)
+    this.offTouch?.()
+    this.offTouch = null
   }
 
   /** Jump the eased state to its target (after a pause so nothing lurches). */

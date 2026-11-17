@@ -15,19 +15,19 @@ const SECTIONS = [
 ] as const
 
 /**
- * Wide screens only: a thin progress line on the right edge with the number and
- * name of the section under the middle of the viewport. Decorative; the nav
- * already links to every section.
+ * Where the page is: the section under the middle of the viewport, and whether
+ * the page has left its top. The rail below shows it on wide screens; on
+ * phones the navigation does (see Nav), which is why this is shared. `on`
+ * false leaves the page unmeasured.
  */
-export function ScrollRail() {
-  const reduced = usePrefersReducedMotion()
-  const { scrollY, scrollYProgress } = useScroll()
-  const fill = useSpring(scrollYProgress, { stiffness: 200, damping: 34, mass: 0.3 })
+export function useCurrentSection(on = true) {
+  const { scrollY } = useScroll()
   const [active, setActive] = useState(0)
   const [shown, setShown] = useState(false)
 
   // Current section: the last one whose top edge has passed the middle of the viewport
   const update = (y: number) => {
+    if (!on) return
     setShown(y > 160)
     const mid = window.innerHeight / 2
     let i = 0
@@ -38,7 +38,21 @@ export function ScrollRail() {
     setActive(i)
   }
   useMotionValueEvent(scrollY, 'change', update)
-  useEffect(() => update(window.scrollY), [])
+  useEffect(() => update(window.scrollY), [on])
+
+  return { active, shown, number: String(active + 1).padStart(2, '0'), label: SECTIONS[active].label }
+}
+
+/**
+ * Wide screens only: a thin progress line on the right edge with the number and
+ * name of the section under the middle of the viewport. Decorative; the nav
+ * already links to every section.
+ */
+export function ScrollRail() {
+  const reduced = usePrefersReducedMotion()
+  const { scrollYProgress } = useScroll()
+  const fill = useSpring(scrollYProgress, { stiffness: 200, damping: 34, mass: 0.3 })
+  const { active, shown } = useCurrentSection()
 
   const current = SECTIONS[active]
 

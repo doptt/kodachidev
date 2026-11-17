@@ -1,4 +1,5 @@
-import { Governor, TIERS, isTier, pickTier, type TierName } from '@/blackhole/quality'
+import { followTouch } from '@/motion/touch'
+import { Governor, TIERS, isTier, pickTier, tierOrder, type TierName } from '@/blackhole/quality'
 import type { SceneFactory, StageContext, StageFrame, StageScene } from './types'
 
 /**
@@ -246,10 +247,14 @@ function sleep() {
   raf = 0
 }
 
-const onPointer = (e: PointerEvent) => {
-  target[0] = (e.clientX / (window.innerWidth || 1)) * 2 - 1
-  target[1] = -((e.clientY / (window.innerHeight || 1)) * 2 - 1)
+const lookAt = (clientX: number, clientY: number) => {
+  target[0] = (clientX / (window.innerWidth || 1)) * 2 - 1
+  target[1] = -((clientY / (window.innerHeight || 1)) * 2 - 1)
 }
+const lookAhead = () => {
+  target[0] = target[1] = 0
+}
+const onPointer = (e: PointerEvent) => lookAt(e.clientX, e.clientY)
 const onPointerGone = (e: PointerEvent) => {
   // A lifted finger lets the camera drift back; a mouse just leaving a child element does not
   if (e.type === 'pointerleave' || e.pointerType !== 'mouse') target[0] = target[1] = 0
@@ -297,9 +302,10 @@ export const stage = {
       gpu = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) ?? '')
       const forced = new URLSearchParams(window.location.search).get('bhtier')
       const nav = navigator as Navigator & { deviceMemory?: number }
-      tier = isTier(forced) ? forced : pickTier(gpu, { coarsePointer: window.matchMedia('(pointer: coarse)').matches, memoryGb: nav.deviceMemory, cores: navigator.hardwareConcurrency })
+      const coarsePointer = window.matchMedia('(pointer: coarse)').matches
+      tier = isTier(forced) ? forced : pickTier(gpu, { coarsePointer, memoryGb: nav.deviceMemory, cores: navigator.hardwareConcurrency })
       // A forced tier is for measuring: it is not stepped down
-      governor = tier && !isTier(forced) ? new Governor(tier) : null
+      governor = tier && !isTier(forced) ? new Governor(tier, { order: tierOrder(coarsePointer) }) : null
     }
     supported = !!(gl && float && tier)
     if (!supported || !gl || !tier) {
@@ -338,6 +344,8 @@ export const stage = {
     window.addEventListener('pointerup', onPointerGone, { passive: true })
     window.addEventListener('pointercancel', onPointerGone, { passive: true })
     document.documentElement.addEventListener('pointerleave', onPointerGone)
+    // A finger leads the scenes as the mouse does, and goes on leading while it scrolls the page
+    const offTouch = followTouch(lookAt, lookAhead)
     document.addEventListener('visibilitychange', onVisibility)
     el.addEventListener('webglcontextlost', onLost)
     el.addEventListener('webglcontextrestored', onRestored)
@@ -358,6 +366,7 @@ export const stage = {
       window.removeEventListener('pointerup', onPointerGone)
       window.removeEventListener('pointercancel', onPointerGone)
       document.documentElement.removeEventListener('pointerleave', onPointerGone)
+      offTouch()
       document.removeEventListener('visibilitychange', onVisibility)
       el.removeEventListener('webglcontextlost', onLost)
       el.removeEventListener('webglcontextrestored', onRestored)

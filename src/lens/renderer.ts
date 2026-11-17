@@ -27,7 +27,7 @@ const SWING_Y = (1.2 * Math.PI) / 180
 /** The six faces of the star map, in the order WebGL numbers them. */
 const FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const
 /** Which size of star map each quality tier takes (the edge of one face, in pixels). */
-const SKY_SIZE: Record<Quality['name'], number> = { ultra: 2048, high: 2048, medium: 1024, low: 1024 }
+const SKY_SIZE: Record<Quality['name'], number> = { ultra: 2048, high: 2048, medium: 1024, low: 1024, lite: 512 }
 /** Seconds the sky takes to come up once its map has arrived. */
 const SKY_FADE = 1.2
 /**

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { BlackHoleRenderer } from './renderer'
 import { timeline, type Frame } from './timeline'
-import { Governor, TIERS, isTier, pickTier, type TierName } from './quality'
+import { followTouch } from '@/motion/touch'
+import { Governor, TIERS, isTier, pickTier, tierOrder, type TierName } from './quality'
 
 export type BlackHoleSceneProps = {
   /** Current pinned scroll progress, 0..1. Read every frame, so pass a stable function. */
@@ -51,10 +52,11 @@ export default function BlackHoleScene({ progress, arrive, still = false, tier, 
 
     const forced = tier ?? new URLSearchParams(window.location.search).get('bhtier')
     const nav = navigator as Navigator & { deviceMemory?: number }
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches
     const start = isTier(forced)
       ? forced
       : pickTier(renderer.gpu, {
-          coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+          coarsePointer,
           memoryGb: nav.deviceMemory,
           cores: navigator.hardwareConcurrency,
         })
@@ -64,7 +66,7 @@ export default function BlackHoleScene({ progress, arrive, still = false, tier, 
       return
     }
 
-    const governor = new Governor(start)
+    const governor = new Governor(start, { order: tierOrder(coarsePointer) })
     renderer.setQuality(TIERS[start])
     canvas.dataset.bhTier = start
     canvas.dataset.bhGpu = renderer.gpu
@@ -158,10 +160,12 @@ export default function BlackHoleScene({ progress, arrive, still = false, tier, 
       raf = 0
     }
 
-    const onPointer = (e: PointerEvent) => {
-      pointerTarget[0] = (e.clientX / (window.innerWidth || 1)) * 2 - 1
-      pointerTarget[1] = -((e.clientY / (window.innerHeight || 1)) * 2 - 1)
+    const lookAt = (clientX: number, clientY: number) => {
+      pointerTarget[0] = (clientX / (window.innerWidth || 1)) * 2 - 1
+      pointerTarget[1] = -((clientY / (window.innerHeight || 1)) * 2 - 1)
     }
+    const onPointer = (e: PointerEvent) => lookAt(e.clientX, e.clientY)
+    let offTouch = () => {}
     const onPointerGone = (e: PointerEvent) => {
       // A lifted finger lets the camera drift back; a mouse just leaving a child element doesn't
       if (e.type === 'pointerleave' || e.pointerType !== 'mouse') pointerTarget[0] = pointerTarget[1] = 0
@@ -224,6 +228,8 @@ export default function BlackHoleScene({ progress, arrive, still = false, tier, 
       window.addEventListener('pointerup', onPointerGone, { passive: true })
       window.addEventListener('pointercancel', onPointerGone, { passive: true })
       document.documentElement.addEventListener('pointerleave', onPointerGone)
+      // A finger leans the camera as the mouse does, and goes on doing so while it scrolls the page
+      offTouch = followTouch(lookAt, () => (pointerTarget[0] = pointerTarget[1] = 0))
     }
     document.addEventListener('visibilitychange', onVisibility)
     canvas.addEventListener('webglcontextlost', onLost)
@@ -239,6 +245,7 @@ export default function BlackHoleScene({ progress, arrive, still = false, tier, 
       window.removeEventListener('pointerup', onPointerGone)
       window.removeEventListener('pointercancel', onPointerGone)
       document.documentElement.removeEventListener('pointerleave', onPointerGone)
+      offTouch()
       document.removeEventListener('visibilitychange', onVisibility)
       canvas.removeEventListener('webglcontextlost', onLost)
       canvas.removeEventListener('webglcontextrestored', onRestored)

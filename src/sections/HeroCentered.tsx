@@ -161,18 +161,22 @@ export function HeroCentered() {
           </div>
 
           {/* Three cards along the bottom of the hero */}
-          <ul role="list" className="mt-12 grid w-full max-w-[64rem] grid-cols-1 gap-2.5 sm:grid-cols-3 md:mt-14 md:gap-4">
-            <motion.li {...rise(cardsAt)}>
+          {/* On a phone they are one row that is swiped sideways and stops on each card, so the hero is a single screen */}
+          <ul
+            role="list"
+            className="hero-cards mt-10 flex w-full max-w-[64rem] gap-2.5 max-sm:-mx-5 max-sm:w-screen max-sm:snap-x max-sm:snap-mandatory max-sm:overflow-x-auto max-sm:overscroll-x-contain max-sm:px-5 max-sm:pb-10 max-sm:-mb-10 sm:mt-12 sm:grid sm:grid-cols-3 md:mt-14 md:gap-4"
+          >
+            <motion.li {...rise(cardsAt)} className="max-sm:w-[78%] max-sm:shrink-0 max-sm:snap-center">
               <HeroCard glyph={icon.code} title="Modern Development" href="#work" label="See my work" delay={cardsAt}>
                 Clean, scalable, and visually engaging design.
               </HeroCard>
             </motion.li>
-            <motion.li {...rise(cardsAt + 0.12)}>
+            <motion.li {...rise(cardsAt + 0.12)} className="max-sm:w-[78%] max-sm:shrink-0 max-sm:snap-center">
               <HeroCard glyph={icon.bolt} title="Performance Focus" delay={cardsAt + 0.12}>
                 Optimized for speed, built for the future.
               </HeroCard>
             </motion.li>
-            <motion.li {...rise(cardsAt + 0.24)}>
+            <motion.li {...rise(cardsAt + 0.24)} className="max-sm:w-[78%] max-sm:shrink-0 max-sm:snap-center">
               <HeroCard glyph={icon.shield} title="Secure by Design" delay={cardsAt + 0.24}>
                 Secure backend and a production-ready page is my priority.
               </HeroCard>

@@ -147,7 +147,8 @@ function Words({
 }
 
 const arrow =
-  'grid size-8 place-items-center rounded-full bg-black/30 text-bh-highlight shadow-[inset_0_0_0_1px_rgb(188_166_142/0.3)] transition-[box-shadow,opacity] duration-(--duration-base) ease-(--ease-glass) hover:shadow-[inset_0_0_0_1px_rgb(255_237_193/0.7)] focus-ring aria-disabled:opacity-35 aria-disabled:hover:shadow-[inset_0_0_0_1px_rgb(188_166_142/0.3)]'
+  // Under a finger the target reaches past the circle that is drawn, to 44px
+  'relative grid size-8 place-items-center rounded-full pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5 pointer-coarse:after:content-[\'\'] bg-black/30 text-bh-highlight shadow-[inset_0_0_0_1px_rgb(188_166_142/0.3)] transition-[box-shadow,opacity] duration-(--duration-base) ease-(--ease-glass) hover:shadow-[inset_0_0_0_1px_rgb(255_237_193/0.7)] focus-ring aria-disabled:opacity-35 aria-disabled:hover:shadow-[inset_0_0_0_1px_rgb(188_166_142/0.3)]'
 
 /**
  * The controls for a project's ring of cards, set just under its picture:
@@ -226,7 +227,7 @@ function Views({
                   tabIndex={j === card ? 0 : -1}
                   onFocus={onFocus}
                   onClick={() => onPick(j)}
-                  className="lens-dot grid size-6 place-items-center rounded-full focus-ring"
+                  className="lens-dot relative grid size-6 place-items-center rounded-full pointer-coarse:after:absolute pointer-coarse:after:-inset-y-2.5 pointer-coarse:after:inset-x-0 pointer-coarse:after:content-[''] focus-ring"
                 >
                   <i aria-hidden="true" className="block size-1.5 rounded-full bg-bh-highlight" />
                 </button>
@@ -481,7 +482,7 @@ function Stage() {
           )}
           style={{ top: `max(4.75rem, ${((top - slack) * 100).toFixed(2)}%)`, bottom: `${((1 - bottom - slack) * 100).toFixed(2)}%` }}
         />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-14 lg:pb-10">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-[calc(max(1.75rem,env(safe-area-inset-bottom))+var(--bar-gap))] sm:px-8 lg:px-14 lg:pb-10">
           <h2 id="work-projects-title" className="sr-only">
             {WORK_INTRO.title}
           </h2>

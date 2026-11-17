@@ -42,7 +42,7 @@ export function IsoArt({ boxes, floatDelay = 0, className }: { boxes: readonly I
   return (
     <svg
       viewBox={`${(cx - W / 2).toFixed(1)} ${(cy - H / 2).toFixed(1)} ${W} ${H}`}
-      className={cn('h-44 w-auto max-w-none shrink-0 overflow-visible sm:h-48', className)}
+      className={cn('h-[6.75rem] w-auto max-w-none shrink-0 overflow-visible sm:h-48', className)}
       fill="none"
       strokeLinejoin="round"
       strokeLinecap="round"
@@ -52,7 +52,7 @@ export function IsoArt({ boxes, floatDelay = 0, className }: { boxes: readonly I
         s.accent ? (
           <g
             key={i}
-            className="transition-[translate] duration-(--duration-slow) ease-(--ease-glass) group-hover/cell:-translate-y-2"
+            className="transition-[translate] duration-(--duration-slow) ease-(--ease-glass) group-hover/cell:-translate-y-2 group-data-[lit=true]/cell:-translate-y-2"
           >
             <g
               className="animate-float"

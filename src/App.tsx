@@ -7,6 +7,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ScrollRail } from '@/components/layout/ScrollRail'
 import { CursorCircle } from '@/components/effects/CursorCircle'
+import { TouchRipple } from '@/components/effects/TouchRipple'
 import { HeroCentered } from '@/sections/HeroCentered'
 import { Build } from '@/sections/Build'
 import { Statement } from '@/sections/Statement'
@@ -28,6 +29,7 @@ export default function App() {
       <Nav />
       <ScrollRail />
       <CursorCircle />
+      <TouchRipple />
       <main>
         <HeroCentered key={held ? 'held' : 'live'} />
         <Build />

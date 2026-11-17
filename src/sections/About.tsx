@@ -27,11 +27,11 @@ export function About() {
         <BentoPanel>
           {/* How I work */}
           {ABOUT.traits.map((t, i) => (
-            <BentoCell key={t.title} index={i} className="hover:bg-periwinkle-300/[0.035] lg:col-span-3">
+            <BentoCell key={t.title} index={i} className="hover:bg-periwinkle-300/[0.035] data-[lit=true]:bg-periwinkle-300/[0.035] lg:col-span-3">
               <p className={label} aria-hidden="true">
                 {String(i + 1).padStart(2, '0')}
               </p>
-              <RevealText as="h3" className="mt-8 text-[1.05rem] font-medium tracking-[-0.01em] text-ink" text={t.title} delay={0.15 + i * 0.07} />
+              <RevealText as="h3" className="mt-4 text-[1.05rem] sm:mt-8 font-medium tracking-[-0.01em] text-ink" text={t.title} delay={0.15 + i * 0.07} />
               <RevealText as="p" className="mt-2 text-[0.9rem] leading-[1.6] text-pretty text-ink-muted" text={t.body} delay={0.3 + i * 0.07} />
             </BentoCell>
           ))}

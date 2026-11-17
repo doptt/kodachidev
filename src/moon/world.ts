@@ -21,6 +21,8 @@ const QUALITY: Record<TierName, { samples: number; shadow: number; segments: num
   high: { samples: 4, shadow: 2048, segments: 384, bloom: 6, rocks: 1100, facets: 2 },
   medium: { samples: 4, shadow: 2048, segments: 256, bloom: 5, rocks: 700, facets: 2 },
   low: { samples: 2, shadow: 2048, segments: 256, bloom: 4, rocks: 420, facets: 1 },
+  // Phones only: no multisampling (the picture is already drawn smaller than the screen and scaled up), a smaller shadow map
+  lite: { samples: 0, shadow: 1024, segments: 192, bloom: 4, rocks: 300, facets: 1 },
 }
 
 /** Only what is brighter than this blooms: sunlit ground and the alien's clothes stay crisp. */
@@ -51,7 +53,7 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
   const pinData = opts.pins.slice(0, MAX_PINS)
   let quality = QUALITY[ctx.tier]
   // Phones get the smaller maps whatever their tier
-  const small = ctx.tier === 'low' || window.matchMedia('(pointer: coarse)').matches
+  const small = ctx.tier === 'low' || ctx.tier === 'lite' || window.matchMedia('(pointer: coarse)').matches
   // The canvas fills the window. The size of the world is fixed from its shape now (see radiusFor).
   const radius = radiusFor(window.innerWidth / Math.max(1, window.innerHeight), ALIEN_HEIGHT)
 

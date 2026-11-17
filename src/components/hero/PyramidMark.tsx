@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/cn'
+import { followTouch } from '@/motion/touch'
 import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
 type Vec = [number, number, number]
@@ -314,8 +315,17 @@ export function PyramidMark({ size = 140, className }: { size?: number; classNam
       canvas.style.cursor = 'grab'
     }
 
+    let offTouch = () => {}
     if (!reduced) {
       window.addEventListener('pointermove', onMove, { passive: true })
+      // On a phone it leans toward the finger, and sits back up when the finger lifts
+      offTouch = followTouch(
+        (x, y) => {
+          target.x = (x / window.innerWidth - 0.5) * 2
+          target.y = (y / window.innerHeight - 0.5) * 2
+        },
+        () => (target.x = target.y = 0),
+      )
       canvas.style.cursor = 'grab'
       canvas.addEventListener('pointerdown', onDown)
       canvas.addEventListener('pointermove', onDrag)
@@ -328,6 +338,7 @@ export function PyramidMark({ size = 140, className }: { size?: number; classNam
       cancelAnimationFrame(raf)
       io.disconnect()
       window.removeEventListener('pointermove', onMove)
+      offTouch()
       canvas.removeEventListener('pointerdown', onDown)
       canvas.removeEventListener('pointermove', onDrag)
       canvas.removeEventListener('pointerup', onUp)

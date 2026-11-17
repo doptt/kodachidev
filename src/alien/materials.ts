@@ -11,7 +11,7 @@ import { makeBeerTextures, makeShadowBlob, makeWebbing } from './textures'
 export type PropMaterials = ReturnType<typeof makePropMaterials>
 
 export function makePropMaterials(env: THREE.Texture, tier: TierName) {
-  const low = tier === 'low' || tier === 'medium'
+  const low = tier === 'low' || tier === 'medium' || tier === 'lite'
   const webbingMaps = makeWebbing(low ? 128 : 256)
   const beerMaps = makeBeerTextures(low ? 256 : 512, BEER)
   const blob = makeShadowBlob()

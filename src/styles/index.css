@@ -776,6 +776,13 @@ html[data-bh-entered] [data-bh-stage]::after {
 }
 
 :root {
+  /*
+   * How much of the tallest window the browser's own bars are covering just now. Nothing on a
+   * desktop, where the window is one height. On a phone the pinned stages are as tall as the window
+   * with its bars away (lvh), so whatever is set along their bottom edge is lifted by this much
+   * while the bars are showing, and comes back down as they slide off.
+   */
+  --bar-gap: calc(100lvh - 100dvh);
   /* Fine monochrome grain, inline so nothing is fetched */
   --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.4 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
@@ -901,4 +908,50 @@ html.hide-native-cursor * {
 }
 .cursor-circle[data-hover='true'][data-pressed='true'] {
   transform: scale(1.35);
+}
+
+/*
+ * The ring that opens under a finger (TouchRipple.tsx): the cursor circle's
+ * look, in the page's colour at that point of the scroll.
+ */
+.touch-ripple {
+  --ripple: color-mix(in oklab, rgb(183 188 255), var(--color-bh-highlight) calc(var(--bh-theme) * 100%));
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--ripple) 14%, transparent), color-mix(in oklab, var(--ripple) 5%, transparent) 70%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--ripple) 55%, transparent),
+    0 0 22px -4px color-mix(in oklab, var(--ripple) 45%, transparent);
+  will-change: transform, opacity;
+}
+
+/*
+ * The hero's three cards as a row to swipe (phones only: from 640px they are a
+ * grid). No scrollbar: the next card showing at the edge says there is more.
+ */
+.hero-cards {
+  scrollbar-width: none;
+}
+.hero-cards::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Where nothing can hover, a press does what the pointer resting there does on
+ * a desktop: the raised glass cards light their rim, and anything pressed
+ * gives a little under the finger.
+ */
+@media (hover: none) {
+  .glass.glass-dark.glass-raised:active {
+    box-shadow:
+      inset 0 1px 0 0 rgb(220 222 255 / 0.07),
+      inset 0 0 0 1px rgb(142 150 255 / 0.25),
+      inset 0 0 36px -18px rgb(142 150 255 / 0.14),
+      0 0 32px -4px rgb(142 150 255 / 0.3),
+      0 2px 8px 0 rgb(0 0 0 / 0.55),
+      0 22px 42px -6px rgb(0 0 0 / 0.8),
+      0 50px 100px -10px rgb(0 0 0 / 0.9);
+  }
+  .moon-card-action:active,
+  .lens-dot:active > i {
+    opacity: 0.7;
+  }
 }
