@@ -56,19 +56,6 @@ export function Build() {
           ))}
         </BentoPanel>
       </Reveal>
-
-      <Reveal delay={0.1}>
-        <p className="mt-8 text-[0.95rem] text-ink-muted">
-          Not sure what you need? That’s fine,{' '}
-          <a
-            href="#contact"
-            className="text-ink underline decoration-ink-faint/60 underline-offset-[5px] transition-colors duration-(--duration-base) hover:decoration-periwinkle-300 focus-ring"
-          >
-            we can figure it out together
-          </a>
-          .
-        </p>
-      </Reveal>
     </Section>
   )
 }
