@@ -8,11 +8,9 @@ const CHAIN = 0.5 // how quickly each circle catches the one ahead of it
 const GROW = 0.14 // how quickly the trail swells in and out as the pointer enters and leaves
 
 /**
- * Punches a tapering tail that follows the pointer through `el`, by writing a
- * CSS mask: a full layer with every circle of the tail subtracted from it.
- * Whatever is behind `el` shows through the hole. If `fill` is given, it gets
- * the opposite mask, so it shows only inside the tail: whatever it holds
- * takes the place of what the hole removed.
+ * Cuts a tapering tail that follows the pointer out of `el`, by writing a CSS
+ * mask. Everything outside the tail is masked away, so the element only shows
+ * where the tail is.
  *
  * The head chases the pointer and every point after it chases the one in
  * front, so a quick stroke leaves a tail that draws back into the head once
@@ -24,14 +22,9 @@ const GROW = 0.14 // how quickly the trail swells in and out as the pointer ente
  * Runs only while the element is on screen and the pointer is a mouse or pen.
  * Under reduced motion it is a single circle that sits on the pointer.
  */
-export function useTrailHole(
-  ref: RefObject<HTMLElement | null>,
-  fillRef: RefObject<HTMLElement | null> | null,
-  { enabled, reduced }: { enabled: boolean; reduced: boolean },
-) {
+export function useInkTrail(ref: RefObject<HTMLElement | null>, { enabled, reduced }: { enabled: boolean; reduced: boolean }) {
   useEffect(() => {
     const el = ref.current
-    const fill = fillRef?.current ?? null
     if (!el || !enabled) return
 
     const count = reduced ? 1 : POINTS
@@ -44,14 +37,8 @@ export function useTrailHole(
     let wasEmpty = true
 
     const hide = () => {
-      el.style.maskImage = ''
-      el.style.webkitMaskImage = ''
-      el.style.maskComposite = ''
-      el.style.webkitMaskComposite = ''
-      if (fill) {
-        fill.style.maskImage = 'linear-gradient(transparent, transparent)'
-        fill.style.webkitMaskImage = fill.style.maskImage
-      }
+      el.style.maskImage = 'linear-gradient(transparent, transparent)'
+      el.style.webkitMaskImage = el.style.maskImage
     }
     hide()
 
@@ -62,9 +49,13 @@ export function useTrailHole(
       const size = parseFloat(getComputedStyle(el).fontSize) || 100
       const head = size * HEAD
 
-      // Over the element (its box already reaches a little past the words)
+      // Over the words, give or take the head's own size
       const over =
-        pointer.seen && pointer.x > rect.left && pointer.x < rect.right && pointer.y > rect.top && pointer.y < rect.bottom
+        pointer.seen &&
+        pointer.x > rect.left - head &&
+        pointer.x < rect.right + head &&
+        pointer.y > rect.top - head &&
+        pointer.y < rect.bottom + head
 
       const ease = (k: number) => (reduced ? 1 : 1 - Math.pow(1 - k, dt))
       grow += ((over ? 1 : 0) - grow) * ease(GROW)
@@ -89,27 +80,12 @@ export function useTrailHole(
         }
       } else {
         wasEmpty = false
-        const circles = stamps(pts, head * grow)
-        const draw = (dx: number, dy: number) =>
-          circles.map(
-            ({ x, y, r }) =>
-              `radial-gradient(circle ${r.toFixed(1)}px at ${(x + dx).toFixed(1)}px ${(y + dy).toFixed(1)}px, #000 calc(100% - 1.5px), transparent)`,
-          )
-        if (fill) {
-          // The same circles, moved into the fill's own coordinates
-          const f = fill.getBoundingClientRect()
-          fill.style.maskImage = draw(rect.left - f.left, rect.top - f.top).join(',')
-          fill.style.webkitMaskImage = fill.style.maskImage
-        }
-        const layers = draw(0, 0)
-        // The circles come first and are each cut out of the solid layer at the bottom
-        layers.push('linear-gradient(#000, #000)')
+        const layers = stamps(pts, head * grow).map(
+          ({ x, y, r }) =>
+            `radial-gradient(circle ${r.toFixed(1)}px at ${x.toFixed(1)}px ${y.toFixed(1)}px, #000 calc(100% - 1.5px), transparent)`,
+        )
         el.style.maskImage = layers.join(',')
         el.style.webkitMaskImage = el.style.maskImage
-        el.style.maskComposite = layers.map((_, i) => (i === layers.length - 1 ? 'add' : 'subtract')).join(',')
-        el.style.webkitMaskComposite = layers
-          .map((_, i) => (i === layers.length - 1 ? 'source-over' : 'destination-out'))
-          .join(',')
       }
       raf = requestAnimationFrame(tick)
     }
@@ -162,13 +138,10 @@ export function useTrailHole(
       io.disconnect()
       window.removeEventListener('pointermove', onMove)
       document.documentElement.removeEventListener('pointerleave', onLeave)
-      hide()
-      if (fill) {
-        fill.style.maskImage = ''
-        fill.style.webkitMaskImage = ''
-      }
+      el.style.maskImage = ''
+      el.style.webkitMaskImage = ''
     }
-  }, [ref, fillRef, enabled, reduced])
+  }, [ref, enabled, reduced])
 }
 
 type Pt = { x: number; y: number }
