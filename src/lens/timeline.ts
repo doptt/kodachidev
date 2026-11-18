@@ -51,6 +51,59 @@ const smootherstep = (x: number) => {
 }
 const rad = (deg: number) => (deg * Math.PI) / 180
 
+/**
+ * A finger's scroll, as opposed to a wheel's. A wheel turns in small notches,
+ * and the stretches above are sized for that; a flick of a finger throws the
+ * page several screens, which ran straight through two or three projects. So
+ * under a finger the stage is paged: one swipe, however hard, is one project.
+ *
+ * It works because the stage is pinned and the move between projects is played
+ * in time: nothing on screen says where the page really is. While a swipe and
+ * its momentum last, the scene is told the page is at rest on a project (its
+ * `homeAt`), one on from where the swipe began once the page has moved
+ * `SWIPE_STEP`; when the page has come to rest it is quietly put there. The
+ * way in (the first picture rising) and the way out (the fall) still follow
+ * the finger, as they follow the wheel.
+ *
+ * All in screens of pinned scroll, like the stretches above.
+ */
+
+/** Where the page rests while project `index` is up: just inside its stretch. */
+export function homeAt(index: number) {
+  return INTRO + (index + 0.08) * PER_PROJECT
+}
+
+/** How far a swipe has to carry the page before the sky sets off for the next project. */
+export const SWIPE_STEP = 0.16
+/** This close to either end of the stretch the page is on its way out of it, and is followed as it is. */
+const SWIPE_FREE = [0.2, 0.3] as const
+
+/** What a swipe began on: -1 the way in, `count` the way out, otherwise the project that was up. */
+export function swipeBase(x: number, count: number) {
+  if (x < INTRO) return -1
+  if (x >= INTRO + count * PER_PROJECT) return count
+  return Math.round(lensTimeline(x / span(count), count).phase)
+}
+
+/**
+ * Where the scene is told the page is, for a swipe that began on `base` with
+ * the page at `from` and has carried it to `x`.
+ */
+export function swipeTarget(base: number, from: number, x: number, count: number) {
+  const last = count - 1
+  if (x < SWIPE_FREE[0] || x > span(count) - SWIPE_FREE[1]) return x
+  // Coming in: the first picture rises with the finger, and stops when it is up
+  if (base < 0) return Math.min(x, homeAt(0))
+  // Going out, or coming back up out of the fall: the last picture is as far back as this swipe goes
+  if (base > last) return Math.max(x, homeAt(last))
+  const moved = x - from
+  if (moved > SWIPE_STEP) return base < last ? homeAt(base + 1) : Math.max(x, homeAt(last))
+  // On from the last project is the fall, which follows the finger from the start
+  if (base === last && moved > 0) return Math.max(x, homeAt(last))
+  if (moved < -SWIPE_STEP) return base > 0 ? homeAt(base - 1) : Math.min(x, homeAt(0))
+  return homeAt(base)
+}
+
 /** Scroll length of the pinned stretch for `count` projects, in viewport heights. */
 export function span(count: number) {
   return INTRO + count * PER_PROJECT + OUTRO
@@ -329,7 +382,10 @@ export function composition(aspect: number, edge: number): Composition {
   // 0 for portrait phones, 1 for wide desktops
   const wide = smoothstep(0.7, 1.5, aspect)
   const tanHalfFov = mix(0.78, 0.6, wide)
-  const horizon = mix(-0.13, -0.27, wide)
+  // Phones held upright: the whole picture stands higher, so the words have the dark under the horizon
+  // to themselves, clear of its glow. Gone by the time the screen is as wide as it is tall and a half.
+  const tall = 1 - smoothstep(0.5, 0.68, aspect)
+  const horizon = mix(-0.13, -0.27, wide) + 0.095 * tall
   // The top of the shadow is `edge - PI/2` above level; pitch the camera so it lands on `horizon`
   const pitch = edge - Math.PI / 2 - Math.atan(horizon * tanHalfFov)
   // Picture height as a share of the screen height, and never wider than the screen allows

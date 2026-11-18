@@ -111,20 +111,22 @@ function Words({
   onPick: (card: number) => void
 }) {
   return (
-    <li className={cn('lens-caption col-start-1 row-start-1 grid items-end gap-x-10 gap-y-3 lg:grid-cols-12', shown && 'is-shown')}>
+    <li className={cn('lens-caption col-start-1 row-start-1 grid items-end gap-x-10 gap-y-2.5 sm:gap-y-3 lg:grid-cols-12', shown && 'is-shown')}>
       <div className="lg:col-span-5">
         <p className={meta}>
           {index + 1} of {projects.length}
           <span className="mx-2 text-bh-ember" aria-hidden="true">
             /
           </span>
-          {project.kind}, {project.year}
+          {project.kind}
+          {/* Phones: one line, so the words start lower, clear of the horizon's glow */}
+          <span className="max-sm:hidden">, {project.year}</span>
         </p>
-        <h3 className="mt-2 font-hero text-[clamp(2.3rem,1.5rem+3.2vw,4.4rem)] leading-[0.95] tracking-[-0.03em] text-bh-highlight">
+        <h3 className="mt-2 font-hero text-[clamp(2.3rem,1.5rem+3.2vw,4.4rem)] max-sm:text-[2.05rem] leading-[0.95] tracking-[-0.03em] text-bh-highlight">
           {project.name}
         </h3>
       </div>
-      <p className="max-w-[34rem] text-[0.92rem] leading-[1.6] text-pretty text-[#c9bda6] lg:col-span-4 lg:pb-1">
+      <p className="max-w-[34rem] text-[0.92rem] leading-[1.6] text-pretty text-[#c9bda6] max-sm:text-[0.875rem] max-sm:leading-[1.5] lg:col-span-4 lg:pb-1">
         {project.summary}
         <span className="sr-only"> Pictured: {project.imageAlt}.</span>
       </p>
@@ -136,7 +138,7 @@ function Words({
             </li>
           ))}
         </ul>
-        <div className="mt-2">
+        <div className="mt-2 max-sm:mt-0.5">
           {/* Only the project that is up can be clicked: the others are stacked, unseen, in the same place */}
           <VisitLink project={project} onFocus={onFocus} className={shown ? 'pointer-events-auto' : undefined} />
         </div>
@@ -477,12 +479,14 @@ function Stage() {
           data-lens-swipe
           aria-hidden="true"
           className={cn(
-            'absolute inset-x-0 cursor-grab touch-pan-y select-none data-dragging:cursor-grabbing',
+            // Under a finger the band runs to the bottom of the screen: a swipe that starts on the horizon
+            // or over the words turns the ring as well as one that starts on the picture
+            'absolute inset-x-0 cursor-grab touch-pan-y select-none data-dragging:cursor-grabbing pointer-coarse:bottom-0!',
             !(words.shown && views[words.index].length > 1) && 'pointer-events-none',
           )}
           style={{ top: `max(4.75rem, ${((top - slack) * 100).toFixed(2)}%)`, bottom: `${((1 - bottom - slack) * 100).toFixed(2)}%` }}
         />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-[calc(max(1.75rem,env(safe-area-inset-bottom))+var(--bar-gap))] sm:px-8 lg:px-14 lg:pb-10">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-[calc(max(0.75rem,env(safe-area-inset-bottom))+var(--bar-gap))] sm:px-8 sm:pb-[calc(max(1.75rem,env(safe-area-inset-bottom))+var(--bar-gap))] lg:px-14 lg:pb-10">
           <h2 id="work-projects-title" className="sr-only">
             {WORK_INTRO.title}
           </h2>

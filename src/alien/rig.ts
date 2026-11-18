@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { createKTX2Loader } from '../stage/ktx2'
+import { trouble } from '../stage/trouble'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 
 /**
@@ -113,9 +114,11 @@ export async function loadRig(renderer: THREE.WebGLRenderer, base: string, onPro
     loader.setKTX2Loader(ktx2)
   }
   try {
-    const gltf = await loader.loadAsync(`${base}${manifest.file ?? 'alien.glb'}`, (event) => {
+    const loading = loader.loadAsync(`${base}${manifest.file ?? 'alien.glb'}`, (event) => {
       if (event.lengthComputable) onProgress?.(event.loaded, event.total)
     })
+    // If the transcoder cannot run, his textures never arrive: give up on him at once, not never
+    const gltf = await (ktx2 ? Promise.race([loading, (ktx2 as KTX2Loader & { broken: Promise<never> }).broken]) : loading)
     const object = gltf.scene
     object.updateMatrixWorld(true)
 
@@ -141,7 +144,8 @@ export async function loadRig(renderer: THREE.WebGLRenderer, base: string, onPro
     geometryToModel.premultiply(new THREE.Matrix4().copy(object.matrixWorld).invert())
 
     return { object, mesh: skinned, bones, rest, clips: new Map(gltf.animations.map((clip) => [clip.name, clip])), manifest, geometryToModel }
-  } catch {
+  } catch (err) {
+    trouble('alien', err)
     return null
   } finally {
     ktx2?.dispose()

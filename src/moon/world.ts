@@ -13,9 +13,19 @@ import { buildPins, type Pins3d } from './pins3d'
 import { Post } from './post'
 import { buildRocks, type Rocks } from './rocks'
 import type { MoonSceneOptions } from './scene'
+import { trouble } from '../stage/trouble'
 import { cameraAxes, cameraPose, moonTimeline, radiusFor, screenDirection, smoothstep } from './timeline'
 
 /** What each quality tier gets. Texture sizes are chosen once, when the scene is made; the rest can step down while it runs. */
+/**
+ * How long the scene may go without getting any nearer to ready before it is
+ * given up on, milliseconds. Long enough for one large file on a slow phone
+ * connection; short enough that a visitor is not left looking at black. When
+ * it runs out the section becomes the flat picture with the contact details
+ * listed (sections/Contact.tsx), which is better than a moon that never comes.
+ */
+const STALLED = 40000
+
 const QUALITY: Record<TierName, { samples: number; shadow: number; segments: number; bloom: number; rocks: number; facets: number }> = {
   ultra: { samples: 4, shadow: 4096, segments: 384, bloom: 6, rocks: 1100, facets: 2 },
   high: { samples: 4, shadow: 2048, segments: 384, bloom: 6, rocks: 1100, facets: 2 },
@@ -68,9 +78,14 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
   let uploads: THREE.Texture[] = []
   let disposed = false
 
+  // When the scene last got nearer to ready, and what it was doing then
+  let movedAt = performance.now()
+  let was: Phase = phase
+
   loadAssets(renderer, { moon: small ? '2k' : '4k', site: small ? '1k' : '2k', craters: small ? '512' : '1k', earth: small ? '1k' : '2k', sky: small ? 512 : 1024 }, (done, total) => {
     // The files are most of the wait; the actor and the shaders are the rest
     state.loaded = (done / total) * 0.8
+    movedAt = performance.now()
     state.emit()
   }).then(
     (loaded) => {
@@ -79,7 +94,7 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
       phase = 'building'
     },
     (err) => {
-      if (import.meta.env.DEV) console.error('[moon] could not load', err)
+      trouble('moon: files', err)
       phase = 'failed'
     },
   )
@@ -93,7 +108,9 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
   const sun = new THREE.DirectionalLight(SUN_LIGHT.color, SUN_LIGHT.intensity)
   sun.position.copy(sunDir).multiplyScalar(40)
   sun.castShadow = true
-  sun.shadow.mapSize.setScalar(quality.shadow)
+  // Phones: a shadow map a quarter the size whatever the tier. On a small screen it is not seen, and it is 12 MB less to hold.
+  const shadowSize = (wanted: number) => (small ? Math.min(wanted, 1024) : wanted)
+  sun.shadow.mapSize.setScalar(shadowSize(quality.shadow))
   // The shadow map takes in the whole moon and what stands on it
   const reach = radius + 1.6
   Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, near: 40 - reach, far: 40 + reach })
@@ -197,7 +214,7 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
       },
       (err) => {
         // The moon and its pins are still worth showing without him
-        if (import.meta.env.DEV) console.error('[moon] the actor could not be made', err)
+        trouble('moon: actor', err)
         phase = 'uploading'
       },
     )
@@ -354,6 +371,15 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
   return {
     prepare() {
       if (phase === 'ready' || phase === 'failed') return phase
+      const now = performance.now()
+      if (phase !== was) {
+        was = phase
+        movedAt = now
+      } else if (now - movedAt > STALLED) {
+        trouble('moon', `stalled while ${phase}`)
+        phase = 'failed'
+        return phase
+      }
       if (phase === 'building' && assets) {
         phase = 'actor'
         build(assets)
@@ -373,7 +399,13 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
           const pending = [renderer.compileAsync(scene, camera), renderer.compileAsync(earth!.scene, farCamera), renderer.compileAsync(buffers, camera)]
           renderer.setRenderTarget(null)
           pending.push(renderer.compileAsync(passes.screen, camera))
-          void Promise.all(pending).then(() => (compiled = true))
+          void Promise.all(pending).then(
+            () => (compiled = true),
+            (err) => {
+              trouble('moon: shaders', err)
+              phase = 'failed'
+            },
+          )
           hold()
           phase = 'compiling'
         }
@@ -403,8 +435,8 @@ export async function buildWorld(ctx: StageContext, opts: MoonSceneOptions): Pro
     setTier(tier) {
       quality = QUALITY[tier]
       post?.setSamples(quality.samples)
-      if (sun.shadow.mapSize.x !== quality.shadow) {
-        sun.shadow.mapSize.setScalar(quality.shadow)
+      if (sun.shadow.mapSize.x !== shadowSize(quality.shadow)) {
+        sun.shadow.mapSize.setScalar(shadowSize(quality.shadow))
         sun.shadow.map?.dispose()
         sun.shadow.map = null
       }

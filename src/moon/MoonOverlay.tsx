@@ -40,6 +40,21 @@ const arrow = (
  * instead of standing over its pin (moon.css).
  */
 /**
+ * What stands in the dark while the scene comes in: the line, and how much of
+ * it has arrived, so that on a slow connection it is plainly still coming.
+ */
+function Landing({ state }: { state: MoonState }) {
+  const [percent, setPercent] = useState(() => Math.round(state.loaded * 100))
+  useEffect(() => state.subscribe((s) => setPercent(Math.round(s.loaded * 100))), [state])
+  return (
+    <p className="moon-loading" role="status">
+      Coming in to land
+      {percent > 0 && percent < 100 && <span aria-hidden="true"> · {percent}%</span>}
+    </p>
+  )
+}
+
+/**
  * The badge over a pin: the mark of the place the pin leads to. Decoration,
  * like the pin itself; the label and its link are what is read out.
  * (The GitHub and Discord marks are those companies' own, used to point at
@@ -327,11 +342,7 @@ export function MoonOverlay({
 
       <p className="moon-hint">{still ? 'Each pin is a way to reach me.' : 'Drag to look round. Each pin is a way to reach me.'}</p>
 
-      {!live && (
-        <p className="moon-loading" role="status">
-          Coming in to land
-        </p>
-      )}
+      {!live && <Landing state={state} />}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { startDriver } from '@/blackhole/driver'
 import { StarField } from '@/blackhole/StarField'
 import { NoiseBackground } from '@/components/effects/NoiseBackground'
 import { WORK_INTRO } from '@/content/projects'
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { useCoarsePointer, usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { AboutSpace } from './AboutSpace'
 
@@ -95,6 +95,7 @@ export function WorkIntro({ onEntered, onExited, onProgress }: WorkIntroProps) {
   const reduced = usePrefersReducedMotion()
   const [near, setNear] = useState(false)
   const [mode, setMode] = useState<Mode>('pending')
+  const letGo = useRef(false)
 
   // Scroll → progress, theme and dim, published to CSS and to `blackHole`
   useEffect(() => {
@@ -120,12 +121,35 @@ export function WorkIntro({ onEntered, onExited, onProgress }: WorkIntroProps) {
     io.observe(section)
     const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
     const idle = window.requestIdleCallback ?? ((fn: () => void) => window.setTimeout(fn, 1))
-    const timer = saveData ? 0 : window.setTimeout(() => idle(() => setNear(true)), 3500)
+    // Once it has been let go (below), only coming back near brings it up again
+    const timer = saveData || letGo.current ? 0 : window.setTimeout(() => idle(() => setNear(true)), 3500)
     return () => {
       io.disconnect()
       window.clearTimeout(timer)
     }
   }, [near])
+
+  // Phones: once the black hole is well behind the visitor its canvas is taken down, and with it a
+  // WebGL context and its render targets. A phone has little graphics memory, and the moon further on
+  // needs what there is; holding a finished scene as well is what gets a context taken away. It is put
+  // back up when the page comes back within a few screens (the observer above).
+  const coarse = useCoarsePointer()
+  useEffect(() => {
+    const section = sectionRef.current
+    if (!section || !near || !coarse) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1]
+        if (entry.isIntersecting || entry.boundingClientRect.bottom > 0) return
+        letGo.current = true
+        setNear(false)
+        setMode((m) => (m === 'live' ? 'pending' : m))
+      },
+      { rootMargin: '300% 0px' },
+    )
+    io.observe(section)
+    return () => io.disconnect()
+  }, [near, coarse])
 
   // Hand-off hooks
   const hooks = useRef({ onEntered, onExited, onProgress })

@@ -804,3 +804,39 @@ test('rings: held, the ring is where the pointer put it; let go, it settles; the
   rings.release(2, 40200)
   assert.equal(rings.read(2, 43000), 0)
 })
+
+// ------------------------------------------------------- paging under a finger ----
+
+test('a swipe is one project, however far it throws the page', async () => {
+  const { homeAt, swipeBase, swipeTarget, SWIPE_STEP, INTRO, PER_PROJECT } = await import('../src/lens/timeline.ts')
+  const count = 4
+  const total = span(count)
+  const shown = (x) => lensTimeline(x / total, count).phase
+  // Resting on a project is that project
+  for (let k = 0; k < count; k++) {
+    assert.equal(shown(homeAt(k)), k)
+    assert.equal(swipeBase(homeAt(k), count), k)
+  }
+  // From the first: a nudge leaves it; a swipe goes one on; a throw of three screens still goes one on
+  const from = homeAt(0)
+  assert.equal(swipeTarget(0, from, from + SWIPE_STEP * 0.9, count), homeAt(0))
+  assert.equal(swipeTarget(0, from, from + SWIPE_STEP * 1.1, count), homeAt(1))
+  assert.equal(swipeTarget(0, from, from + 3, count), homeAt(1))
+  // And back the same way
+  assert.equal(swipeTarget(2, homeAt(2), homeAt(2) - 2.4, count), homeAt(1))
+  // A second swipe before the first has died away starts from where the first was headed
+  assert.equal(swipeTarget(1, from + 1.7, from + 1.7 + 0.5, count), homeAt(2))
+  // Coming in from above, a throw stops on the first project
+  assert.equal(swipeBase(0.1, count), -1)
+  assert.equal(swipeTarget(-1, 0, 0.5, count), 0.5)
+  assert.equal(swipeTarget(-1, 0, 3.6, count), homeAt(0))
+  // On from the last is the fall, which follows the finger
+  const end = INTRO + count * PER_PROJECT
+  assert.equal(swipeTarget(3, homeAt(3), end + 0.3, count), end + 0.3)
+  // Back up out of the fall stops on the last project
+  assert.equal(swipeBase(end + 0.2, count), count)
+  assert.equal(swipeTarget(count, end + 0.4, homeAt(1), count), homeAt(3))
+  // Thrown right out of the stage, either way, the scene follows the page out
+  assert.equal(swipeTarget(0, from, total - 0.1, count), total - 0.1)
+  assert.equal(swipeTarget(2, homeAt(2), 0.05, count), 0.05)
+})

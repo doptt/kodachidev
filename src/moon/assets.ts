@@ -69,14 +69,17 @@ export async function loadAssets(renderer: THREE.WebGLRenderer, sizes: AssetSize
     )
 
   try {
-    const [color, normal, detail, craters, site, earth, stars] = await Promise.all([
-      count(map(`moon-color-${sizes.moon}`, 'round')),
-      count(map('moon-normal-2k', 'round')),
-      count(map('moon-detail', 'tile')),
-      count(map(`moon-craters-${sizes.craters}`, 'tile')),
-      count(map(`site-${sizes.site}`, 'none')),
-      count(map(`earth-${sizes.earth}`, 'round')),
-      count(sky),
+    const [color, normal, detail, craters, site, earth, stars] = await Promise.race([
+      ktx2.broken,
+      Promise.all([
+        count(map(`moon-color-${sizes.moon}`, 'round')),
+        count(map('moon-normal-2k', 'round')),
+        count(map('moon-detail', 'tile')),
+        count(map(`moon-craters-${sizes.craters}`, 'tile')),
+        count(map(`site-${sizes.site}`, 'none')),
+        count(map(`earth-${sizes.earth}`, 'round')),
+        count(sky),
+      ]),
     ])
     return {
       color,

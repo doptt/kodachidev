@@ -1,4 +1,5 @@
 import { followTouch } from '@/motion/touch'
+import { trouble } from './trouble'
 import { Governor, TIERS, isTier, pickTier, tierOrder, type TierName } from '@/blackhole/quality'
 import type { SceneFactory, StageContext, StageFrame, StageScene } from './types'
 
@@ -95,7 +96,7 @@ function start(entry: Entry) {
         wake()
       },
       (err) => {
-        if (import.meta.env.DEV) console.error(`[stage] ${entry.id} failed to start`, err)
+        trouble(`stage: ${entry.id}`, err)
         if (entry.epoch === epoch) setStatus(entry, 'failed')
       },
     )
@@ -268,6 +269,7 @@ const onLost = (e: Event) => {
   e.preventDefault()
   lost = true
   sleep()
+  trouble('stage', 'the WebGL context was lost')
   // The GPU objects went with the context: forget the scenes without touching GL
   for (const entry of entries.values()) drop(entry, false)
   emit()

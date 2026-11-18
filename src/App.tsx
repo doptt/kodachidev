@@ -8,12 +8,16 @@ import { Footer } from '@/components/layout/Footer'
 import { ScrollRail } from '@/components/layout/ScrollRail'
 import { CursorCircle } from '@/components/effects/CursorCircle'
 import { TouchRipple } from '@/components/effects/TouchRipple'
+import { DebugReadout } from '@/components/dev/DebugReadout'
 import { HeroCentered } from '@/sections/HeroCentered'
 import { Build } from '@/sections/Build'
 import { Statement } from '@/sections/Statement'
 import { Work } from '@/sections/Work'
 import { About } from '@/sections/About'
 import { Contact } from '@/sections/Contact'
+
+/** `?debug` puts a readout of what the graphics are doing on the page (see DebugReadout). */
+const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug')
 
 export default function App() {
   const reduced = usePrefersReducedMotion()
@@ -39,6 +43,7 @@ export default function App() {
         <Contact />
       </main>
       <Footer />
+      {debug && <DebugReadout />}
     </>
   )
 }
