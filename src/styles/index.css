@@ -10,6 +10,8 @@
   --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
   --font-hero: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
   --font-nav: 'Montserrat Variable', ui-sans-serif, system-ui, sans-serif;
+  /* The navigation bar and its phone menu */
+  --font-bar: 'Sora Variable', ui-sans-serif, system-ui, sans-serif;
 
   --text-display-lg: clamp(2.25rem, 1rem + 4vw, 4rem);
   --text-display-lg--line-height: 1.02;

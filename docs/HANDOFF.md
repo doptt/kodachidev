@@ -242,7 +242,7 @@ Everything at his spot, as one actor the moon scene places (`types.ts` is the ag
 
 `src/styles/index.css`: the `@theme` block is the design tokens (type, colours, radii, shadows, easing); then the glass recipe (`.glass`, `.glass-blur`, `.glass-tint`, `.glass-dark`); then the CSS of the black hole sequence, the big glowing text, the nav's colour change, the lensed sky's captions, the sound switch; then utilities for the hero's gradient text. `.on-dark` recolours a section for the black page by overriding the theme's colour variables inside it. The moon's CSS is its own file, `src/moon/moon.css`.
 
-Fonts: Outfit for display (`font-hero`), Geist for text, Geist Mono for small labels, Montserrat in the nav, Bricolage Grotesque for the nav's monogram.
+Fonts: Outfit for display (`font-hero`), Geist for text, Geist Mono for small labels, Sora in the navigation bar, Montserrat for the footer's site name and the black hole's button, Bricolage Grotesque for the nav's monogram.
 
 ## Fallbacks and accessibility
 

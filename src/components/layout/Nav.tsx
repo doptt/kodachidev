@@ -170,7 +170,7 @@ export function Nav() {
             <span className="grid items-center md:contents">
               <span
                 className={cn(
-                  'col-start-1 row-start-1 font-nav text-[0.95rem] font-light tracking-tight transition-[opacity,max-width,transform] duration-(--duration-base) ease-(--ease-glass)',
+                  'col-start-1 row-start-1 font-bar text-[0.95rem] font-light tracking-tight transition-[opacity,max-width,transform] duration-(--duration-base) ease-(--ease-glass)',
                   condensed ? 'md:max-w-0 md:-translate-x-1 md:opacity-0 overflow-hidden' : 'max-w-40 opacity-100',
                   placed && 'max-md:-translate-y-1.5 max-md:opacity-0',
                 )}
@@ -196,7 +196,7 @@ export function Nav() {
                 <a
                   href={l.href}
                   className={cn(
-                    'nav-link inline-flex min-h-11 items-center rounded-pill font-nav text-[0.9rem] font-light text-ink-soft transition-[color,padding,text-shadow] duration-(--duration-base) ease-(--ease-glass) hover:text-ink focus-ring',
+                    'nav-link inline-flex min-h-11 items-center rounded-pill font-bar text-[0.9rem] font-light text-ink-soft transition-[color,padding,text-shadow] duration-(--duration-base) ease-(--ease-glass) hover:text-ink focus-ring',
                     condensed ? 'px-2.5' : 'px-3.5',
                   )}
                 >
@@ -211,7 +211,7 @@ export function Nav() {
             <a
               href="#contact"
               className={cn(
-                'nav-cta hidden min-h-10 items-center rounded-pill font-nav font-light text-navy-950 transition-[padding,background-color,transform,box-shadow] duration-(--duration-base) ease-(--ease-glass) active:scale-[0.98] md:inline-flex focus-ring',
+                'nav-cta hidden min-h-10 items-center rounded-pill font-bar font-light text-navy-950 transition-[padding,background-color,transform,box-shadow] duration-(--duration-base) ease-(--ease-glass) active:scale-[0.98] md:inline-flex focus-ring',
                 condensed ? 'px-3.5 text-[0.85rem]' : 'px-4 text-[0.9rem]',
               )}
             >
@@ -291,7 +291,7 @@ export function Nav() {
                     ref={i === 0 ? firstLinkRef : undefined}
                     href={l.href}
                     onClick={() => setOpen(false)}
-                    className="flex min-h-14 items-center rounded-glass-sm px-3 font-nav text-[2rem] font-light tracking-tight text-ink focus-ring"
+                    className="flex min-h-14 items-center rounded-glass-sm px-3 font-bar text-[2rem] font-light tracking-tight text-ink focus-ring"
                   >
                     {l.label}
                   </a>
@@ -302,7 +302,7 @@ export function Nav() {
               <a
                 href="#contact"
                 onClick={() => setOpen(false)}
-                className="nav-cta inline-flex min-h-12 items-center justify-center rounded-pill px-6 font-nav font-light text-navy-950 focus-ring"
+                className="nav-cta inline-flex min-h-12 items-center justify-center rounded-pill px-6 font-bar font-light text-navy-950 focus-ring"
               >
                 Get in touch
               </a>
