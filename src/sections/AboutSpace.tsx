@@ -5,7 +5,7 @@ import { StarField } from '@/blackhole/StarField'
 import { RevealText } from '@/components/effects/RevealText'
 import { ScrambleText } from '@/components/effects/ScrambleText'
 import { Reveal } from '@/components/ui/Reveal'
-import { useInkTrail } from '@/components/effects/useInkTrail'
+import { useTrailHole } from '@/components/effects/useTrailHole'
 import { useCoarsePointer, usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
 /** The headline, split the way it is set: a small lead-in, then two enormous words. */
@@ -36,7 +36,7 @@ function Letter({
   index: number
   count: number
   progress: MotionValue<number>
-  /** Just the black letter, for the layer the cursor trail reveals */
+  /** Just the black letter, for the copy that fills the cursor tail */
   ink?: boolean
 }) {
   const from = (index / count) * 0.55
@@ -77,10 +77,11 @@ function Letter({
  */
 export function AboutSpace() {
   const headline = useRef<HTMLHeadingElement>(null)
+  const lit = useRef<HTMLSpanElement>(null)
   const ink = useRef<HTMLSpanElement>(null)
   const reduced = usePrefersReducedMotion()
   const coarse = useCoarsePointer()
-  useInkTrail(ink, { enabled: !coarse, reduced })
+  useTrailHole(lit, ink, { enabled: !coarse, reduced })
   // 0 as the headline comes in at the bottom of the screen, 1 once it is a third of the way up
   const { scrollYProgress } = useScroll({ target: headline, offset: ['start 0.98', 'start 0.34'] })
   const drift = useTransform(scrollYProgress, [0, 1], ['3%', '0%'])
@@ -107,15 +108,18 @@ export function AboutSpace() {
           >
             {/* The wide, soft light the words throw into the dark around them */}
             <motion.span className="bigtext-aura" style={reduced ? undefined : { opacity: scrollYProgress }} />
-            {reduced ? (
-              <span className="bigtext-static relative">{BIG}</span>
-            ) : (
-              BIG.split('').map((char, i) => <Letter key={i} char={char} index={i} count={BIG.length} progress={scrollYProgress} />)
-            )}
-            {/* The same words in black, laid exactly over the lit ones. Only the
-                cursor trail shows it, so the pointer reads as a hole in the light. */}
+            {/* The lit words. The cursor tail punches a hole through them, glow and
+                all, and the black copy below fills the letters back in, so the
+                pointer leaves solid black letters with no light around them. */}
+            <span ref={lit} className="bigtext-lit" data-cursor="hide">
+              {reduced ? (
+                <span className="bigtext-static relative">{BIG}</span>
+              ) : (
+                BIG.split('').map((char, i) => <Letter key={i} char={char} index={i} count={BIG.length} progress={scrollYProgress} />)
+              )}
+            </span>
             {!coarse && (
-              <span ref={ink} className="bigtext-ink" data-cursor="hide">
+              <span ref={ink} className="bigtext-ink" aria-hidden="true">
                 {reduced ? (
                   <span className="relative">{BIG}</span>
                 ) : (
