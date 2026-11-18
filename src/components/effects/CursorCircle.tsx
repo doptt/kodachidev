@@ -61,8 +61,9 @@ export function CursorCircle() {
         pos.x = mouse.x
         pos.y = mouse.y
       }
-      outer.style.opacity = '1'
       const target = e.target as Element | null
+      // Things that draw their own cursor (the black tail over the About headline) ask for the circle to step aside
+      outer.style.opacity = target?.closest('[data-cursor="hide"]') ? '0' : '1'
       inner.dataset.hover = target?.closest(INTERACTIVE) ? 'true' : 'false'
     }
     const onLeave = () => {

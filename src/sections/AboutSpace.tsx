@@ -115,7 +115,7 @@ export function AboutSpace() {
             {/* The same words in black, laid exactly over the lit ones. Only the
                 cursor trail shows it, so the pointer reads as a hole in the light. */}
             {!coarse && (
-              <span ref={ink} className="bigtext-ink">
+              <span ref={ink} className="bigtext-ink" data-cursor="hide">
                 {reduced ? (
                   <span className="relative">{BIG}</span>
                 ) : (
