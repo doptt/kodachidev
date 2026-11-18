@@ -223,6 +223,32 @@ vec3 meteor(vec3 dir, float foot, float period, float seed) {
   return mix(CREAM, vec3(1.0), body) * (body * body * across * life * life * 5.0);
 }
 
+// How strongly the cards beside the middle one bend away: the curvature, 1 / radius, of the bend,
+// in units of the card's distance from the viewer, for a card fully to one side.
+const float CARD_CURVE = 3.0;
+
+// Where direction `d` meets a card whose outer half (the side `side`, +1 right, -1 left, of its
+// middle `c`) bends away from the viewer round its own vertical (`u`), on a circle of curvature
+// `k`. The inner half stays flat. Returns the position on the card as on a flat one: x the
+// distance along it, round the bend, y the height.
+vec2 onCurvedCard(vec3 d, vec3 c, vec3 r, vec3 u, float k, float side) {
+  float a = dot(d, r) * side;
+  float b = dot(d, u);
+  float z = dot(d, c);
+  if (a <= 0.0) return vec2(a * side, b) / z;
+  float R = 1.0 / k;
+  float m = 1.0 + R; // depth of the bend's axis, behind the card
+  // |t (a, z) - (0, m)| = R, the near crossing. A ray that misses it is far off the card.
+  float dd = a * a + z * z;
+  float dc = z * m;
+  float disc = dc * dc - dd * (m * m - R * R);
+  if (disc < 0.0) return vec2(1e3);
+  float t = (dc - sqrt(disc)) / dd;
+  // Up to where the bend begins, the card is still flat
+  if (t * a < 0.0) return vec2(a * side, b) / z;
+  return vec2(R * atan(t * a, m - t * z) * side, t * b);
+}
+
 void main() {
   vec3 d = normalize(uCam * vec3((vUv * 2.0 - 1.0) * uTan, 1.0));
   // Angle from straight down
@@ -303,10 +329,21 @@ void main() {
     vec3 c = uSrcCentre[n];
     float z = dot(sky, c);
     if (z < 0.02) continue;
-    // Position on the picture's own plane: x across, y up
-    vec2 p = vec2(dot(sky, uSrcRight[n]), dot(sky, uSrcUp[n])) / z;
-    vec2 px = vec2(dot(skyDx, uSrcRight[n]), dot(skyDx, uSrcUp[n])) / z - p * dot(skyDx, c) / z;
-    vec2 py = vec2(dot(skyDy, uSrcRight[n]), dot(skyDy, uSrcUp[n])) / z - p * dot(skyDy, c) / z;
+    // Position on the picture: x across, y up. The middle card is flat; the ones beside it are flat
+    // on the side nearest the middle and bend away off the edge of the screen, more the further out
+    // they sit.
+    float k = CARD_CURVE * uSrcShape[n].y;
+    vec2 p, px, py;
+    if (k < 1e-3) {
+      p = vec2(dot(sky, uSrcRight[n]), dot(sky, uSrcUp[n])) / z;
+      px = vec2(dot(skyDx, uSrcRight[n]), dot(skyDx, uSrcUp[n])) / z - p * dot(skyDx, c) / z;
+      py = vec2(dot(skyDy, uSrcRight[n]), dot(skyDy, uSrcUp[n])) / z - p * dot(skyDy, c) / z;
+    } else {
+      float side = dot(c, uCam[0]) < 0.0 ? -1.0 : 1.0;
+      p = onCurvedCard(sky, c, uSrcRight[n], uSrcUp[n], k, side);
+      px = onCurvedCard(sky + skyDx, c, uSrcRight[n], uSrcUp[n], k, side) - p;
+      py = onCurvedCard(sky + skyDy, c, uSrcRight[n], uSrcUp[n], k, side) - p;
+    }
 
     // Rounded rectangle
     vec2 size = uHalf * uSrcShape[n].x;
@@ -327,11 +364,12 @@ void main() {
     if (layer >= 0.0) shot = textureGrad(uShots, vec3(uv, layer), px * scale, py * scale).rgb;
     else shot = textureGrad(uMore, vec3(uv, -1.0 - layer), px * scale, py * scale).rgb;
 
-    // A hairline of light round the picture. Squeezed into a ring it becomes the bright line of the ring.
+    // A hairline of light round the picture, only once the lens squeezes it into a ring, where it
+    // becomes the bright line of the ring. A picture hanging in the open sky has no outline.
     float line = 0.012 * size.y;
     float rim = exp(-pow((sd + line) / max(line, soft), 2.0)) * min(1.0, line / soft);
 
-    vec3 lit = shot * (1.0 + 1.5 * bent) + CREAM * rim * (0.55 + 3.2 * bent);
+    vec3 lit = shot * (1.0 + 1.5 * bent) + CREAM * rim * 3.2 * bent;
     // Toward the side of the screen a card goes dark first and only then thin, so the stars do not show through its picture
     float sideways = mix(1.0, aside, uSrcShape[n].y);
     col = mix(col, lit * (uFade * uSrcShape[n].z * sideways), inside * gain * smoothstep(0.0, 0.45, sideways));
