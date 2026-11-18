@@ -5,7 +5,8 @@ import { StarField } from '@/blackhole/StarField'
 import { RevealText } from '@/components/effects/RevealText'
 import { ScrambleText } from '@/components/effects/ScrambleText'
 import { Reveal } from '@/components/ui/Reveal'
-import { usePrefersReducedMotion } from '@/hooks/useMediaQuery'
+import { useInkTrail } from '@/components/effects/useInkTrail'
+import { useCoarsePointer, usePrefersReducedMotion } from '@/hooks/useMediaQuery'
 
 /** The headline, split the way it is set: a small lead-in, then two enormous words. */
 const LEAD_IN = 'A bit'
@@ -24,12 +25,34 @@ const label = 'font-mono text-[0.72rem] tracking-[0.08em] text-bh-glow'
  * changes. Animating the blur or the glow itself would mean repainting letters
  * a third of a screen tall, with their shadows, on every frame.
  */
-function Letter({ char, index, count, progress }: { char: string; index: number; count: number; progress: MotionValue<number> }) {
+function Letter({
+  char,
+  index,
+  count,
+  progress,
+  ink = false,
+}: {
+  char: string
+  index: number
+  count: number
+  progress: MotionValue<number>
+  /** Just the black letter, for the layer the cursor trail reveals */
+  ink?: boolean
+}) {
   const from = (index / count) * 0.55
   const lit = useTransform(progress, [from, from + 0.4], [0, 1])
   const sharp = useTransform(lit, [0, 0.35, 1], [0, 0.25, 1])
   const ghost = useTransform(lit, [0, 0.5, 1], [0.16, 0.5, 0])
   const glyph = char === ' ' ? NBSP : char
+  if (ink) {
+    return (
+      <span className="relative inline-block">
+        <motion.span className="bigtext-sharp" style={{ opacity: sharp }}>
+          {glyph}
+        </motion.span>
+      </span>
+    )
+  }
   return (
     <span className="relative inline-block">
       <motion.span className="bigtext-ghost" style={{ opacity: ghost }}>
@@ -54,7 +77,10 @@ function Letter({ char, index, count, progress }: { char: string; index: number;
  */
 export function AboutSpace() {
   const headline = useRef<HTMLHeadingElement>(null)
+  const ink = useRef<HTMLSpanElement>(null)
   const reduced = usePrefersReducedMotion()
+  const coarse = useCoarsePointer()
+  useInkTrail(ink, { enabled: !coarse, reduced })
   // 0 as the headline comes in at the bottom of the screen, 1 once it is a third of the way up
   const { scrollYProgress } = useScroll({ target: headline, offset: ['start 0.98', 'start 0.34'] })
   const drift = useTransform(scrollYProgress, [0, 1], ['3%', '0%'])
@@ -85,6 +111,19 @@ export function AboutSpace() {
               <span className="bigtext-static relative">{BIG}</span>
             ) : (
               BIG.split('').map((char, i) => <Letter key={i} char={char} index={i} count={BIG.length} progress={scrollYProgress} />)
+            )}
+            {/* The same words in black, laid exactly over the lit ones. Only the
+                cursor trail shows it, so the pointer reads as a hole in the light. */}
+            {!coarse && (
+              <span ref={ink} className="bigtext-ink">
+                {reduced ? (
+                  <span className="relative">{BIG}</span>
+                ) : (
+                  BIG.split('').map((char, i) => (
+                    <Letter key={i} ink char={char} index={i} count={BIG.length} progress={scrollYProgress} />
+                  ))
+                )}
+              </span>
             )}
           </motion.span>
         </h2>

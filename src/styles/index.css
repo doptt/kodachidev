@@ -466,6 +466,17 @@ html[data-bh-reduced] .bh-stars-stage {
   will-change: opacity;
   background: radial-gradient(closest-side, rgb(214 190 150 / 0.2), rgb(188 166 142 / 0.09) 55%, transparent);
 }
+/* The black copy of the words that the cursor trail reveals (useInkTrail sets its mask) */
+.bigtext-ink {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #000;
+  pointer-events: none;
+  mask-image: linear-gradient(transparent, transparent);
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+}
 /* The numbers beside the bio: the same light, turned down */
 .bigtext-number {
   color: #fff8ea;
