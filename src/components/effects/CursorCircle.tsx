@@ -96,7 +96,7 @@ export function CursorCircle() {
   return (
     <div
       ref={outerRef}
-      data-bh-vars="dim"
+      data-bh-vars="theme dim"
       aria-hidden="true"
       className="pointer-events-none fixed left-0 top-0 z-[100] opacity-0 transition-opacity duration-300 will-change-transform"
       style={{ width: SIZE, height: SIZE }}
