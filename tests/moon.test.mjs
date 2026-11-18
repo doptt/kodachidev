@@ -540,3 +540,13 @@ test('every pin stands on ground that is in view, clear of the alien, of the foo
     }
   }
 })
+
+test('the texture worker in public/ is the one the script makes from the installed three, and compiles no text', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { build } = await import('../assets-src/scripts/ktx2-worker.mjs')
+  const made = await build()
+  const have = readFileSync(new URL('../public/basis/ktx2-worker.js', import.meta.url), 'utf8')
+  assert.equal(have, made, 'run node assets-src/scripts/ktx2-worker.mjs')
+  // Nothing the page's Content-Security-Policy forbids: no code from strings, no blob import
+  assert.ok(!/\bnew Function\b|newFunc\(Function|\beval\(|importScripts\(/.test(have))
+})
