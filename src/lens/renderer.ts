@@ -18,7 +18,7 @@ import {
 } from '@/blackhole/gl'
 import type { Quality } from '@/blackhole/quality'
 import { LENS_FLOOR, TABLE_SIZE, deflectionTable, shadowAngle, skyAngle } from './geodesic'
-import { MAX_CARDS, cards, ringLayout } from './ring'
+import { ARC_DROP, MAX_CARDS, cards, ringLayout } from './ring'
 import { R_HOVER, THETA_STEP, cameraPitch, composition, horizonGlow, sources, type LensFrame } from './timeline'
 
 /** How far the pointer swings the camera, radians. */
@@ -601,13 +601,23 @@ export class LensRenderer {
     const layers = new Float32Array(MAX_CARDS * 2)
     const shapes = new Float32Array(MAX_CARDS * 3)
     shown.forEach((card, n) => {
-      const ct = Math.cos(card.theta)
-      const st = Math.sin(card.theta)
+      // The cards beside the middle one hang on an arc that falls away to either side, the way the
+      // horizon does: lower the further round they are, and tipped to lie along it.
+      const theta = card.theta + ARC_DROP * card.turn * card.turn
+      const slope = 2 * ARC_DROP * card.turn // d theta / d turn
+      const ct = Math.cos(theta)
+      const st = Math.sin(theta)
       const ca = Math.cos(card.turn)
       const sa = Math.sin(card.turn)
-      centres.set([st * sa, ct, st * ca], n * 3)
-      ups.set([-ct * sa, st, -ct * ca], n * 3)
-      rights.set([ca, 0, -sa], n * 3)
+      const c = [st * sa, ct, st * ca]
+      // Across: along the arc, the way the middle moves as the card turns. Up: square to that, on the sky.
+      const along = [ct * slope * sa + st * ca, -st * slope, ct * slope * ca - st * sa]
+      const len = Math.hypot(along[0], along[1], along[2])
+      const r = along.map((v) => v / len)
+      const u = [c[1] * r[2] - c[2] * r[1], c[2] * r[0] - c[0] * r[2], c[0] * r[1] - c[1] * r[0]]
+      centres.set(c, n * 3)
+      ups.set(u, n * 3)
+      rights.set(r, n * 3)
       // The first picture of each project is a layer of one stack; the further views are in the other, counted from -1 down
       const layer = card.view === 0 ? card.project : -1 - (this.viewFirst[card.project] + card.view - 1)
       layers.set([layer, card.gain * this.arrived(card.project, card.view, input.alive)], n * 2)

@@ -21,6 +21,13 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t
 
 // ------------------------------------------------------------ where the cards are ----
 
+/**
+ * The cards do not sit level: they hang on an arc that falls away to either
+ * side like the horizon below them. A card `turn` radians round from straight
+ * ahead hangs this much times turn² lower on the sky, radians, tipped to lie
+ * along the arc. The middle one is level.
+ */
+export const ARC_DROP = 0.1
 /** A card beside the middle one is this much of its size. */
 export const SIDE_SCALE = 0.9
 /** How bright a card is one place from the middle, and two. It is dimmed, not thinned: the sky does not show through it. */
