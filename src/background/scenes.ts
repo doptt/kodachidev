@@ -26,16 +26,10 @@ export type BgScene = {
   contrast: number
   /** Tiny hue rotation in radians (keep within ±0.12). */
   hueShift: number
-  /**
-   * How far the paint is held to a glow along the bottom of the screen, under a black sky that keeps
-   * only the stars. 0 = the field fills the screen, 1 = the horizon. Inside the glow the darks go to
-   * black and the colour is pushed.
-   */
-  horizon: number
 }
 
 export const SCENES: Record<string, BgScene> = {
-  /** A black, starry sky with the field glowing up from the bottom of the screen: the only look with a horizon. */
+  /** Calm and brightest. Faithful to the source still; soft light, delicate stars. */
   hero: {
     waveAmp: 0.022,
     warpScale: 2.2,
@@ -47,7 +41,6 @@ export const SCENES: Record<string, BgScene> = {
     darkness: 0.1,
     contrast: 1.0,
     hueShift: 0,
-    horizon: 1,
   },
   /** A touch closer, waves breathe a bit more, warm-ish light from the top right. */
   build: {
@@ -61,7 +54,6 @@ export const SCENES: Record<string, BgScene> = {
     darkness: 0.3,
     contrast: 1.08,
     hueShift: 0.03,
-    horizon: 0,
   },
   /** Interlude: dark and quiet so the bright statement panel carries the screen. */
   statement: {
@@ -75,7 +67,6 @@ export const SCENES: Record<string, BgScene> = {
     darkness: 0.52,
     contrast: 1.04,
     hueShift: 0,
-    horizon: 0,
   },
   /** The centrepiece: pronounced ridges, stronger sliding light, more stars. */
   work: {
@@ -89,7 +80,6 @@ export const SCENES: Record<string, BgScene> = {
     darkness: 0.26,
     contrast: 1.12,
     hueShift: -0.02,
-    horizon: 0,
   },
   /**
    * On the way into the black hole: the field slows, widens and darkens as it
@@ -106,7 +96,6 @@ export const SCENES: Record<string, BgScene> = {
     darkness: 0.6,
     contrast: 1.02,
     hueShift: 0.02,
-    horizon: 0,
   },
   /** Wider, quieter; light from the left; a hint more violet. */
   about: {
@@ -120,7 +109,6 @@ export const SCENES: Record<string, BgScene> = {
     darkness: 0.4,
     contrast: 1.05,
     hueShift: 0.06,
-    horizon: 0,
   },
   /** Darker and calmest, almost still water, few stars. */
   contact: {
@@ -134,7 +122,6 @@ export const SCENES: Record<string, BgScene> = {
     darkness: 0.6,
     contrast: 0.98,
     hueShift: 0.02,
-    horizon: 0,
   },
 }
 
