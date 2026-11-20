@@ -74,13 +74,14 @@ export function HeroCentered() {
 
   return (
     <section id="top" data-bg-scene="hero" aria-labelledby="hero-title" className="relative">
-      {/* Scrim behind the centered column so type stays legible over bright ridges */}
+      {/* Scrim behind the centered column. The sky behind it is black already (the hero's horizon, see background/scenes.ts): this
+          keeps the type legible while the field floods back in as the hero scrolls away. Black, so it adds no navy cast to the sky. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0"
         style={{
           background:
-            'radial-gradient(60% 70% at 50% 42%, rgb(5 6 26 / 0.74) 0%, rgb(5 6 26 / 0.42) 50%, rgb(5 6 26 / 0) 100%)',
+            'radial-gradient(60% 70% at 50% 42%, rgb(0 0 0 / 0.74) 0%, rgb(0 0 0 / 0.42) 50%, rgb(0 0 0 / 0) 100%)',
         }}
       />
       <div className="relative min-h-svh">

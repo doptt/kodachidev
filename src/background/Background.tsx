@@ -104,10 +104,32 @@ export default function Background({ scene, still, className }: BackgroundProps)
   const field = useSceneStatus('field')
   const mode = useStill || field === 'failed' ? 'still' : field === 'ready' ? 'live' : 'loading'
 
+  // The hero's horizon over the still: it belongs to the top of the page, so it lifts as the hero scrolls
+  // away, as the live field's does. Once the field is live the canvas covers all this and nothing need follow.
+  const horizonRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (mode === 'live') return
+    const sync = () => {
+      const el = horizonRef.current
+      if (el) el.style.opacity = String(Math.max(0, 1 - window.scrollY / ((window.innerHeight || 1) * 0.75)))
+    }
+    sync()
+    window.addEventListener('scroll', sync, { passive: true })
+    window.addEventListener('resize', sync)
+    return () => {
+      window.removeEventListener('scroll', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [mode])
+
   return (
     <div className={className} style={rootStyle} aria-hidden="true" data-bg-mode={mode} data-bh-vars="theme dim">
       <img src={stillSrc} alt="" decoding="async" fetchPriority="high" style={imgStyle} draggable={false} />
       <div style={stillShadeStyle} />
+      {/* The still's own horizon: a black sky, and the picture again, brightened, showing only along the bottom */}
+      <div ref={horizonRef} style={horizonStyle}>
+        <img src={stillSrc} alt="" decoding="async" style={horizonGlowStyle} draggable={false} />
+      </div>
       {/* Fades the still to black as the black hole sequence arrives (see .bh-veil). The field does the same for itself. */}
       <div className="bh-veil" style={veilStyle} />
       <canvas ref={canvasRef} data-stage style={{ ...canvasStyle, opacity: visible ? 1 : 0 }} />
@@ -168,6 +190,23 @@ const stillShadeStyle: CSSProperties = {
   inset: 0,
   background:
     'radial-gradient(ellipse 85% 80% at 50% 50%, rgba(5,6,26,0.10) 0%, rgba(5,6,26,0.28) 60%, rgba(5,6,26,0.55) 100%)',
+}
+
+// The hero's horizon for the still, after the shader's (see `uHorizon` in bg.frag.glsl): black above, the
+// picture with its darks crushed and its blues pushed along the bottom, standing higher toward the corners.
+const HORIZON_MASK = 'radial-gradient(ellipse 110% 100% at 50% 0%, transparent 55%, rgb(0 0 0 / 0.25) 70%, rgb(0 0 0 / 0.53) 80%, #000 100%)'
+
+const horizonStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: '#000',
+}
+
+const horizonGlowStyle: CSSProperties = {
+  ...imgStyle,
+  filter: 'brightness(1.75) contrast(1.3) saturate(0.85) hue-rotate(5deg)',
+  maskImage: HORIZON_MASK,
+  WebkitMaskImage: HORIZON_MASK,
 }
 
 const veilStyle: CSSProperties = {

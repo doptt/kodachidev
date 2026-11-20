@@ -20,13 +20,14 @@ export type FrameUniforms = {
   darkness: number
   contrast: number
   hue: number
+  horizon: number
   ripple: number
 }
 
 const UNIFORM_NAMES = [
   'uTex', 'uBloom', 'uBloomOn', 'uRes', 'uTexSize', 'uCells', 'uTime', 'uFlow', 'uCam', 'uCamRot', 'uZoom', 'uParallax',
   'uTexAspect', 'uWaveAmp', 'uWarpScale', 'uLightAngle', 'uLightStr', 'uStars', 'uDarkness',
-  'uContrast', 'uHue', 'uRipple', 'uVeil',
+  'uContrast', 'uHue', 'uHorizon', 'uRipple', 'uVeil',
 ] as const
 
 /** The field texture is a quilt of this many cells; the hero still is the top-left cell. */
@@ -211,6 +212,7 @@ export class BackgroundRenderer {
     gl.uniform1f(l.uDarkness!, u.darkness)
     gl.uniform1f(l.uContrast!, u.contrast)
     gl.uniform1f(l.uHue!, u.hue)
+    gl.uniform1f(l.uHorizon!, u.horizon)
     gl.uniform1f(l.uRipple!, u.ripple)
     gl.uniform1f(l.uVeil!, veil)
     gl.drawArrays(gl.TRIANGLES, 0, 3)

@@ -162,6 +162,7 @@ export class BackgroundController {
       darkness: this.scene.darkness,
       contrast: this.scene.contrast,
       hue: this.scene.hueShift,
+      horizon: this.scene.horizon,
       ripple: this.ripple,
     }
   }

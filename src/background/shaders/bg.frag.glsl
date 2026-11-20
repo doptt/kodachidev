@@ -33,6 +33,7 @@ uniform float uStars;      // star density multiplier
 uniform float uDarkness;   // 0..1
 uniform float uContrast;   // ~1
 uniform float uHue;        // tiny hue rotation (radians)
+uniform float uHorizon;    // 0..1: the paint held to a glow along the bottom, under a black sky
 uniform float uRipple;     // 0..1 scroll-velocity ripple
 uniform float uVeil;       // 0..1 fade to black, as the page goes dark for the black hole
 
@@ -91,6 +92,16 @@ float fbm3(vec2 p) {
 }
 
 // ---- helpers ---------------------------------------------------------------
+
+// Brightness as the eye takes this blue-heavy picture, for the horizon's levels.
+float tone(vec3 c) {
+  return dot(c, vec3(0.30, 0.25, 0.45));
+}
+
+vec3 saturate3(vec3 c, float s) {
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  return max(mix(vec3(l), c, s), 0.0);
+}
 
 vec2 rot(vec2 p, float a) {
   float s = sin(a), c = cos(a);
@@ -319,9 +330,37 @@ void main() {
 
   // Grading: tiny hue shift, darkness toward navy, soft vignette.
   col = hueRotate(col, uHue);
-  col = mix(col, NAVY * 0.6, uDarkness * 0.85);
+
+  // The horizon, which is the hero's look. The paint is held to a glow that rises from the
+  // bottom of the screen, higher toward the corners, and everything above it is a black sky
+  // that keeps only the stars. Inside the glow the darks are taken down to black and the blues
+  // pushed, so that it reads as light coming up rather than as a picture cut off. Its edge is
+  // drawn in the flowing coordinates and carries a slow swell, so it drifts with the paint.
+  vec2 hc = c * vec2(viewAspect, 1.0);
+  float swell = sin(uTime * 0.19 + hc.x * 2.4) * 0.014 + sin(uTime * 0.13 - hc.x * 1.3 + 1.7) * 0.010;
+  // A tall screen has no corners to speak of for the glow to climb, and sees only the middle of the
+  // field, which is mostly dark along the bottom: there the horizon stands higher (and see `well`).
+  float narrow = smoothstep(1.4, 0.7, viewAspect);
+  float arc = hc.y + 0.50 - narrow * 0.14 - hc.x * hc.x * 0.16 + fbm3(p * 2.2 + vec2(9.0 + uFlow * 0.012, 9.0)) * 0.07 + swell;
+  float rise = smoothstep(0.62, -0.02, arc);
+  rise *= rise;
+  // Brightened, the paint's own blue reads as cobalt: a few degrees toward violet keeps it the
+  // indigo it looks at its usual level, and the indigo of the headline and buttons over it.
+  vec3 lit = hueRotate(saturate3(col, 1.22), 0.10);
+  lit *= smoothstep(0.07, 0.28, tone(lit)) * 1.55;
+  // Light of its own, welling up under the paint in slow drifts, so that the glow holds where the
+  // paint happens to be dark. A tall screen leans on it far more than a wide one does.
+  float drift = 0.6 + fbm3(pStatic * 1.6 + vec2(uFlow * 0.018, -uFlow * 0.012)) * 1.2
+              + fbm3(pStatic * 4.3 + vec2(-uFlow * 0.014, uFlow * 0.02)) * 0.5;
+  float well = pow(smoothstep(0.46, -0.04, arc), 1.6) * max(drift, 0.0);
+  lit += vec3(0.20, 0.23, 0.80) * well * mix(0.10, 1.0, narrow);
+  vec3 sky = stars * 0.85 + DEEP_BLUE * exp(-max(arc, 0.0) / 0.05) * 0.09;
+  col = mix(col, lit * rise + sky * (1.0 - rise), uHorizon);
+
+  // Under the horizon the darkness goes to true black and the vignette stands down: the sky is black already
+  col = mix(col, NAVY * 0.6 * (1.0 - uHorizon), uDarkness * 0.85);
   float vig = smoothstep(1.35, 0.3, length(c * vec2(1.0, 1.15)));
-  col *= mix(0.74, 1.0, vig);
+  col *= mix(mix(0.74, 1.0, vig), 1.0, uHorizon);
 
   // Triangular-distributed dither (two hashes) so the dark gradients never band.
   vec2 dp = gl_FragCoord.xy + fract(uTime) * 61.7;
