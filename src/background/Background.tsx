@@ -193,7 +193,7 @@ const stillShadeStyle: CSSProperties = {
 }
 
 // The hero's horizon for the still, after the shader's (see `uHorizon` in bg.frag.glsl): black above, the
-// picture turned violet, with its darks crushed, along the bottom, standing higher toward the corners.
+// picture with its darks crushed and its blues pushed along the bottom, standing higher toward the corners.
 const HORIZON_MASK = 'radial-gradient(ellipse 110% 100% at 50% 0%, transparent 55%, rgb(0 0 0 / 0.25) 70%, rgb(0 0 0 / 0.53) 80%, #000 100%)'
 
 const horizonStyle: CSSProperties = {
@@ -204,7 +204,7 @@ const horizonStyle: CSSProperties = {
 
 const horizonGlowStyle: CSSProperties = {
   ...imgStyle,
-  filter: 'brightness(1.85) contrast(1.3) saturate(0.95) hue-rotate(27deg)',
+  filter: 'brightness(1.75) contrast(1.3) saturate(0.85) hue-rotate(5deg)',
   maskImage: HORIZON_MASK,
   WebkitMaskImage: HORIZON_MASK,
 }

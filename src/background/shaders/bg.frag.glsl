@@ -43,9 +43,6 @@ const vec3 NAVY = vec3(0.020, 0.024, 0.102);        // #05061a
 const vec3 PERIWINKLE = vec3(0.557, 0.588, 1.0);    // #8e96ff
 const vec3 STAR_WHITE = vec3(0.90, 0.92, 1.0);
 const vec3 DEEP_BLUE = vec3(0.30, 0.38, 1.0);
-// The hero's horizon is purple: the field's blue turned this far toward violet, and the light under it
-const float HORIZON_HUE = 0.42;
-const vec3 HORIZON_VIOLET = vec3(0.46, 0.15, 1.0);
 
 // ---- hashing & noise -------------------------------------------------------
 
@@ -336,10 +333,9 @@ void main() {
 
   // The horizon, which is the hero's look. The paint is held to a glow that rises from the
   // bottom of the screen, higher toward the corners, and everything above it is a black sky
-  // that keeps only the stars. Inside the glow the darks are taken down to black and the paint
-  // is turned from its blue to violet and pushed, so that it reads as purple light coming up
-  // rather than as a picture cut off. Its edge is drawn in the flowing coordinates and carries
-  // a slow swell, so it drifts with the paint.
+  // that keeps only the stars. Inside the glow the darks are taken down to black and the blues
+  // pushed, so that it reads as light coming up rather than as a picture cut off. Its edge is
+  // drawn in the flowing coordinates and carries a slow swell, so it drifts with the paint.
   vec2 hc = c * vec2(viewAspect, 1.0);
   float swell = sin(uTime * 0.19 + hc.x * 2.4) * 0.014 + sin(uTime * 0.13 - hc.x * 1.3 + 1.7) * 0.010;
   // A tall screen has no corners to speak of for the glow to climb, and sees only the middle of the
@@ -348,15 +344,17 @@ void main() {
   float arc = hc.y + 0.50 - narrow * 0.14 - hc.x * hc.x * 0.16 + fbm3(p * 2.2 + vec2(9.0 + uFlow * 0.012, 9.0)) * 0.07 + swell;
   float rise = smoothstep(0.62, -0.02, arc);
   rise *= rise;
-  vec3 lit = saturate3(hueRotate(col, HORIZON_HUE), 1.4);
-  lit *= smoothstep(0.07, 0.28, tone(lit)) * 1.7;
+  // Brightened, the paint's own blue reads as cobalt: a few degrees toward violet keeps it the
+  // indigo it looks at its usual level, and the indigo of the headline and buttons over it.
+  vec3 lit = hueRotate(saturate3(col, 1.22), 0.10);
+  lit *= smoothstep(0.07, 0.28, tone(lit)) * 1.55;
   // Light of its own, welling up under the paint in slow drifts, so that the glow holds where the
   // paint happens to be dark. A tall screen leans on it far more than a wide one does.
   float drift = 0.6 + fbm3(pStatic * 1.6 + vec2(uFlow * 0.018, -uFlow * 0.012)) * 1.2
               + fbm3(pStatic * 4.3 + vec2(-uFlow * 0.014, uFlow * 0.02)) * 0.5;
   float well = pow(smoothstep(0.46, -0.04, arc), 1.6) * max(drift, 0.0);
-  lit += HORIZON_VIOLET * 0.85 * well * mix(0.10, 1.0, narrow);
-  vec3 sky = hueRotate(stars, HORIZON_HUE) * 0.85 + HORIZON_VIOLET * exp(-max(arc, 0.0) / 0.05) * 0.10;
+  lit += vec3(0.20, 0.23, 0.80) * well * mix(0.10, 1.0, narrow);
+  vec3 sky = stars * 0.85 + DEEP_BLUE * exp(-max(arc, 0.0) / 0.05) * 0.09;
   col = mix(col, lit * rise + sky * (1.0 - rise), uHorizon);
 
   // Under the horizon the darkness goes to true black and the vignette stands down: the sky is black already
